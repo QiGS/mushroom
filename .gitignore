@@ -1,0 +1,8 @@
+node_modules/
+dist/
+work/
+*.log
+.env*
+!.env.example
+/主角_3d.glb
+/img_v3_*.jpg

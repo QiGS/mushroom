@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#142c29" />
+    <meta name="description" content="菌野：一场关于森林、菌子与慢时光的 3D 探索旅程。" />
+    <title>菌野 · 美味菌子在哪里</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  </head>
+  <body>
+    <canvas id="world" aria-label="菌野 3D 森林探索场景" tabindex="0"></canvas>
+    <div id="vignette"></div>
+    <div id="loading"><div class="loading-mark">♧</div><span class="eyebrow">A LITTLE WILDER</span><h1>菌野</h1><p id="loading-text">让风穿过树林…</p><div class="loading-track"><i id="loading-progress"></i></div></div>
+    <section id="welcome" class="hidden">
+      <div class="title-wrap"><div class="eyebrow"><span class="tiny-line"></span> A LITTLE WILDER <span class="tiny-line"></span></div><h1>菌<span>野</span><small>风起的地方，万物生长。</small></h1><p class="intro">背上行囊，走进一片会呼吸的森林。<br>寻找雨后的菌子，也找回久违的慢时光。</p><button id="begin" class="gold-button">走进菌林 <span>↗</span></button><button id="continue" class="text-button hidden">继续上一次的旅程 <span>→</span></button><div class="welcome-foot">一段不必赶路的旅程 <span>✧</span> 耳机体验更佳</div></div>
+      <div class="scene-caption"><span>01 / THE WILDWOOD</span><strong>晨雾未散，林间正好。</strong><i></i></div>
+    </section>
+    <main id="hud" class="hidden">
+      <header class="top-bar"><div class="brand"><span class="brand-symbol">♧</span><div><b>菌野</b><small>A LITTLE WILDER</small></div></div><div id="compass" aria-label="指南针"><span>W</span><i>·</i><span>N</span><i>·</i><span>E</span><div id="compass-target">◆</div></div><div class="top-actions"><span id="save-status">已保存</span><button id="sound-toggle" aria-label="切换声音" title="声音"><i data-lucide="volume-2"></i></button><button id="settings-button" aria-label="设置" title="设置 / Esc"><i data-lucide="settings-2"></i></button></div></header>
+      <section class="status"><div id="hearts" aria-label="生命值">♥ ♥ ♥ ♥ ♥</div><div class="stamina"><span>体力</span><div><i id="stamina-fill"></i></div></div></section>
+      <section class="quest"><div class="quest-eyebrow"><span>◆</span><span id="quest-step"></span></div><h2 id="quest-title"></h2><p id="quest-detail"></p><button id="journal-button" class="quest-link">旅途手记 <span>L</span></button></section>
+      <div id="location-banner"><small>THE WILDWOOD</small><h2 id="location-name">晨光林地</h2><span>—— 风会记得每一个旅人 ——</span></div>
+      <div id="interaction" class="hidden"><span class="key">E</span><div><small id="interact-category"></small><strong id="interact-label"></strong></div><span class="interaction-arrow">↗</span></div>
+      <aside class="map-widget"><div class="map-heading"><span id="region-label">晨光林地</span><span id="weather-label">☀ 晴朗</span></div><button id="minimap-button" aria-label="打开森林地图"><canvas id="minimap" width="240" height="240"></canvas><span class="map-north">N</span><span class="map-expand"><i data-lucide="expand"></i></span></button><div class="map-time"><span id="day-label">第 1 天</span><strong id="time-label">08:30</strong><span>地图 <kbd>M</kbd></span></div></aside>
+      <footer class="bottom-bar"><div class="control-hints"><span><kbd>W A S D</kbd> 移动</span><span><kbd>Shift</kbd> 奔跑</span><span><kbd>Space</kbd> 跳跃</span><span class="mouse-hint"><i data-lucide="mouse"></i> 拖动环视</span></div><nav class="equipment"><button id="bag-button"><i data-lucide="backpack"></i><span>背篓</span><small id="bag-count">0 / 24</small><kbd>B</kbd></button><button id="guide-button"><i data-lucide="book-open"></i><span>菌物图鉴</span><kbd>G</kbd></button><button id="photo-button"><i data-lucide="camera"></i><span>留住此刻</span><kbd>P</kbd></button></nav></footer>
+      <div id="mobile-controls"><div id="joystick"><i></i></div><div class="touch-actions"><button id="touch-jump" aria-label="跳跃">↑</button><button id="touch-interact" aria-label="交互">E</button></div></div>
+    </main>
+    <div id="toasts" aria-live="polite"></div>
+    <div id="discovery" class="hidden"><span>NEW DISCOVERY</span><h2>新的林间相遇</h2><p></p></div>
+    <div id="modal-backdrop" class="hidden"><section id="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title"><header><div><span id="panel-kicker" class="eyebrow"></span><h2 id="panel-title"></h2></div><button id="close-panel" class="icon-button" aria-label="关闭面板">×</button></header><div id="panel-body"></div></section></div>
+    <div id="photo-ui" class="hidden"><div class="photo-corner tl"></div><div class="photo-corner tr"></div><div class="photo-corner bl"></div><div class="photo-corner br"></div><span class="photo-brand">菌野 / A LITTLE WILDER</span><div class="photo-actions"><span>拖动调整视角 · 滚轮调节距离</span><button id="take-photo" class="gold-button">保存照片</button><button id="exit-photo" class="text-button">返回旅程 <kbd>Esc</kbd></button></div></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
