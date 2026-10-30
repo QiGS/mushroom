@@ -7,7 +7,11 @@ permissions:
   contents: read
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,7 +21,16 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Check local game launcher
+        run: node scripts/check-launcher.mjs
+      - name: Build and check macOS portable package
+        if: runner.os == 'macOS'
+        run: |
+          python3 scripts/package-macos.py
+          mkdir -p work/package-check
+          unzip -q 菌野-macOS即玩版.zip -d work/package-check
+          node scripts/check-launcher.mjs work/package-check/Mushroom-macOS
       - uses: actions/upload-artifact@v4
         with:
-          name: mushroom-production
+          name: mushroom-production-${{ matrix.os }}
           path: dist

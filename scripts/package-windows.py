@@ -33,7 +33,7 @@ source = stage / 'source'
 source.mkdir()
 for folder in ['src', 'public', 'scripts', 'tests', 'docs', '.github']:
     shutil.copytree(project / folder, source / folder)
-for name in ['README.md', 'package.json', 'package-lock.json', 'vite.config.js', 'index.html', '.gitignore', '.gitattributes', '启动游戏.cmd']:
+for name in ['README.md', 'package.json', 'package-lock.json', 'vite.config.js', 'index.html', '.gitignore', '.gitattributes', '启动游戏.cmd', '启动游戏.command']:
     shutil.copy2(project / name, source / name)
 
 instructions = '''菌野 · 美味菌子在哪里

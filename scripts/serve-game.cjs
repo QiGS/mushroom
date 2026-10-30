@@ -20,10 +20,12 @@ const mime = {
 
 function openBrowser(url) {
   if (process.env.MUSHROOM_NO_OPEN === '1') return;
-  const child = spawn(process.env.ComSpec || 'cmd.exe',
-    ['/d', '/s', '/c', `start "" "${url}"`],
-    { windowsHide: true, stdio: 'ignore' });
+  const [command, args] = process.platform === 'win32'
+    ? [process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `start "" "${url}"`]]
+    : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
+  const child = spawn(command, args, { windowsHide: true, stdio: 'ignore' });
   child.on('error', () => console.log(`请在浏览器中打开：${url}`));
+  child.on('exit', code => { if (code) console.log(`请在浏览器中打开：${url}`); });
   child.unref();
 }
 
@@ -35,9 +37,11 @@ function ensureBuild() {
   console.log('首次从源码启动：正在准备游戏，请保留此窗口。');
   const env = { ...process.env, npm_config_cache: path.join(project, 'work', 'npm-cache') };
   const commands = fs.existsSync(path.join(project, 'node_modules', 'vite'))
-    ? ['npm run build'] : ['npm ci', 'npm run build'];
-  for (const command of commands) {
-    const result = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', command],
+    ? [['run', 'build']] : [['ci'], ['run', 'build']];
+  for (const args of commands) {
+    const command = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'npm';
+    const commandArgs = process.platform === 'win32' ? ['/d', '/s', '/c', `npm ${args.join(' ')}`] : args;
+    const result = spawnSync(command, commandArgs,
       { cwd: project, env, stdio: 'inherit', windowsHide: true });
     if (result.error || result.status !== 0) throw new Error('游戏准备失败，请检查网络并重试。');
   }
@@ -89,6 +93,10 @@ async function existingGame(port) {
 }
 
 async function main() {
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  if (major < 22 || (major === 22 && minor < 12)) {
+    throw new Error('需要 Node.js 22.12 或更新版本；也可以使用内置运行环境的便携包。');
+  }
   ensureBuild();
   const start = process.env.MUSHROOM_PORT === undefined ? 5173 : Number(process.env.MUSHROOM_PORT);
   if (!Number.isInteger(start) || start < 0 || start > 65535) throw new Error('无效的端口号。');

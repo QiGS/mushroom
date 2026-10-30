@@ -6,22 +6,49 @@
 
 ## 运行
 
-需要 Node.js 22.12+。Windows 可以双击项目内的 `启动游戏.cmd`。也可以在项目目录执行：
+游戏通过本地服务在浏览器中运行，支持 Windows 和 macOS。请使用支持 WebGL 2 的现代浏览器，并开启硬件加速。
 
-便携 ZIP 版本已内置 Windows 运行环境和构建成品，完整解压后双击顶层的 `启动游戏.cmd` 即可，无需安装依赖。源码目录中的启动器会先查找 `dist`，缺少构建时才自动安装依赖并构建。启动器自动选择可用本地端口，并在浏览器中打开游戏。
+### 从 GitHub 克隆运行
+
+仓库包含源码和全部必要游戏素材，不包含 Node.js、依赖目录或构建成品。先安装 [Node.js 22.12 或更新版本](https://nodejs.org/en/download)，再执行：
+
+```sh
+git clone https://github.com/QiGS/mushroom.git
+cd mushroom
+npm start
+```
+
+首次启动会自动安装依赖、构建游戏并打开浏览器，需要联网。以后直接 `npm start`。Windows 也可双击 `启动游戏.cmd`，macOS 可双击 `启动游戏.command`。如果从 GitHub 下载 ZIP 后 `.command` 丢失执行权限，可在该目录的终端执行 `bash 启动游戏.command`。
+
+启动器自动选择可用的本地端口。运行时保留终端窗口，按 Ctrl+C 停止。更新源码后执行 `npm ci && npm run build`，然后重新启动，避免继续使用旧的构建。
+
+### 便携压缩包
+
+完整解压后，在顶层目录启动，不要进入 `source` 目录或直接在压缩软件里运行：
+
+| 压缩包 | 启动入口 | 运行环境 |
+| --- | --- | --- |
+| `菌野-Windows即玩版.zip` | `Mushroom-Windows/启动游戏.cmd` | 内置 Windows x64 Node.js |
+| `菌野-macOS即玩版.zip` | `Mushroom-macOS/启动游戏.command` | 内置 Apple 芯片与 Intel 两种 Node.js，自动选择 |
+
+便携包包含构建成品，无需另装 Node.js 或 npm 依赖。macOS 包面向 macOS 11 及更新版本。游戏进度保存在当前浏览器的当前地址中，继续游玩请使用同一浏览器和端口。便携包保存在制作电脑本地，不随 `git clone` 下载；仓库包含复现打包脚本。
+
+### 开发与构建
 
 ```sh
 npm ci
 npm run dev
 ```
 
-打开终端显示的 `http://127.0.0.1:5173/`。请使用支持 WebGL 2 的现代浏览器，并开启硬件加速。
+打开终端显示的 `http://127.0.0.1:5173/`。
 
 ```sh
 npm test          # 游戏规则与场景验收
 npm run build    # 生成 dist
 npm run preview  # 预览生产构建
 ```
+
+开发环境还安装 Python 3 后，可以执行 `python scripts/package-macos.py` 生成 macOS 便携包（首次下载两种官方运行环境并校验 SHA256），或执行 `python scripts/package-windows.py --node "官方 Node.js 目录/node.exe"` 生成 Windows 便携包。打包前先运行 `npm ci` 和 `npm run build`。
 
 `dist` 是可独立托管的静态网站，资源路径支持部署在 `/mushroom/` 等子目录。仓库内提供 GitHub Actions 构建检查和手动触发的 Pages 部署流程；首次部署需在仓库 Settings → Pages 选择 GitHub Actions。
 
