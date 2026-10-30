@@ -1,1 +1,24 @@
-{"name":"mushroom-wildwood","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"vite --host 127.0.0.1","build":"vite build","preview":"vite preview --host 127.0.0.1","test":"node --test tests/*.test.js","optimize":"node scripts/optimize.mjs"},"dependencies":{"lucide":"0.577.0","three":"0.187.0"},"devDependencies":{"@gltf-transform/core":"4.3.0","@gltf-transform/extensions":"4.3.0","@gltf-transform/functions":"4.3.0","meshoptimizer":"1.0.1","vite":"7.3.1"}}
+{
+  "name": "mushroom-wildwood",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "optimize": "node scripts/optimize.mjs"
+  },
+  "dependencies": {
+    "lucide": "0.577.0",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "4.3.0",
+    "@gltf-transform/extensions": "4.3.0",
+    "@gltf-transform/functions": "4.3.0",
+    "meshoptimizer": "1.0.1",
+    "vite": "7.3.1"
+  }
+}
