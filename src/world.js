@@ -1,4 +1,6 @@
 import * as T from "three";
+import { COLLECTION_CLEARINGS } from "./collection.js";
+import { buildCollectionWorld } from "./collection-world.js";
 import {
   SPECIES,
   NESTS,
@@ -71,7 +73,7 @@ transformed.z += cos(uTime*.9 + wp.z*.3) * ${(0.3 * strength).toFixed(3)} * max(
   return m;
 }
 
-export function buildWorld(scene, chapter = 1, weather = "rain") {
+export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   const root = new T.Group();
   scene.add(root);
   const random = seededRandom(957),
@@ -168,6 +170,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain") {
     { x: 25, z: -5, r: 13 },
     ...NESTS.map((p) => ({ ...p, r: 5.8 })),
     ...LANDMARKS.map((p) => ({ ...p, r: 4 })),
+    ...COLLECTION_CLEARINGS.map((p) => ({ ...p, r: 3.2 })),
     { x: -25, z: 5, r: 4 },
     { x: -31, z: 0, r: 5 },
     { x: 22, z: -18, r: 4 },
@@ -1151,7 +1154,15 @@ export function buildWorld(scene, chapter = 1, weather = "rain") {
   ring.visible = false;
   ring.castShadow = false;
   ring.receiveShadow = false;
+  const collection = buildCollectionWorld(
+    root,
+    interactables,
+    chapter,
+    day,
+    height,
+  );
   function update(t, state) {
+    collection.update(t, state);
     time.value = t;
     for (const fn of animated) fn(t);
     const phase = state.elapsed / (600 + state.chapter * 60);
@@ -1187,6 +1198,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain") {
     ring.rotation.z = t * 0.3;
   }
   function sync(state) {
+    collection.sync(state);
     for (const item of items) {
       const g = mushroomObjects.get(item.id);
       g.visible =
@@ -1203,6 +1215,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain") {
         obj.cloth.visible = state.markers.includes(obj.id);
   }
   function dispose() {
+    collection.dispose();
     scene.remove(root);
     const gs = new Set(),
       ms = new Set();
@@ -1217,6 +1230,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain") {
     ms.forEach((m) => m.dispose());
   }
   return {
+    collection,
     root,
     colliders,
     interactables,

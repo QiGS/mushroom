@@ -1,0 +1,93 @@
+[
+  {
+    "id": "bolete",
+    "source": "牛肝菌.glb",
+    "sourceTriangles": 1932052,
+    "triangles": 10000,
+    "bytes": 407884
+  },
+  {
+    "id": "chanterelle",
+    "source": "鸡油菌.glb",
+    "sourceTriangles": 1960758,
+    "triangles": 10000,
+    "bytes": 404912
+  },
+  {
+    "id": "russula",
+    "source": "红菇.glb",
+    "sourceTriangles": 1983884,
+    "triangles": 9996,
+    "bytes": 450200
+  },
+  {
+    "id": "milkcap",
+    "source": "奶浆菌.glb",
+    "sourceTriangles": 1998524,
+    "triangles": 9990,
+    "bytes": 444388
+  },
+  {
+    "id": "greenhead",
+    "source": "青头菌.glb",
+    "sourceTriangles": 1923434,
+    "triangles": 9998,
+    "bytes": 437364
+  },
+  {
+    "id": "termite",
+    "source": "鸡纵菌.glb",
+    "sourceTriangles": 1935360,
+    "triangles": 10000,
+    "bytes": 440924
+  },
+  {
+    "id": "ganba",
+    "source": "干巴菌.glb",
+    "sourceTriangles": 1895398,
+    "triangles": 9998,
+    "bytes": 509696
+  },
+  {
+    "id": "bluebolete",
+    "source": "见手青.glb",
+    "sourceTriangles": 1912772,
+    "triangles": 9990,
+    "bytes": 389556
+  },
+  {
+    "id": "bamboofungus",
+    "source": "竹荪.glb",
+    "sourceTriangles": 1951020,
+    "triangles": 18186,
+    "bytes": 942580
+  },
+  {
+    "id": "morel",
+    "source": "羊肚菌.glb",
+    "sourceTriangles": 1965934,
+    "triangles": 9998,
+    "bytes": 442004
+  },
+  {
+    "id": "matsutake",
+    "source": "松茸.glb",
+    "sourceTriangles": 1947884,
+    "triangles": 9992,
+    "bytes": 470808
+  },
+  {
+    "id": "truffle",
+    "source": "松露.glb",
+    "sourceTriangles": 1977528,
+    "triangles": 10000,
+    "bytes": 438260
+  },
+  {
+    "id": "basket",
+    "source": "竹篮.glb",
+    "sourceTriangles": 1980219,
+    "triangles": 9997,
+    "bytes": 524908
+  }
+]

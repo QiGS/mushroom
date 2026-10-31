@@ -153,7 +153,15 @@ test("save round trip preserves inventory, markers, gate, unlocks and settings",
     assert.deepEqual(restored[k], s[k]);
 });
 test("damaged and unexpected saves recover finite bounded defaults", () => {
-  assert.deepEqual(sanitizeSave(null), newGame());
+  const recovered = sanitizeSave(null),
+    fresh = newGame();
+  assert.ok(
+    Number.isInteger(recovered.collection.seed) &&
+      recovered.collection.seed > 0,
+  );
+  // Every new adventure has its own loot seed; all other recovery defaults agree.
+  fresh.collection.seed = recovered.collection.seed;
+  assert.deepEqual(recovered, fresh);
   const s = sanitizeSave({
     version: 2,
     chapter: 99,

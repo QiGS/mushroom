@@ -19,6 +19,13 @@ import {
   requirementsMet,
   CAMP,
 } from "./state.js";
+import { CollectionUI } from "./collection-ui.js";
+import {
+  RARITIES,
+  TREASURES,
+  activeClues,
+  collectionStats,
+} from "./collection.js";
 const $ = (id) => document.getElementById(id);
 const icons = () =>
   createIcons({
@@ -45,6 +52,7 @@ export class UI {
     this.location = "";
     this.waypoint = null;
     this.mapTimer = 0;
+    this.collection = new CollectionUI(this);
     this.bind();
     icons();
   }
@@ -100,6 +108,7 @@ export class UI {
   show(title, kicker, html, kind = "other") {
     if (!this.panel) this.lastFocus = document.activeElement;
     this.panel = kind;
+    $("panel").dataset.kind = kind;
     this.game.look?.release();
     this.game.clearInput();
     $("panel-title").textContent = title;
@@ -144,6 +153,12 @@ export class UI {
       "bag",
     );
     this.bindSpecies();
+    const collectionSummary = document.createElement("div");
+    collectionSummary.className = "collection-bag-link";
+    const stats = collectionStats(s);
+    collectionSummary.innerHTML = `<span>永久收藏 ${stats.unique} / 12 种 · ${stats.total} 朵</span><button>翻开收藏图鉴 →</button>`;
+    collectionSummary.querySelector("button").onclick = () => this.guide();
+    $("panel-body").prepend(collectionSummary);
     $("use-fruit").onclick = () => {
       this.game.useFruit();
       this.bag();
@@ -172,6 +187,9 @@ export class UI {
       .forEach((b) => (b.onclick = () => this.species(b.dataset.species)));
   }
   guide() {
+    this.collection.open();
+  }
+  storyGuide() {
     const s = this.game.state;
     this.show(
       "林间菌物手记",
@@ -191,7 +209,7 @@ export class UI {
       `<div class="species-detail">${mushroomSVG(known ? p.color : "#9ca78e")}<div><div class="latin">${known ? p.latin : "An undiscovered little wonder"}</div><p>${known ? p.note : `在${p.area}继续寻找，亲手采集后便能记录它的故事。`}</p><div class="tag-row"><span class="tag">${p.area}</span><span class="tag">${p.rarity}</span></div></div></div><div class="panel-footer"><span>背篓中的数量：${s.inventory[id]}</span><button id="back-guide">返回图鉴</button></div>`,
       "species",
     );
-    $("back-guide").onclick = () => this.guide();
+    $("back-guide").onclick = () => this.storyGuide();
   }
   journal() {
     const s = this.game.state,
@@ -442,12 +460,21 @@ export class UI {
       "map",
     );
     this.drawMap($("large-map").getContext("2d"), 600, true);
+    $("panel-body").insertAdjacentHTML(
+      "beforeend",
+      this.collection.cluesMarkup(),
+    );
+    document.querySelectorAll("[data-map-clue]").forEach((button) => {
+      button.onclick = () => this.collection.track(button.dataset.mapClue);
+    });
     $("large-map").onclick = (e) => {
       const r = e.currentTarget.getBoundingClientRect();
       this.waypoint = {
         x: ((e.clientX - r.left) / r.width) * 110 - 55,
-        z: ((e.clientY - r.top) / r.height) * 100 - 55,
+        z: ((e.clientY - r.top) / r.height) * 110 - 55,
       };
+      this.game.state.collection.track = null;
+      this.game.save();
       this.toast("已记下方向，指南针会为你指路。");
       this.close();
     };
@@ -535,6 +562,50 @@ export class UI {
         if (s.gateOpen) ctx.fillText("深山菌谷", px(0), pz(-40));
       }
     }
+    for (const box of TREASURES) {
+      const opened = s.collection.opened.includes(box.id);
+      if (
+        !opened &&
+        Math.hypot(s.position.x - box.x, s.position.z - box.z) > 14
+      )
+        continue;
+      ctx.fillStyle = opened ? "#9c9f7e" : "#a57936";
+      ctx.font = `${large ? 17 : 12}px sans-serif`;
+      ctx.fillText(opened ? "▫" : "▣", px(box.x), pz(box.z));
+    }
+    for (const clue of activeClues(s)) {
+      const rarity = RARITIES[clue.species.rarity];
+      ctx.strokeStyle = rarity.color;
+      ctx.fillStyle = rarity.color + "22";
+      ctx.lineWidth = s.collection.track === clue.id ? 2.5 : 1.3;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.arc(
+        px(Math.round(clue.x / 3) * 3),
+        pz(Math.round(clue.z / 3) * 3),
+        4.8 * scale,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = rarity.color;
+      ctx.font = `${large ? 18 : 12}px sans-serif`;
+      ctx.fillText(
+        rarity.icon,
+        px(Math.round(clue.x / 3) * 3),
+        pz(Math.round(clue.z / 3) * 3) + 4,
+      );
+      if (large) {
+        ctx.font = "11px sans-serif";
+        ctx.fillText(
+          `${rarity.name}菌线索`,
+          px(clue.x),
+          pz(clue.z) - 4.8 * scale - 6,
+        );
+      }
+    }
     if (this.waypoint) {
       ctx.strokeStyle = "#d39435";
       ctx.lineWidth = 1.5;
@@ -612,7 +683,11 @@ export class UI {
       if (this.panel === "map")
         this.drawMap($("large-map").getContext("2d"), 600, true);
     }
-    const dir = this.waypoint || (requirementsMet(s) ? CAMP : { x: 0, z: -35 });
+    const tracked = activeClues(s).find((p) => p.id === s.collection.track);
+    const dir =
+      this.waypoint ||
+      tracked ||
+      (requirementsMet(s) ? CAMP : { x: 0, z: -35 });
     const angle = Math.atan2(dir.x - p.x, dir.z - p.z) - this.game.yaw;
     const diff = Math.atan2(Math.sin(angle), Math.cos(angle));
     $("compass-target").style.left =

@@ -32,7 +32,7 @@ for package in ['three', 'lucide']:
 source = stage / 'source'
 source.mkdir()
 for folder in ['src', 'public', 'scripts', 'tests', 'docs', '.github']:
-    shutil.copytree(project / folder, source / folder)
+    shutil.copytree(project / folder, source / folder, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
 for name in ['README.md', 'package.json', 'package-lock.json', 'vite.config.js', 'index.html', '.gitignore', '.gitattributes', '启动游戏.cmd', '启动游戏.command']:
     shutil.copy2(project / name, source / name)
 
@@ -58,6 +58,9 @@ WASD 移动；直接移动鼠标环视；Shift 奔跑；Space 跳跃。
 浏览器未允许捕获鼠标时，仍可按住鼠标拖动环视。
 E 采集/交谈；F 观察；J 攻击；Q 闪避；R 投石；H 回复果。
 B 背篓；G 图鉴；M 地图；L 手记；Esc 设置。
+村口小径有第一只寻菌礼盒。靠近按 E 开盲盒，随机获得不同数量的收藏菌。
+G 查看 12 种菌子图鉴、重复数量和星标；M 查看宝箱便笺并追踪稀有菌搜索圈。
+收藏永久保留，不占料理背篓；重游刷新宝箱与野生收藏菌。
 游戏进度保存在当前浏览器。请使用相同浏览器和地址继续游玩。
 
 内容

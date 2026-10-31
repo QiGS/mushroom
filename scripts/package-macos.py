@@ -81,7 +81,7 @@ def main():
     source = stage / 'source'
     source.mkdir()
     for folder in ['src', 'public', 'scripts', 'tests', 'docs', '.github']:
-        shutil.copytree(PROJECT / folder, source / folder)
+        shutil.copytree(PROJECT / folder, source / folder, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
     for name in ['README.md', 'package.json', 'package-lock.json', 'vite.config.js', 'index.html', '.gitignore', '.gitattributes', '启动游戏.cmd', '启动游戏.command']:
         shutil.copy2(PROJECT / name, source / name)
     instructions = '''菌野 · 美味菌子在哪里
@@ -94,7 +94,7 @@ macOS 便携版（Apple 芯片 / Intel 自动选择）
 
 从已能启动的旧版更新：先关闭旧游戏页和启动窗口，只需用本包的 dist
 文件夹替换旧版的 dist 文件夹，再运行旧版的启动脚本即可。
-本次动作和视角更新都在 dist 中，可保留已允许打开的启动脚本及 runtime。
+本次收藏、盲盒、动作和视角更新都在 dist 中，可保留已允许打开的启动脚本及 runtime。
 
 内置游戏成品与官方 Node.js，无需安装 npm 依赖或下载游戏资源。
 需要 macOS 11 或更新版本，以及支持 WebGL 2 的现代浏览器。
@@ -115,6 +115,9 @@ WASD 移动；直接移动鼠标环视；Shift 奔跑；Space 跳跃。
 浏览器未允许捕获鼠标时，可按住鼠标拖动环视。
 E 采集/交谈；F 观察；J 攻击；Q 闪避；R 投石；H 回复果。
 B 背篓；G 图鉴；M 地图；L 手记；Esc 设置。
+村口小径有第一只寻菌礼盒。靠近按 E 开盲盒，随机获得不同数量的收藏菌。
+G 查看 12 种菌子图鉴、重复数量和星标；M 查看宝箱便笺并追踪稀有菌搜索圈。
+收藏永久保留，不占料理背篓；重游刷新宝箱与野生收藏菌。
 进度保存在当前浏览器的当前地址中，请使用同一浏览器与端口继续游玩。
 
 dist 是成品；runtime 是两种芯片的运行环境；source 是源码与说明。

@@ -1,3 +1,8 @@
+import {
+  newCollection,
+  sanitizeCollection,
+  nextCollectionTrip,
+} from "./collection.js";
 export const SAVE_KEY = "mushroom-wilds-v2";
 export const CAMP = { x: 0, z: 30 };
 export const SPECIES = [
@@ -138,6 +143,7 @@ export function newGame() {
     position: { x: 0, z: 27 },
     inventory: Object.fromEntries(SPECIES.map((s) => [s.id, 0])),
     discovered: [],
+    collection: newCollection(),
     collected: [],
     nests: [],
     chests: [],
@@ -257,6 +263,8 @@ export function sanitizeSave(raw) {
     quality: raw.settings?.quality === "low" ? "low" : "high",
     sensitivity: finite(raw.settings?.sensitivity, 1, 0.3, 2),
   };
+  s.day = Math.max(1, Math.floor(s.day));
+  s.collection = sanitizeCollection(raw.collection, s.chapter, s.day);
   return s;
 }
 export function startChapter(old, chapter, weather) {
@@ -279,6 +287,7 @@ export function startChapter(old, chapter, weather) {
     s[k] = structuredClone(old[k]);
   s.chapter = Math.max(1, Math.min(old.unlocked, chapter));
   s.day = old.day + 1;
+  s.collection = nextCollectionTrip(old.collection || newCollection());
   s.weather = weather || ["rain", "sun", "fog"][s.chapter - 1];
   s.potions = Math.max(1, old.potions);
   return s;

@@ -1,5 +1,6 @@
 // Local development only. This module is excluded from production builds.
 import { terrainHeight, CHAPTERS } from "./state.js";
+import { activeClues } from "./collection.js";
 export function attachQA(game) {
   const bar = document.createElement("div");
   bar.id = "qa-controls";
@@ -41,6 +42,28 @@ export function attachQA(game) {
     if (item) move(item.x, item.z + 1);
   });
   add("QA 交互", () => game.interact());
+  add("QA 盲盒", () => {
+    const item = game.world.interactables.find(
+      (i) =>
+        i.type === "treasure" && !game.state.collection.opened.includes(i.id),
+    );
+    if (item) move(item.x, item.z + 0.8);
+  });
+  add("QA 收藏", () => {
+    const item = game.world.interactables.find(
+      (i) => i.type === "specimen" && i.object.visible,
+    );
+    if (item) move(item.x, item.z + 0.4);
+  });
+  add("QA 线索", () => {
+    const item = activeClues(game.state)[0];
+    if (item) move(item.x, item.z + 0.3);
+  });
+  add("QA 图鉴", () => game.ui.guide());
+  add("QA 隐藏面板", () => {
+    bar.hidden = true;
+    bar.style.display = "none";
+  });
   add("QA 青影", () => {
     const e = game.enemies.find((e) => e.boss);
     if (e) {

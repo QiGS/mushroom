@@ -1,0 +1,225 @@
+import {
+  COLLECTION,
+  RARITIES,
+  TREASURES,
+  collectionImage,
+  collectionStats,
+  activeClues,
+  openTreasure,
+  trackClue,
+} from "./collection.js";
+import "./collection.css";
+const $ = (id) => document.getElementById(id);
+const speciesById = (id) => COLLECTION.find((p) => p.id === id);
+const picture = (p, known = true, cls = "") =>
+  `<img class="collection-portrait ${known ? "" : "undiscovered"} ${cls}" src="${collectionImage(p.id)}" alt="${known ? p.name : "尚未发现的菌子剪影"}" draggable="false"/>`;
+
+export class CollectionUI {
+  constructor(ui) {
+    this.ui = ui;
+    this.game = ui.game;
+    this.filter = "all";
+    this.page = 0;
+    this.selected = null;
+  }
+  open(selected) {
+    const ui = this.ui,
+      s = this.game.state,
+      c = s.collection,
+      stats = collectionStats(s);
+    if (selected) {
+      this.selected = selected;
+      this.filter = "all";
+      this.page = Math.floor(
+        COLLECTION.findIndex((p) => p.id === selected) / 9,
+      );
+    }
+    const list = COLLECTION.filter(
+      (p) =>
+        this.filter === "all" ||
+        p.rarity === this.filter ||
+        (this.filter === "owned" && c.counts[p.id]) ||
+        (this.filter === "favorites" && c.favorites.includes(p.id)),
+    );
+    this.page = Math.max(
+      0,
+      Math.min(this.page, Math.ceil(list.length / 9) - 1),
+    );
+    if (!this.selected || !list.some((p) => p.id === this.selected))
+      this.selected = list[0]?.id || null;
+    if (c.unseen.includes(this.selected)) {
+      c.unseen = c.unseen.filter((id) => id !== this.selected);
+      this.game.save();
+    }
+    const p = speciesById(this.selected),
+      known = p && c.counts[p.id] > 0;
+    const found = p && c.foundAt[p.id],
+      hasClue = p && activeClues(s).some((item) => item.id === p.id);
+    const count = (rarity) =>
+      COLLECTION.filter((p) => p.rarity === rarity && c.counts[p.id] > 0)
+        .length;
+    const filters = [
+      ["all", "♧", "全部菌子", `${stats.unique} / 12`],
+      ["common", "✦", "常见菌", `${count("common")} / 6`],
+      ["rare", "✧", "稀有菌", `${count("rare")} / 4`],
+      ["epic", "✶", "史诗菌", `${count("epic")} / 2`],
+      ["owned", "▣", "已收藏", `${stats.unique} 种`],
+      ["favorites", "★", "我的标记", `${c.favorites.length} 种`],
+    ];
+    const detail = p
+      ? `<section class="book-detail" aria-label="菌子详情">
+      <div class="book-detail-heading"><div><span class="book-number">FIELD NOTE / ${String(COLLECTION.indexOf(p) + 1).padStart(2, "0")}</span><h3>${known ? p.name : "尚未发现"}</h3></div><button id="collection-favorite" class="favorite-button ${c.favorites.includes(p.id) ? "selected" : ""}" aria-label="${c.favorites.includes(p.id) ? "取消关注" : "标记关注"}">★</button></div>
+      <div class="book-hero ${p.rarity}">${picture(p, known)}<span class="rarity-seal ${p.rarity}">${RARITIES[p.rarity].icon} ${RARITIES[p.rarity].name}</span>${known ? `<span class="hero-count">累计收藏 <strong>×${c.counts[p.id]}</strong></span>` : ""}</div>
+      <p class="book-description">${known ? p.note : "这页故事还在等待一场相遇。寻找林间宝箱，或亲手采集散落在山野中的菌子，便能点亮这一页。"}</p>
+      <div class="book-facts"><div><span>生长区域</span><b>${p.area}</b></div><div><span>首次发现</span><b>${found ? `第 ${found.day} 天 · ${found.source === "box" ? "宝箱惊喜" : "林间采集"}` : "尚未记录"}</b></div><div><span>收藏规则</span><b>重复累计 · 永久保留</b></div></div>
+      <div class="book-clue"><span>⌖ 采集提示</span><p>${p.hint}</p>${hasClue ? `<button id="collection-track">${c.track === p.id ? "查看正在追踪的线索" : "在地图追踪线索"} ↗</button>` : `<small>${p.rarity === "common" ? "常见菌每趟都可找到，也会出现在盲盒中。" : "开启林间宝箱，可获得本趟稀有与史诗菌的便笺。"}</small>`}</div>
+    </section>`
+      : `<section class="book-detail empty-page"><span>✧</span><h3>留一页给下一次相遇</h3><p>${this.filter === "favorites" ? "点击详情页的星星，记下想寻找的菌子。" : "打开宝箱、走进林间，点亮你的第一份收藏。"}</p></section>`;
+    ui.show(
+      "山野菌子图鉴",
+      "THE WILDWOOD / COLLECTION",
+      `<nav class="book-nav" aria-label="手记导航"><button data-book-nav="map">⌖ 地图</button><button data-book-nav="bag">♧ 背篓</button><button class="active" aria-current="page">菌子图鉴</button><button data-book-nav="journal">☷ 任务</button><button data-book-nav="achievements">☆ 成就</button><button data-book-nav="settings">⚙ 设置</button></nav>
+      <div class="collection-book"><aside class="book-filters" aria-label="图鉴分类">${filters.map(([id, icon, label, total]) => `<button class="book-filter ${this.filter === id ? "active" : ""}" data-collection-filter="${id}" aria-pressed="${this.filter === id}"><span>${icon}</span><b>${label}<small>${total}</small></b></button>`).join("")}<div class="book-note"><span>寻菌小记</span><p>重复的相遇，<br/>也是森林的馈赠。</p><b>${stats.total}</b><small>朵永久收藏</small></div></aside>
+      <section class="book-cards-page" aria-label="菌子卡片"><div class="book-page-heading"><span>林间拾珍</span><small>已点亮 ${stats.unique} / 12</small></div><div class="collection-grid">${list
+        .slice(this.page * 9, this.page * 9 + 9)
+        .map(
+          (p) =>
+            `<button class="collection-card ${p.rarity} ${c.counts[p.id] ? "known" : "locked"} ${this.selected === p.id ? "selected" : ""}" data-collection-id="${p.id}" aria-label="${c.counts[p.id] ? `${p.name}，累计 ${c.counts[p.id]} 朵` : `未发现的${RARITIES[p.rarity].name}菌，第 ${COLLECTION.indexOf(p) + 1} 页`}" aria-pressed="${this.selected === p.id}"><span class="card-scene">${picture(p, c.counts[p.id] > 0)}${c.unseen.includes(p.id) ? '<i class="new-species">新</i>' : ""}${c.favorites.includes(p.id) ? '<i class="card-star">★</i>' : ""}</span><strong>${c.counts[p.id] ? p.name : "未发现"}</strong><small>${RARITIES[p.rarity].icon} ${RARITIES[p.rarity].name}${c.counts[p.id] ? ` <b>×${c.counts[p.id]}</b>` : ""}</small></button>`,
+        )
+        .join(
+          "",
+        )}${!list.length ? '<p class="empty-cards">这里还没有记录。<br/>去山野里找一份惊喜吧。</p>' : ""}</div><div class="book-pagination"><button id="collection-prev" aria-label="上一页" ${this.page === 0 ? "disabled" : ""}>‹</button><span>${this.page + 1} / ${Math.max(1, Math.ceil(list.length / 9))}</span><button id="collection-next" aria-label="下一页" ${this.page >= Math.ceil(list.length / 9) - 1 ? "disabled" : ""}>›</button></div></section>${detail}</div>
+      <footer class="book-footer"><button id="story-field-guide">查看旅途食材手记 →</button><span>游戏收藏设定，不作为现实菌种辨识与食用依据。</span></footer>`,
+      "collection",
+    );
+    document.querySelectorAll("[data-collection-filter]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          this.filter = b.dataset.collectionFilter;
+          this.page = 0;
+          this.selected = null;
+          this.open();
+        }),
+    );
+    document.querySelectorAll("[data-collection-id]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          this.selected = b.dataset.collectionId;
+          this.open();
+        }),
+    );
+    document
+      .querySelectorAll("[data-book-nav]")
+      .forEach(
+        (b) =>
+          (b.onclick = () =>
+            b.dataset.bookNav === "achievements"
+              ? this.achievements()
+              : ui[b.dataset.bookNav]()),
+      );
+    $("collection-prev").onclick = () => {
+      this.page--;
+      this.selected = list[this.page * 9]?.id;
+      this.open();
+    };
+    $("collection-next").onclick = () => {
+      this.page++;
+      this.selected = list[this.page * 9]?.id;
+      this.open();
+    };
+    $("story-field-guide").onclick = () => ui.storyGuide();
+    if (p)
+      $("collection-favorite").onclick = () => {
+        c.favorites = c.favorites.includes(p.id)
+          ? c.favorites.filter((id) => id !== p.id)
+          : [...c.favorites, p.id];
+        this.game.save();
+        this.open();
+      };
+    if (hasClue) $("collection-track").onclick = () => this.track(p.id);
+  }
+  track(id) {
+    const result = trackClue(this.game.state, id);
+    if (!result.ok) return this.ui.toast(result.message, true);
+    this.game.save();
+    this.ui.waypoint = null;
+    this.ui.map();
+    this.ui.toast("线索已圈在地图上，沿指南针寻找搜索区域。");
+  }
+  offer(boxId) {
+    const s = this.game.state;
+    if (s.collection.opened.includes(boxId))
+      return this.ui.toast("这个宝箱本趟已经打开过了。");
+    const name =
+      TREASURES.find((b) => b.id === boxId)?.name || "旧宝箱里的额外礼物";
+    this.ui.show(
+      name,
+      "A LITTLE SURPRISE",
+      `<div class="loot-stage sealed"><div class="loot-orbit"></div><img class="loot-basket" src="${collectionImage("basket")}" alt="等待打开的寻菌竹篮"/><span class="loot-ribbon">山野寻菌盲盒</span><h3>这次，森林会送来什么？</h3><p>一份菌子收藏，一点意料之外的惊喜。<br/>数量随机，重复的菌子也会累积进图鉴。</p><button id="open-mushroom-box" class="loot-open">揭开封签 · 打开盲盒</button><details class="loot-odds"><summary>看看盒子里的可能</summary><p>常见 72%（2–6 朵） · 稀有 24%（1–3 朵） · 史诗 4%（1–2 朵）。连续 7 盒未出稀有或史诗，第 8 盒至少稀有。宝箱仅通过探索获得。</p></details></div>`,
+      "treasure",
+    );
+    $("open-mushroom-box").onclick = () => {
+      const result = openTreasure(s, boxId);
+      if (!result.ok) return this.ui.toast(result.message, true);
+      this.game.world.sync(s);
+      this.game.save();
+      const button = $("open-mushroom-box"),
+        stage = button.closest(".loot-stage");
+      button.disabled = true;
+      button.textContent = "封签正在散开…";
+      stage.classList.add("opening");
+      this.game.audio.play("collect");
+      setTimeout(() => {
+        // A closed or replaced dialog must not interrupt the player's next action.
+        if (!stage.isConnected || this.ui.panel !== "treasure") return;
+        this.game.audio.play(
+          result.rarity === "common" ? "collect" : "discover",
+        );
+        this.result(result);
+      }, 650);
+    };
+  }
+  result(reward, wild = false) {
+    const p = speciesById(reward.id),
+      rarity = RARITIES[p.rarity],
+      clue = speciesById(reward.clue);
+    this.ui.show(
+      wild ? "林间的新收藏" : "森林送来了一份惊喜",
+      "A LITTLE WONDER",
+      `<div class="loot-stage revealed ${p.rarity}"><span class="loot-rarity">${rarity.icon} ${rarity.name}收藏</span><div class="loot-portrait">${picture(p)}<span class="loot-quantity">×${reward.quantity}</span></div><span class="loot-first">${reward.first ? "首次发现 · 图鉴已点亮" : "再次相遇 · 收藏数量已累加"}</span><h3>${p.name}</h3><p>累计收藏 <b>${reward.total}</b> 朵${reward.bonus ? ` · 收藏成就奖励 +${reward.bonus} 竹叶币` : ""}${reward.guaranteed ? " · 本次触发稀有保底" : ""}</p>${clue ? `<div class="loot-clue"><span>⌖ 还找到一张${RARITIES[clue.rarity].name}菌便笺</span><p>${clue.area}的搜索范围，已经记在地图上。</p><button id="loot-track">查看地图线索 ↗</button></div>` : ""}<div class="loot-actions"><button id="loot-continue">收好收藏，继续寻宝</button><button id="loot-guide">翻开图鉴 →</button></div></div>`,
+      "treasure",
+    );
+    $("loot-continue").onclick = () => {
+      this.ui.close();
+      this.game.look?.capture();
+    };
+    $("loot-guide").onclick = () => this.open(p.id);
+    if (clue) $("loot-track").onclick = () => this.track(clue.id);
+  }
+  achievements() {
+    const s = this.game.state,
+      stats = collectionStats(s);
+    this.ui.show(
+      "把相遇写成成就",
+      "COLLECTION MILESTONES",
+      `<div class="collection-achievements">${[
+        [3, "初识菌林", 20],
+        [6, "林间收藏家", 50],
+        [12, "菌物全图鉴", 100],
+      ]
+        .map(
+          ([n, title, coins]) =>
+            `<article class="collection-achievement ${stats.unique >= n ? "complete" : ""}"><span>♜</span><div><h3>${title}</h3><p>收藏 ${n} 种不同菌子 · ${coins} 竹叶币</p><progress value="${Math.min(stats.unique, n)}" max="${n}"></progress><small>${Math.min(stats.unique, n)} / ${n} ${s.collection.milestones.includes(n) ? "· 奖励已领取" : ""}</small></div></article>`,
+        )
+        .join(
+          "",
+        )}</div><p class="panel-subtitle">累计打开 ${s.collection.totalBoxes} 个宝箱 · 永久收藏 ${stats.total} 朵菌子</p><div class="panel-footer"><span>成就奖励会在达成时自动领取</span><button id="achievement-guide">返回图鉴</button></div>`,
+      "achievements",
+    );
+    $("achievement-guide").onclick = () => this.open();
+  }
+  cluesMarkup() {
+    const clues = activeClues(this.game.state);
+    return `<div class="map-clues"><h3>采菌人的便笺 <small>${clues.length} 条可用线索</small></h3>${clues.length ? clues.map((p) => `<button data-map-clue="${p.id}" class="${p.species.rarity} ${this.game.state.collection.track === p.id ? "active" : ""}"><span>${RARITIES[p.species.rarity].icon}</span><div><b>${RARITIES[p.species.rarity].name}菌 · ${p.species.area}</b><small>${this.game.state.collection.track === p.id ? "指南针正在追踪" : "点击设为指南针目标"}</small></div></button>`).join("") : "<p>打开林间宝箱，会得到当前山林里真实存在的稀有菌线索。</p>"}</div>`;
+  }
+}

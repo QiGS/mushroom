@@ -11,6 +11,7 @@ import {
   angleDelta,
 } from "./character-motion.js";
 import { DesktopLook } from "./desktop-look.js";
+import { collectSpecimen } from "./collection.js";
 import {
   SAVE_KEY,
   SPECIES,
@@ -79,7 +80,12 @@ class Game {
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = T.SRGBColorSpace;
-    this.world = buildWorld(this.scene, this.state.chapter, this.state.weather);
+    this.world = buildWorld(
+      this.scene,
+      this.state.chapter,
+      this.state.weather,
+      this.state.day,
+    );
     this.player = makeTraveler();
     this.scene.add(this.player.root);
     this.player.root.position.set(
@@ -441,6 +447,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.ui.toast("浏览器存储不可用，本次进度可能无法保存。", true);
     if (this.modelFallback)
       this.ui.toast("主角资源未能加载，已启用内置旅人。", true);
+    if (!this.state.collection.totalBoxes)
+      this.ui.toast(
+        "村口小径藏着寻菌礼盒 · 靠近按 E 开箱，按 G 翻开收藏图鉴。",
+        false,
+        6500,
+      );
   }
   returnTitle() {
     this.save();
@@ -468,7 +480,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   }
   rebuild() {
     this.world.dispose();
-    this.world = buildWorld(this.scene, this.state.chapter, this.state.weather);
+    this.world = buildWorld(
+      this.scene,
+      this.state.chapter,
+      this.state.weather,
+      this.state.day,
+    );
     this.world.sync(this.state);
     this.player.root.position.set(
       this.state.position.x,
@@ -777,6 +794,34 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const item = this.nearest;
     if (!item) return;
     const s = this.state;
+    if (item.type === "treasure") {
+      this.ui.collection.offer(item.id);
+      return;
+    }
+    if (item.type === "specimen") {
+      const result = collectSpecimen(s, item.id);
+      if (!result.ok) return this.result(result);
+      this.collectTime = 0.55;
+      this.world.sync(s);
+      this.save();
+      this.audio.play(result.first ? "discover" : "collect");
+      this.burst(
+        item.object.position,
+        result.rarity === "epic"
+          ? 0xc8a0ef
+          : result.rarity === "rare"
+            ? 0x87d4d7
+            : 0xdceba4,
+        14,
+      );
+      if (result.first || result.rarity !== "common")
+        this.ui.collection.result(result, true);
+      else
+        this.ui.toast(
+          `${item.name.replace("收藏", "")} +1 · 累计收藏 ${result.total} 朵`,
+        );
+      return;
+    }
     if (item.type === "mushroom") {
       const threat = this.enemies.some(
         (e) =>
@@ -849,6 +894,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       return;
     }
     if (item.type === "chest") {
+      if (s.chests.includes(item.id)) {
+        this.ui.collection.offer("story-hidden");
+        return;
+      }
       s.chests.push(item.id);
       if (s.chapter === 1) {
         s.compass = true;
@@ -866,6 +915,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.audio.play("discover");
       this.world.sync(s);
       this.save();
+      this.ui.collection.offer("story-hidden");
       return;
     }
     if (item.type === "uncle") {
@@ -1387,6 +1437,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     let best = null,
       bestDist = Infinity;
     for (const item of this.world.interactables) {
+      if (item.type === "specimen" && !item.object.visible) continue;
+      if (
+        item.type === "treasure" &&
+        this.state.collection.opened.includes(item.id)
+      )
+        continue;
       if (item.type === "mushroom" && !item.object.visible) continue;
       if (
         item.type === "nest" &&
@@ -1398,7 +1454,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         continue;
       if (
         item.type === "chest" &&
-        (this.state.chests.includes(item.id) || !item.object.visible)
+        ((this.state.chests.includes(item.id) &&
+          this.state.collection.opened.includes("story-hidden")) ||
+          !item.object.visible)
       )
         continue;
       if (item.type === "landmark" && this.state.landmarks.includes(item.id))
