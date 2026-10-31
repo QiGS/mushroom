@@ -100,6 +100,7 @@ try {
   for (const [file, mime] of [
     ["villagers/grandma.glb", "model/gltf-binary"],
     ["villagers/uncle.glb", "model/gltf-binary"],
+    ...['flower-guide', 'forager-guide', 'herder-guide'].map((id) => [`villagers/${id}.glb`, 'model/gltf-binary']),
     ["fonts/wildwood-wenkai.woff2", "font/woff2"],
     ["fonts/jingmai-rounded.woff2", "font/woff2"],
     ...["note", "fruit", "hat", "shoes", "bell", "compass"].map((id) => [

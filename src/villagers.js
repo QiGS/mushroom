@@ -1,7 +1,7 @@
 import * as T from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 const cache = new Map();
-export function addVillager(parent, id, fallback) {
+export function addVillager(parent, id, fallback, options = {}) {
   let disposed = false,
     model = null;
   // The scene can be constructed by headless rule tests without fetching assets.
@@ -21,7 +21,7 @@ export function addVillager(parent, id, fallback) {
         const b = new T.Box3().setFromObject(model),
           size = b.getSize(new T.Vector3()),
           center = b.getCenter(new T.Vector3());
-        const scale = (id === "grandma" ? 1.65 : 1.9) / size.y;
+        const scale = (options.height || (id === "grandma" ? 1.65 : 1.9)) / size.y;
         model.scale.setScalar(scale);
         model.position.set(
           -center.x * scale,
@@ -38,6 +38,7 @@ export function addVillager(parent, id, fallback) {
           }
         });
         parent.add(model);
+        model.userData.restY = model.position.y;
         fallback.visible = false;
       })
       .catch((error) =>
@@ -49,8 +50,13 @@ export function addVillager(parent, id, fallback) {
       );
   }
   return {
-    update(t) {
-      if (model) model.rotation.y = Math.sin(t * 0.45) * 0.025;
+    get loaded() { return !!model; },
+    update(t, walking = false) {
+      if (model) {
+        model.rotation.y = Math.sin(t * 0.45) * 0.025;
+        model.position.y = model.userData.restY + (walking ? Math.abs(Math.sin(t * 7)) * .045 : 0);
+        model.rotation.z = walking ? Math.sin(t * 7) * .018 : 0;
+      }
     },
     dispose() {
       disposed = true;

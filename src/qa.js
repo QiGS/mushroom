@@ -18,6 +18,7 @@ import { RIVER_NOTE, surfaceHeight } from "./navigation.js";
 import { grantTool, TOOL_DEFS } from "./tools.js";
 import { daylight } from "./journey.js";
 import { missionTarget } from "./mission.js";
+import { stepBody } from './terrain.js';
 export function attachQA(game) {
   const bar = document.createElement("div");
   bar.id = "qa-controls";
@@ -48,6 +49,30 @@ export function attachQA(game) {
     bar.append(b);
   };
   add("QA 开始", () => game.begin(true));
+  add('QA 引路人', () => {
+    game.state.talked = true;
+    game.invincible = 300;
+    const g = game.world.guide;
+    move(g.x, g.z + 2);
+    game.yaw = 0;
+    game.pitch = .2;
+    game.distance = 6;
+    game.findInteraction();
+  });
+  add('QA 跟随向导', () => {
+    game.ui.close();
+    const p = game.player.root.position;
+    const body = { position: p, grounded: true, vertical: 0 };
+    for (let i = 0; i < 7200 && ['walking', 'waiting'].includes(game.guide.phase); i++) {
+      game.guide.update(1 / 60, game.state, p);
+      const q = game.world.guide.object.position, dx = q.x - p.x, dz = q.z - p.z, n = Math.hypot(dx, dz);
+      if (n > 2.2) stepBody(game.world, game.state, body, dx / n * .055, dz / n * .055, 1 / 60);
+      game.state.position = { x: p.x, z: p.z };
+    }
+    game.findInteraction();
+  });
+  add('QA 苔溪宝箱', () => move(36.3, -76.5));
+  add('QA 赤岩宝箱', () => move(-26, -72.5));
   add("QA 推进战斗", () => {
     game.ui.close();
     for (let i = 0; i < 360; i++) {
@@ -602,7 +627,7 @@ export function attachQA(game) {
   setInterval(() => {
     const p = game.player.root.position;
     status.textContent =
-      `渲染帧:${game.renderer.info.render.frame} 血条:${game.ui.adventure.elements.size}/${game.enemies.length} GL几何:${game.renderer.info.memory.geometries} 纹理:${game.renderer.info.memory.textures} 像素比:${game.renderer.getPixelRatio().toFixed(2)} 帧均值:${game.frameAverage.toFixed(1)} 怪:${game.enemies.filter((e) => e.hp > 0).length} 弹:${gunAmmo(game.state)}/${game.state.gear[game.state.weapon]} 开镜:${game.scoped} FOV:${game.camera.fov.toFixed(1)} 炮:${game.artillery.length} 毒弹:${game.poisonBolts.length} 首领:${game.enemies
+      `向导:${game.guide.phase}/${game.world.guide.visual.loaded ? '模型已载入' : '替代模型'} 渲染帧:${game.renderer.info.render.frame} 血条:${game.ui.adventure.elements.size}/${game.enemies.length} GL几何:${game.renderer.info.memory.geometries} 纹理:${game.renderer.info.memory.textures} 像素比:${game.renderer.getPixelRatio().toFixed(2)} 帧均值:${game.frameAverage.toFixed(1)} 怪:${game.enemies.filter((e) => e.hp > 0).length} 弹:${gunAmmo(game.state)}/${game.state.gear[game.state.weapon]} 开镜:${game.scoped} FOV:${game.camera.fov.toFixed(1)} 炮:${game.artillery.length} 毒弹:${game.poisonBolts.length} 首领:${game.enemies
         .filter((e) => e.boss)
         .map((e) => e.name + "=" + e.hp + "/" + e.maxHp + "/" + e.state)
         .join(

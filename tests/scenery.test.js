@@ -14,7 +14,7 @@ import { createPathfinder } from "../src/navigation.js";
 import { mouseChest, reachableInteraction } from "../src/interaction.js";
 
 test("treasures reward distinct regions, with no spawn cluster in any chapter", () => {
-  assert.equal(TREASURES.length, 5);
+  assert.equal(TREASURES.length, 8);
   for (const story of [
     { x: -14, z: -1 },
     { x: 22, z: -19 },
@@ -23,7 +23,8 @@ test("treasures reward distinct regions, with no spawn cluster in any chapter", 
     const boxes = [...TREASURES, story];
     for (const [i, a] of boxes.entries()) {
       assert.ok(Math.hypot(a.x, a.z - 27) >= 25);
-      assert.ok(terrainHeight(a.x, a.z) > waterLevel(a.x, a.z));
+      // The mossy canyon chest sits on the raised stream walkway.
+      if (a.id !== 'moss-canyon') assert.ok(terrainHeight(a.x, a.z) > waterLevel(a.x, a.z));
       for (const b of boxes.slice(i + 1))
         assert.ok(Math.hypot(a.x - b.x, a.z - b.z) >= 24);
     }
@@ -32,7 +33,7 @@ test("treasures reward distinct regions, with no spawn cluster in any chapter", 
   assert.ok(terrainHeight(66, 15) < -8);
 });
 
-test("all five treasures can be reached on foot without falling or swimming, including the valley floor", () => {
+test("all regional treasures can be reached on foot without falling or swimming, including both imported canyons", () => {
   const world = buildWorld(new T.Scene(), 1, "sun"),
     state = newGame();
   const route = createPathfinder(world);

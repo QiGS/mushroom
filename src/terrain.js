@@ -108,10 +108,13 @@ export function terrainHeight(x, z) {
 }
 function canyonStream(x, z) {
   // Follow the narrow watercourse baked into the supplied mossy canyon model.
-  if (z > -54 || z < -80) return -Infinity;
-  const rise = (-z - 54) * 0.23,
+  const c = CANYONS[0],
+    sourceX = 32 + (x - c.x) * 28 / c.width,
+    sourceZ = -68 + (z - c.z) * 30 / c.depth;
+  if (sourceZ > -54 || sourceZ < -80) return -Infinity;
+  const rise = (-sourceZ - 54) * 0.23,
     center = 30 + rise;
-  if (Math.abs(x - center) > 1.15) return -Infinity;
+  if (Math.abs(sourceX - center) > 1.15) return -Infinity;
   const surface = canyonSurface(x, z);
   return Number.isFinite(surface) && Math.abs(surface - rise) < 1.3
     ? surface + 0.03
@@ -149,12 +152,20 @@ export function overlapsCollider(c, x, z, radius = 0.32) {
   }
   return Math.hypot(x - c.x, z - c.z) < c.r + radius;
 }
+export const STEP_HEIGHT = 0.34;
+// Allow a body already overlapping a trunk/furniture edge to walk out. Entering
+// a new solid or moving deeper into it is still blocked, including during dodge.
+function penetration(c, x, z, radius = 0.32) {
+  if (c.hx === undefined) return Math.max(0, c.r + radius - Math.hypot(x - c.x, z - c.z));
+  const dx = Math.abs(x - c.x) - c.hx, dz = Math.abs(z - c.z) - c.hz;
+  return Math.max(0, radius - Math.hypot(Math.max(0, dx), Math.max(0, dz)) - Math.min(0, Math.max(dx, dz)));
+}
 export function surfaceHeight(world, x, z) {
   let y = terrainHeight(x, z);
   for (const p of world.stones || [])
     if (Math.hypot(x - p.x, z - p.z) < p.r + 0.08) y = Math.max(y, p.y);
   for (const p of world.surfaces || [])
-    if (Math.abs(x - p.x) < p.hx && Math.abs(z - p.z) < p.hz)
+    if (Math.abs(x - p.x) < p.hx && Math.abs(z - p.z) < p.hz && (!p.contains || p.contains(x, z)))
       y = Math.max(y, p.heightAt ? p.heightAt(x, z) : p.y);
   // Existing timber bridge in the original forest.
   if (
@@ -193,11 +204,14 @@ export function stepBody(world, s, body, dx, dz, dt) {
   const oldWater = waterLevel(p.x, p.z),
     wasSwimming = body.swimming === true;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.15));
-  const blocked = (x, z) =>
-    collidersNear(world, x, z).some(
-      (c) => colliderActive(c, s) && overlapsCollider(c, x, z),
-    ) ||
-    (s.chapter === 3 && !s.gateOpen && z < -32.5 && z > -46 && Math.abs(x) < 5);
+  const blocked = (x, z) => {
+    if (s.chapter === 3 && !s.gateOpen && z < -32.5 && z > -46 && Math.abs(x) < 5) return true;
+    return collidersNear(world, x, z).some((c) => {
+      if (!colliderActive(c, s)) return false;
+      const next = penetration(c, x, z);
+      return next > 0 && next >= penetration(c, p.x, p.z) - 0.000001;
+    });
+  };
   for (let i = 0; i < steps; i++) {
     for (const [axis, amount] of [
       ["x", dx / steps],
@@ -216,7 +230,7 @@ export function stepBody(world, s, body, dx, dz, dt) {
       const bankStep =
         wasSwimming && surfaceHeight(world, x, z) <= oldWater + 0.8
           ? 1.55
-          : 0.24;
+          : STEP_HEIGHT;
       if (!blocked(x, z) && rise <= Math.max(bankStep, Math.abs(amount) * 1.3))
         p[axis] = v;
     }

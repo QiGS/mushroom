@@ -1,0 +1,23 @@
+[
+  {
+    "id": "flower-guide",
+    "source": "npc/采花少女.glb",
+    "sourceTriangles": 1882083,
+    "triangles": 17998,
+    "bytes": 1249540
+  },
+  {
+    "id": "forager-guide",
+    "source": "npc/采菌大叔 (1).glb",
+    "sourceTriangles": 1976186,
+    "triangles": 17998,
+    "bytes": 1164392
+  },
+  {
+    "id": "herder-guide",
+    "source": "npc/放牛小孩.glb",
+    "sourceTriangles": 1931920,
+    "triangles": 17996,
+    "bytes": 1095284
+  }
+]

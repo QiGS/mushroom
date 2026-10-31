@@ -6,6 +6,7 @@ import {
   encounterHint,
 } from "./boss-encounters.js";
 import { Narrator } from "./narrator.js";
+import { TrailGuide, guideDestination } from './trail-guide.js';
 import { BOSS_DESTINATIONS, prepareBossTrip } from "./story.js";
 import { makeAnt, updateAnt } from "./ant-enemy.js";
 import { disposeObject } from "./resources.js";
@@ -178,6 +179,7 @@ class Game {
     this.audio.enabled = this.state.settings.sound;
     this.ui = new UI(this);
     this.narrator = new Narrator(this);
+    this.guide = new TrailGuide(this.world);
     this.acidPools = [];
     this.poisonBolts = [];
     this.artillery = [];
@@ -653,6 +655,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     );
     this.route = new RouteGuide(this.scene, this.world);
     this.world.sync(this.state);
+    this.guide = new TrailGuide(this.world);
     this.player.root.position.set(
       this.state.position.x,
       surfaceHeight(this.world, this.state.position.x, this.state.position.z),
@@ -1723,6 +1726,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const item = this.nearest;
     if (!item) return;
     const s = this.state;
+    if (item.type === 'trail-guide') return this.talkGuide();
     if (item.type === "shop") return this.ui.shop();
     if (item.type === "bed" && s.bedOwned) return this.ui.bed();
     if (item.type === "forecast" && s.forecastOwned) return this.ui.forecast();
@@ -2315,6 +2319,21 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.save();
     }
   }
+  talkGuide() {
+    const guide = this.guide, actor = guide.actor, destination = guideDestination(this.state);
+    this.ui.dialog.show({
+      speaker: `${actor.displayName} · ${actor.role}`,
+      text: `${actor.greeting}\n\n眼下要做的是：${destination.name}。${destination.hint}`,
+      actions: [
+        { label: '带我去主线线索', run: () => {
+          this.ui.dialog.close();
+          const ok = guide.start(this.state);
+          this.ui.toast(ok ? `${actor.displayName}开始带路，落后时会等你。` : '这里没有安全步行路线。先回到平坦路面，再来请向导带路。');
+        } },
+        { label: '请在这里等我', run: () => { guide.stop(); this.ui.dialog.close(); } },
+      ],
+    });
+  }
   updateEnemies(dt) {
     const p = this.player.root.position;
     for (const e of this.enemies) {
@@ -2543,7 +2562,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.reachableItems.push(item);
       const d =
         Math.hypot(item.x - p.x, item.z - p.z) -
-        (isChest(item) ? 0.8 : item.type === "bed" ? 0.7 : 0);
+        (isChest(item) ? 0.8 : item.type === "bed" ? 0.7 : 0) +
+        (item.type === 'trail-guide' && this.guide.phase === 'arrived' ? 1.3 : 0);
       if (d < bestDist) {
         best = item;
         bestDist = d;
@@ -2706,6 +2726,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.narrator.update(dt);
       this.updateNightPopulation();
       this.updatePlayer(dt);
+      const clue = this.guide.update(dt, this.state, this.player.root.position);
+      if (this.state.waypoint?.kind === 'guide') Object.assign(this.state.waypoint, { x: this.world.guide.x, z: this.world.guide.z });
+      if (clue) this.ui.toast(`${this.guide.actor.displayName}：到了，${clue.hint}`, false, 6500);
       this.updateEnemies(dt);
       this.findInteraction();
       if (this.nearest?.species === "giant" && this.keys.has("KeyE")) {

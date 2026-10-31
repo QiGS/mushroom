@@ -18,6 +18,7 @@ import { missionTarget } from "./mission.js";
 import { AdventureUI } from "./adventure-ui.js";
 import "./encounters.css";
 import "./adventure.css";
+import "./guides.css";
 import { SHOP, purchase, EXPLORATION_SPOTS } from "./exploration.js";
 import {
   MAP_SPACE,
@@ -662,6 +663,18 @@ export class UI {
       this.mapZoom = !this.mapZoom;
       this.map();
     };
+    const guide = this.game.world.guide;
+    const guideButton = document.createElement('button');
+    guideButton.className = 'map-guide-link';
+    guideButton.textContent = `寻找引路人：${guide.displayName} · ${guide.role}`;
+    guideButton.onclick = () => {
+      s.guidance = false;
+      s.collection.track = null;
+      this.waypoint = { x: guide.x, z: guide.z, kind: 'guide' };
+      this.game.save();
+      this.map();
+    };
+    document.querySelector('.explore-map-links').append(guideButton);
     $("map-detail").onclick = () => {
       this.mapEssentials = !this.mapEssentials;
       this.map();
@@ -952,6 +965,13 @@ export class UI {
     }
     const navTarget = navigationTarget(s);
     const granny = grandmaPlace(s);
+    const guide = this.game.world.guide;
+    drawMapSymbol(ctx, 'granny', px(guide.x), pz(guide.z), large ? 10 : 5, '#377e8a');
+    if (large) {
+      ctx.fillStyle = '#275d63';
+      ctx.font = '12px JingmaiRounded, sans-serif';
+      ctx.fillText(guide.displayName + ' · 引路人', px(guide.x), pz(guide.z) - 16);
+    }
     ctx.fillStyle = "#f5e5b8";
     ctx.beginPath();
     ctx.arc(px(granny.x), pz(granny.z), large ? 5 : 3, 0, Math.PI * 2);

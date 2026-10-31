@@ -114,6 +114,9 @@ export const TREASURES = [
   { id: "pine", x: 8, z: -65, name: "北境松影的宝箱", area: "北方松林" },
   { id: "ridge", x: -68, z: -25.8, name: "风铃山巅的宝箱", area: "风铃山巅" },
   { id: "moon", x: 81, z: -43, name: "东岭望月的宝箱", area: "峡谷东岸" },
+  { id: "moss-canyon", x: 36.3, z: -78, name: "苔溪深峡的宝箱", area: "苔溪深峡" },
+  { id: "red-canyon", x: -26, z: -74, name: "赤岩谷底的宝箱", area: "赤岩峡谷" },
+  { id: "flower-ridge", x: 43, z: -42, name: "花雾东坡的宝箱", area: "花雾东坡" },
 ];
 const COMMON_POINTS = [
   [-7, 20],
@@ -365,6 +368,9 @@ export function openTreasure(s, boxId) {
     pine: "hat",
     ridge: "bell",
     moon: "compass",
+    "moss-canyon": "boots",
+    "red-canyon": "fruit",
+    "flower-ridge": "hat",
   }[boxId];
   const tool = toolId ? { id: toolId, quantity: 1 } : null;
   if (tool) grantTool(s, tool.id, tool.quantity);

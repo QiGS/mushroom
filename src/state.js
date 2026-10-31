@@ -380,7 +380,7 @@ export function sanitizeSave(raw) {
     s.waypoint = {
       x: finite(raw.waypoint.x, 0, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX),
       z: finite(raw.waypoint.z, 0, WORLD_BOUNDS.minZ, WORLD_BOUNDS.maxZ),
-      kind: ["river", "treasure", "nest", "landmark", "camp", "boss"].includes(
+      kind: ["river", "treasure", "nest", "landmark", "camp", "boss", "guide"].includes(
         raw.waypoint.kind,
       )
         ? raw.waypoint.kind

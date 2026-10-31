@@ -4,8 +4,8 @@ import {Vector3,Matrix4,Box3} from 'three';
 import {writeFile} from 'node:fs/promises';
 const io=new NodeIO().registerExtensions(ALL_EXTENSIONS), fields=[];
 for(const spec of [
-  {id:'canyon-one',x:32,z:-68,width:28,depth:30,height:18,base:-0.5},
-  {id:'canyon-two',x:-25,z:-67,width:38,depth:32,height:19,base:-0.8},
+  {id:'canyon-one',x:32,z:-71,width:36,depth:36,height:18,base:-0.5},
+  {id:'canyon-two',x:-25,z:-70,width:46,depth:38,height:19,base:-0.8},
 ]) {
   const doc=await io.read(`public/assets/props/${spec.id}.glb`), tris=[],bounds=new Box3();
   for(const node of doc.getRoot().listNodes()) {

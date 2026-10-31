@@ -32,10 +32,27 @@ export class AdventureUI {
     this.ammo.className = "rifle-status";
     this.ammo.hidden = true;
     document.getElementById("hud").append(this.ammo);
+    this.guideLabel = document.createElement('div');
+    this.guideLabel.id = 'trail-guide-label';
+    this.guideLabel.hidden = true;
+    document.getElementById('hud').append(this.guideLabel);
   }
   update() {
     const g = this.game,
       s = g.state;
+    const guide = g.world?.guide;
+    this.guideLabel.hidden = true;
+    if (guide) {
+      this.vector.copy(guide.object.position);
+      this.vector.y += guide.height + .45;
+      this.vector.project(g.camera);
+      if (!g.ui.blocking && Math.hypot(guide.x - s.position.x, guide.z - s.position.z) < 30 && this.vector.z > -1 && this.vector.z < 1 && Math.abs(this.vector.x) < 1.1 && Math.abs(this.vector.y) < 1.1) {
+        this.guideLabel.hidden = false;
+        this.guideLabel.style.left = `${(this.vector.x * .5 + .5) * 100}%`;
+        this.guideLabel.style.top = `${(-this.vector.y * .5 + .5) * 100}%`;
+        this.guideLabel.textContent = `${guide.displayName} · ${guide.role}\n${g.guide.status()}`;
+      }
+    }
     // Harvest ambushes append in place; night enemies also change IDs in place.
     // Reconcile actual IDs instead of treating array identity as a roster version.
     const ids = new Set(g.enemies.map((e) => e.id));

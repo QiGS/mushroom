@@ -1,0 +1,13 @@
+#trail-guide-label {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  color: #fff1cc;
+  font: 13px/1.55 JingmaiRounded, sans-serif;
+  white-space: pre-line;
+  text-align: center;
+  text-shadow: 0 2px 5px #213a2c, 0 0 12px #213a2c;
+  padding: 6px 14px;
+  background: linear-gradient(90deg, transparent, #294b37bb 15%, #294b37bb 85%, transparent);
+  pointer-events: none;
+}
+.map-guide-link { border-left: 3px solid #5597a0; }

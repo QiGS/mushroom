@@ -1,6 +1,8 @@
 import * as T from "three";
 import { addProp } from "./prop-model.js";
 import { addVillager } from "./villagers.js";
+import { addCanyonWalkway } from './trail-surfaces.js';
+import { surfaceHeight } from './terrain.js';
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   terrainHeight as height,
@@ -41,7 +43,7 @@ export function buildExplorationWorld(
   };
   const box = (g, x, y, z, w, h, d, color) =>
     add(g, new T.BoxGeometry(w, h, d), color, x, y, z);
-  const group = (x, z, y = height(x, z)) => {
+  const group = (x, z, y = surfaceHeight({ stones, surfaces }, x, z)) => {
     const g = new T.Group();
     g.position.set(x, y, z);
     root.add(g);
@@ -73,6 +75,7 @@ export function buildExplorationWorld(
   };
 
   const models = [];
+  addCanyonWalkway(root, surfaces);
   for (const c of CANYONS) {
     const g = group(c.x, c.z, c.base);
     box(
@@ -522,16 +525,22 @@ export function buildExplorationWorld(
     const edge = Math.min((x - 49) / 5, (79 - x) / 5, 1);
     const y = T.MathUtils.lerp(height(x, z) + 0.08, 8.8, Math.max(0, edge));
     const g = group(x, z, y);
-    box(g, 0, -0.1, 0, 0.73, 0.18, 2.3, i % 2 ? 0x9a7a50 : 0xb39666);
-    stones.push({ x, z, r: 1.07, y });
+    box(g, 0, -0.1, 0, 0.77, 0.18, 3.5, i % 2 ? 0x9a7a50 : 0xb39666);
     bridge.push({ x, y, z });
     if (i % 4 === 0)
       for (const side of [-1, 1])
-        box(g, 0, 0.55, side * 1.12, 0.09, 1.1, 0.09, 0x67523a);
+        box(g, 0, 0.55, side * 1.72, 0.09, 1.1, 0.09, 0x67523a);
   }
+  surfaces.push({
+    x: 64, z: -30, hx: 15.4, hz: 1.75,
+    heightAt(x) {
+      const t = T.MathUtils.clamp((x - 49) / .75, 0, 40), i = Math.min(39, Math.floor(t));
+      return T.MathUtils.lerp(bridge[i].y, bridge[i + 1].y, t - i);
+    },
+  });
   for (const side of [-1, 1]) {
     const g = new T.BufferGeometry().setFromPoints(
-      bridge.map((p) => new T.Vector3(p.x, p.y + 0.95, p.z + side * 1.12)),
+      bridge.map((p) => new T.Vector3(p.x, p.y + 0.95, p.z + side * 1.72)),
     );
     root.add(new T.Line(g, new T.LineBasicMaterial({ color: 0x68583d })));
   }

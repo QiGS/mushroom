@@ -6,6 +6,7 @@ import {
   waterLevel,
   colliderActive,
   overlapsCollider,
+  STEP_HEIGHT,
 } from "./terrain.js";
 export { surfaceHeight } from "./terrain.js";
 import { CAMP, requirementsMet } from "./state.js";
@@ -22,7 +23,7 @@ export const RIVER_NOTE = {
 export const RIVER_WALKWAY = Array.from({ length: 16 }, (_, i) => ({
   x: 14.5 + i * 0.7,
   z: -4,
-  r: 0.95,
+  r: 1.35,
   y: 0.48,
 }));
 export function canWalk(world, s, x, z) {
@@ -53,6 +54,7 @@ export function navigationTarget(s) {
       name:
         {
           boss: BOSSES[s.chapter]?.name || "首领位置",
+          guide: '本章引路人',
           river: "河心线索",
           treasure: "探索宝箱",
           nest: "菌窝线索",
@@ -106,7 +108,7 @@ export function createPathfinder(world) {
       if (
         !valid(s, x, z) ||
         Math.abs(y - previous) >
-          Math.max(0.27, (Math.hypot(b.x - a.x, b.z - a.z) / n) * 1.3)
+          Math.max(STEP_HEIGHT, (Math.hypot(b.x - a.x, b.z - a.z) / n) * 1.3)
       )
         return false;
       previous = y;

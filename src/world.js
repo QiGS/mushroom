@@ -1,6 +1,7 @@
 import { BOSSES } from "./progression.js";
+import { CHAPTER_GUIDES, chapterGuide } from "./guide-data.js";
 import { grandmaPlace, GRANDMA_CLEARINGS } from "./story.js";
-import { CANYONS, canyonAt, baseTerrainHeight } from "./terrain.js";
+import { CANYONS, canyonAt, baseTerrainHeight, surfaceHeight } from "./terrain.js";
 import { disposeObject, bakePainted } from "./resources.js";
 import { addProp } from "./prop-model.js";
 import { softenFoliage } from "./camera-collision.js";
@@ -242,6 +243,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     ...NIGHT_SPAWNS.map(([x, z]) => ({ x, z, r: 3 })),
     ...EXPLORE_CLEARINGS,
     ...GRANDMA_CLEARINGS,
+    ...CHAPTER_GUIDES.map((p) => ({ ...p, r: 4 })),
     ...(chapter >= 4
       ? [{ ...BOSSES[chapter], r: BOSSES[chapter].radius + 9 }]
       : []),
@@ -507,7 +509,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   // A continuous wooden approach makes the clue platform reachable in every chapter.
   for (const [i, p] of RIVER_WALKWAY.entries()) {
     mesh(
-      new T.BoxGeometry(0.74, 0.18, 1.65),
+      new T.BoxGeometry(0.74, 0.18, 2.6),
       material(i % 2 ? 0x917651 : 0xa48759),
       root,
       p.x,
@@ -523,19 +525,19 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
           root,
           p.x,
           0.71,
-          p.z + side * 0.78,
+          p.z + side * 1.25,
         );
       }
   }
   mesh(
-    new T.CylinderGeometry(1.35, 1.65, 0.65, 10),
+    new T.CylinderGeometry(2.15, 2.45, 0.65, 12),
     material(0x8f9e83),
     root,
     RIVER_NOTE.x,
     0.15,
     RIVER_NOTE.z,
   );
-  stones.push({ ...RIVER_NOTE, r: 1.35, y: 0.48 });
+  stones.push({ ...RIVER_NOTE, r: 2.15, y: 0.48 });
   const riverNote = new T.Group();
   riverNote.position.set(RIVER_NOTE.x, 0.48, RIVER_NOTE.z);
   root.add(riverNote);
@@ -586,14 +588,14 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     const z = 7 - i * 3;
     const x = 25 + Math.sin(i) * 0.8;
     const m = mesh(
-      new T.CylinderGeometry(0.8, 1.1, 0.45, 7),
+      new T.CylinderGeometry(1.4, 1.6, 0.45, 9),
       material(0x9b9f86),
       root,
       x,
       0.12,
       z,
     );
-    stones.push({ x, z, r: 0.9, y: 0.34 });
+    stones.push({ x, z, r: 1.4, y: 0.34 });
   }
   // Old timber bridge across the shallow runnel.
   const bridge = new T.Group();
@@ -822,6 +824,16 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   grandmaFallback.position.set(0, 0, 0);
   grandma.add(grandmaFallback);
   const villagers = [addVillager(grandma, "grandma", grandmaFallback)];
+  const guideDef = chapterGuide(chapter), guideObject = at(guideDef.x, guideDef.z), guideFallback = npc(0, 0, 0x66977c);
+  guideFallback.position.set(0, 0, 0);
+  guideObject.add(guideFallback);
+  const guide = {
+    ...guideDef, object: guideObject, walking: false,
+    visual: addVillager(guideObject, guideDef.id, guideFallback, { height: guideDef.height }),
+    type: 'trail-guide', name: `与${guideDef.name}交谈`, displayName: guideDef.name,
+    category: `${guideDef.role} · 可以为你带路`, radius: 3,
+  };
+  interactables.push(guide);
   interactables.push({
     type: "grandma",
     name: "与奶奶交谈",
@@ -1465,20 +1477,14 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   ring.visible = false;
   ring.castShadow = false;
   ring.receiveShadow = false;
+  const exploration = buildExplorationWorld(root, colliders, interactables, stones, surfaces);
   const collection = buildCollectionWorld(
     root,
     interactables,
     chapter,
     day,
-    height,
+    (x, z) => surfaceHeight({ stones, surfaces }, x, z),
     weather,
-  );
-  const exploration = buildExplorationWorld(
-    root,
-    colliders,
-    interactables,
-    stones,
-    surfaces,
   );
   function moveGrandma(state) {
     const p = grandmaPlace(state),
@@ -1493,6 +1499,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   function update(t, state) {
     moveGrandma(state);
     villagers.forEach((v) => v.update(t));
+    guide.visual.update(t, guide.walking);
     exploration.update(t, state);
     sun.position.set(
       state.position.x - 30,
@@ -1593,6 +1600,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     exploration.dispose();
     boardTexture?.dispose();
     villagers.forEach((v) => v.dispose());
+    guide.visual.dispose();
     collection.dispose();
     chestArt.dispose();
     scene.remove(root);
@@ -1610,6 +1618,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   }
   return {
     mountains,
+    guide,
     refreshForage,
     foliageFocus,
     foliageEye,

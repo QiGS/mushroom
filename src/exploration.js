@@ -85,6 +85,8 @@ export const SHOP = [
   },
 ];
 export const EXPLORATION_SPOTS = [
+  { id: "moss-canyon", x: 32.8, z: -64, name: "苔溪深峡", description: "苔石河湾 · 沿溪谷栈道向北寻宝", coins: 25, tool: "fruit" },
+  { id: "red-canyon", x: -25, z: -62, name: "赤岩谷底", description: "红岩营地 · 深处还有远行者的补给", coins: 25, tool: "hat" },
   {
     id: "ridge",
     x: -68,
@@ -130,6 +132,14 @@ const grassPlaces = [
   [78, -25],
   [79, -48],
   [41, 13],
+  [31.4, -58],
+  [33.6, -67],
+  [36.8, -80],
+  [-23, -57],
+  [-25, -66],
+  [-23, -73],
+  [41, -38],
+  [-53, -11],
 ];
 export const BREAKABLES = [
   ...grassPlaces.map(([x, z], i) => ({
@@ -167,6 +177,10 @@ export const BREAKABLES = [
     [-45, 19],
     [49, -26],
     [77, -34],
+    [31.1, -61],
+    [-23, -61],
+    [-26, -71],
+    [43, -46],
   ].map(([x, z], i) => ({
     id: `crate-${i}`,
     kind: "crate",
@@ -182,6 +196,9 @@ export const BREAKABLES = [
     [-3, 36],
     [10, 26],
     [-57, 13],
+    [33.8, -72],
+    [-23, -77],
+    [-65, -21],
   ].map(([x, z], i) => ({
     id: `jar-${i}`,
     kind: "jar",
