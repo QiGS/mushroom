@@ -1,4 +1,13 @@
-import { terrainHeight, CAMP, requirementsMet } from "./state.js";
+import {
+  terrainHeight,
+  WORLD_BOUNDS,
+  surfaceHeight,
+  waterLevel,
+  colliderActive,
+  overlapsCollider,
+} from "./terrain.js";
+export { surfaceHeight } from "./terrain.js";
+import { CAMP, requirementsMet } from "./state.js";
 import { activeClues, TREASURES } from "./collection.js";
 
 export const RIVER_NOTE = {
@@ -13,27 +22,25 @@ export const RIVER_WALKWAY = Array.from({ length: 16 }, (_, i) => ({
   r: 0.95,
   y: 0.48,
 }));
-export function surfaceHeight(world, x, z) {
-  let y = terrainHeight(x, z);
-  for (const p of world.stones)
-    if (Math.hypot(x - p.x, z - p.z) < p.r + 0.1) y = Math.max(y, p.y);
-  return y;
-}
 export function canWalk(world, s, x, z) {
-  if (x < -51 || x > 51 || z < -49 || z > 39) return false;
-  if (s.chapter === 3 && !s.gateOpen && z < -32.1 && Math.abs(x) < 5.4)
+  const b = WORLD_BOUNDS;
+  if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) return false;
+  if (
+    s.chapter === 3 &&
+    !s.gateOpen &&
+    z < -32.1 &&
+    z > -46 &&
+    Math.abs(x) < 5.4
+  )
     return false;
-  if (world.colliders.some((c) => Math.hypot(x - c.x, z - c.z) < c.r + 0.4))
-    return false;
-  const deepWater =
-    Math.hypot((x - 25) / 8.5, (z + 4) / 13) < 1.16 &&
-    terrainHeight(x, z) < -0.35;
-  return (
-    !deepWater ||
-    world.stones.some(
-      (p) => Math.hypot(x - p.x, z - p.z) < Math.max(0.3, p.r - 0.2),
+  if (
+    world.colliders.some(
+      (c) => colliderActive(c, s) && overlapsCollider(c, x, z, 0.4),
     )
-  );
+  )
+    return false;
+  const water = waterLevel(x, z);
+  return !Number.isFinite(water) || surfaceHeight(world, x, z) > water + 0.08;
 }
 export function navigationTarget(s) {
   if (s.waypoint)
@@ -77,16 +84,26 @@ export function navigationTarget(s) {
 export function createPathfinder(world) {
   const cache = new Map();
   const valid = (s, x, z) => {
-    const key = `${s.chapter}:${s.gateOpen}:${x}:${z}`;
+    const key = `${s.chapter}:${s.gateOpen}:${s.unlocked}:${s.broken.length}:${x}:${z}`;
     if (cache.size > 60000) cache.clear();
     if (!cache.has(key)) cache.set(key, canWalk(world, s, x, z));
     return cache.get(key);
   };
   const clear = (s, a, b) => {
     const n = Math.ceil(Math.hypot(a.x - b.x, a.z - b.z) * 4);
-    for (let i = 1; i <= n; i++)
-      if (!valid(s, a.x + ((b.x - a.x) * i) / n, a.z + ((b.z - a.z) * i) / n))
+    let previous = surfaceHeight(world, a.x, a.z);
+    for (let i = 1; i <= n; i++) {
+      const x = a.x + ((b.x - a.x) * i) / n,
+        z = a.z + ((b.z - a.z) * i) / n,
+        y = surfaceHeight(world, x, z);
+      if (
+        !valid(s, x, z) ||
+        Math.abs(y - previous) >
+          Math.max(0.27, (Math.hypot(b.x - a.x, b.z - a.z) / n) * 1.3)
+      )
         return false;
+      previous = y;
+    }
     return true;
   };
   const nearest = (s, p) => {
@@ -142,7 +159,7 @@ export function createPathfinder(world) {
       return top;
     };
     push({ ...from, f: Math.hypot(from.x - to.x, from.z - to.z) });
-    while (heap.length && closed.size < 9500) {
+    while (heap.length && closed.size < 27000) {
       const p = pop(),
         pk = key(p);
       if (closed.has(pk)) continue;

@@ -1,3 +1,13 @@
+import { AdventureUI } from "./adventure-ui.js";
+import { SHOP, purchase, EXPLORATION_SPOTS } from "./exploration.js";
+import {
+  MAP_SPACE,
+  WORLD_BOUNDS,
+  terrainHeight,
+  houseUnlocked,
+  insideHouse,
+  canyonCenter,
+} from "./terrain.js";
 import {
   createIcons,
   Volume2,
@@ -57,6 +67,7 @@ export class UI {
     this.mapTimer = 0;
     this.collection = new CollectionUI(this);
     this.toolbelt = new ToolbeltUI(this);
+    this.adventure = new AdventureUI(game);
     this.bind();
     icons();
   }
@@ -319,11 +330,12 @@ export class UI {
         )
         .join(
           " · ",
-        )}</small></button><button id="rest-village"><strong>坐下歇一会</strong><small>恢复全部体力，保留本次探索进度</small></button><button id="sell-harvest"><strong>兑换多余菌子</strong><small>保留任务食材，将余下收获换成竹叶币</small></button><button id="upgrade-basket"><strong>${s.capacity === 36 ? "大竹篮已备好" : "扩容竹篮 · 80 竹叶币"}</strong><small>${s.capacity === 36 ? "容量 36 朵" : "把容量从 24 朵增加到 36 朵"}</small></button></div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><button id="chapter-select">选择旅程</button></div>`,
+        )}</small></button><button id="open-shop"><strong>逛逛山货铺</strong><small>购买斧子、猎枪、防水鞋与补给</small></button><button id="rest-village"><strong>坐下歇一会</strong><small>恢复全部体力，保留本次探索进度</small></button><button id="sell-harvest"><strong>兑换多余菌子</strong><small>保留任务食材，将余下收获换成竹叶币</small></button><button id="upgrade-basket"><strong>${s.capacity === 36 ? "大竹篮已备好" : "扩容竹篮 · 80 竹叶币"}</strong><small>${s.capacity === 36 ? "容量 36 朵" : "把容量从 24 朵增加到 36 朵"}</small></button></div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><button id="chapter-select">选择旅程</button></div>`,
       "camp",
     );
     $("submit-harvest").onclick = () =>
       s.settled ? this.feast() : this.cooking();
+    $("open-shop").onclick = () => this.shop();
     $("rest-village").onclick = () => {
       s.health = 5;
       s.stamina = 100;
@@ -345,6 +357,46 @@ export class UI {
       this.grandma();
     };
     $("chapter-select").onclick = () => this.chapters();
+  }
+  shop() {
+    const s = this.game.state;
+    this.show(
+      "山货铺",
+      "TOOLS FOR THE TRAIL",
+      `<div class="shop-heading"><span>竹叶币 <strong>${s.coins}</strong></span><span>竹材 ${s.timber}</span></div><p class="panel-subtitle">购买后进入道具栏，↑↓ 选中、G 装备。左键使用武器，1 / 2 / 3 切换竹杖、斧子、猎枪。</p><div class="shop-grid">${SHOP.map((p) => `<article class="shop-item"><span>${p.icon}</span><h3>${p.name}</h3><p>${p.detail}</p><button data-buy="${p.id}" ${s.coins < p.price ? "disabled" : ""}>购买 ${p.name} · ${p.price} 竹叶币</button></article>`).join("")}</div><div class="shop-footer"><span>竹材每份可换 4 竹叶币</span><button class="shop-material" id="sell-timber" ${s.timber ? "" : "disabled"}>出售竹材 · +${s.timber * 4}</button></div>`,
+      "shop",
+    );
+    document.querySelectorAll("[data-buy]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          const result = purchase(this.game.state, b.dataset.buy);
+          this.game.result(result);
+          this.shop();
+        }),
+    );
+    document.getElementById("sell-timber").onclick = () => {
+      const s = this.game.state;
+      if (!s.timber) return;
+      s.coins += s.timber * 4;
+      s.timber = 0;
+      this.game.save();
+      this.shop();
+    };
+  }
+  house() {
+    this.show(
+      "山间小屋",
+      "A ROOM OF YOUR OWN",
+      '<p class="camp-intro">第一道山野料理，让村庄有了新的烟火气。小屋的门已经打开，走进去看看吧。</p><p class="panel-subtitle">屋内有床铺、书架和木桌。房顶在进入时隐去，便于查看室内。</p><div class="panel-footer"><span>居所已永久解锁</span><button id="house-rest">歇脚 · 恢复生命与体力</button></div>',
+      "house",
+    );
+    document.getElementById("house-rest").onclick = () => {
+      this.game.state.health = 5;
+      this.game.state.stamina = 100;
+      this.game.save();
+      this.close();
+      this.toast("休息好了，继续探索山野吧。");
+    };
   }
   cooking() {
     const s = this.game.state;
@@ -428,7 +480,7 @@ export class UI {
     this.show(
       "让旅程更合心意",
       "SETTINGS",
-      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>J</kbd>竹杖攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>R</kbd>投石诱导</span><span><kbd>↑ / ↓</kbd>切换道具</span><span><kbd>G</kbd>使用当前道具</span><span><kbd>V</kbd>虚线引导开关</span><span><kbd>L</kbd>旅途手记</span><span><kbd>M / B / I</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
+      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>左键 / J</kbd>武器攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>R</kbd>投石诱导</span><span><kbd>1 / 2 / 3</kbd>切换武器</span><span><kbd>↑ / ↓</kbd>切换道具</span><span><kbd>G</kbd>使用当前道具</span><span><kbd>V</kbd>虚线引导开关</span><span><kbd>L</kbd>旅途手记</span><span><kbd>M / B / I</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
       "settings",
     );
     $("set-sound").onclick = () => {
@@ -470,7 +522,7 @@ export class UI {
     this.drawMap($("large-map").getContext("2d"), 600, true);
     $("panel-body").insertAdjacentHTML(
       "beforeend",
-      `<div class="map-route-summary"><div><strong>⌖ ${target.name}</strong><small>距离 ${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · 道具栏指南针 ×${s.tools.compass}</small></div><button id="map-guide-toggle">V · ${s.guidance ? "关闭" : "显示"}虚线引导</button></div><p class="map-compass-hint">右上罗盘指示目标方向 · 金色标记为当前目标 · 河心石台可沿浮桥抵达</p>${!s.riverNoteFound ? '<div class="map-clues"><button class="river-note" id="map-river"><span>▤</span><div><b>河心石台 · 未拾取的便笺</b><small>点击追踪，再按 V 查看通路</small></div></button></div>' : ""}${this.collection.cluesMarkup()}`,
+      `<div class="map-route-summary"><div><strong>⌖ ${target.name}</strong><small>距离 ${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · 道具栏指南针 ×${s.tools.compass}</small></div><button id="map-guide-toggle">V · ${s.guidance ? "关闭" : "显示"}虚线引导</button></div><p class="map-compass-hint">右上罗盘指示目标方向 · 金色标记为当前目标 · 河心石台可沿浮桥抵达</p>${!s.riverNoteFound ? '<div class="map-clues"><button class="river-note" id="map-river"><span>▤</span><div><b>河心石台 · 未拾取的便笺</b><small>点击追踪，再按 V 查看通路</small></div></button></div>' : ""}${this.collection.cluesMarkup()}<div class="explore-map-links">${EXPLORATION_SPOTS.map((p) => `<button data-explore="${p.id}">◇ ${p.name}</button>`).join("")}<button data-explore="shop">山货铺</button></div>`,
     );
     $("map-guide-toggle").onclick = () => {
       this.game.toggleGuidance();
@@ -486,12 +538,37 @@ export class UI {
     document.querySelectorAll("[data-map-clue]").forEach((button) => {
       button.onclick = () => this.collection.track(button.dataset.mapClue);
     });
+    document.querySelectorAll("[data-explore]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          const p =
+            b.dataset.explore === "shop"
+              ? { x: 8, z: 27.3 }
+              : EXPLORATION_SPOTS.find((p) => p.id === b.dataset.explore);
+          this.waypoint = { x: p.x, z: p.z, kind: "custom" };
+          s.collection.track = null;
+          this.game.save();
+          this.map();
+        }),
+    );
     $("large-map").onclick = (e) => {
       const r = e.currentTarget.getBoundingClientRect();
       this.waypoint = {
         kind: "custom",
-        x: ((e.clientX - r.left) / r.width) * 110 - 55,
-        z: ((e.clientY - r.top) / r.height) * 110 - 55,
+        x: Math.max(
+          WORLD_BOUNDS.minX,
+          Math.min(
+            WORLD_BOUNDS.maxX,
+            ((e.clientX - r.left) / r.width) * MAP_SPACE.span + MAP_SPACE.x,
+          ),
+        ),
+        z: Math.max(
+          WORLD_BOUNDS.minZ,
+          Math.min(
+            WORLD_BOUNDS.maxZ,
+            ((e.clientY - r.top) / r.height) * MAP_SPACE.span + MAP_SPACE.z,
+          ),
+        ),
       };
       this.game.state.collection.track = null;
       this.game.save();
@@ -501,12 +578,37 @@ export class UI {
   }
   drawMap(ctx, size, large = false) {
     const s = this.game.state;
-    const scale = size / 110,
-      px = (x) => (x + 55) * scale,
-      pz = (z) => (z + 55) * scale;
+    const scale = size / MAP_SPACE.span,
+      px = (x) => (x - MAP_SPACE.x) * scale,
+      pz = (z) => (z - MAP_SPACE.z) * scale;
     ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = large ? "#dce1c9" : "#b3c5a0";
     ctx.fillRect(0, 0, size, size);
+    // Elevation bands put the explorable ridge and gorge on both maps.
+    for (let x = -92; x < 92; x += 4)
+      for (let z = -94; z < 56; z += 4) {
+        const h = terrainHeight(x, z);
+        if (x < -43 || (x > 43 && z < 24)) {
+          ctx.fillStyle =
+            h > 23
+              ? "#9a9e86"
+              : h > 10
+                ? "#a3aa86"
+                : h < -4
+                  ? "#638f89"
+                  : x > 43
+                    ? "#bea783"
+                    : "#a7b58e";
+          ctx.fillRect(px(x), pz(z), 4 * scale + 0.5, 4 * scale + 0.5);
+        }
+      }
+    ctx.strokeStyle = large ? "#85987a" : "#718a6b";
+    ctx.strokeRect(
+      px(WORLD_BOUNDS.minX),
+      pz(WORLD_BOUNDS.minZ),
+      (WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX) * scale,
+      (WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ) * scale,
+    );
     ctx.strokeStyle = large ? "#b7c3a0" : "#90a783";
     ctx.lineWidth = 1;
     for (let i = 0; i < 5; i++) {
@@ -656,6 +758,30 @@ export class UI {
       ctx.stroke();
       ctx.setLineDash([]);
     }
+    ctx.strokeStyle = "#9d8157";
+    ctx.lineWidth = large ? 4 : 2;
+    ctx.beginPath();
+    ctx.moveTo(px(49), pz(-30));
+    ctx.lineTo(px(79), pz(-30));
+    ctx.stroke();
+    for (const p of EXPLORATION_SPOTS) {
+      ctx.fillStyle = s.surveyed.includes(p.id) ? "#697f56" : "#9c783e";
+      ctx.font = `${large ? 14 : 10}px sans-serif`;
+      ctx.fillText("◇", px(p.x), pz(p.z));
+      if (large) {
+        ctx.font = "11px sans-serif";
+        ctx.fillText(p.name, px(p.x), pz(p.z) - 12);
+      }
+    }
+    if (large) {
+      ctx.fillStyle = "#6c764e";
+      ctx.fillText("山货铺", px(8) + 18, pz(29) + 16);
+      ctx.fillText(
+        houseUnlocked(s) ? "小屋 · 已开放" : "小屋 · 首章后开放",
+        px(-6) - 27,
+        pz(33) + 28,
+      );
+    }
     const navTarget = navigationTarget(s);
     if (navTarget) {
       ctx.strokeStyle = "#d39435";
@@ -710,6 +836,7 @@ export class UI {
     ctx.restore();
   }
   update(dt) {
+    this.adventure.update();
     const s = this.game.state,
       ch = CHAPTERS[s.chapter - 1],
       q = quest(s);
@@ -736,22 +863,27 @@ export class UI {
       `${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · ${s.guidance ? (this.game.route.points.length ? "引导中" : "暂无安全路线") : "显示路线"}`;
     $("route-status").classList.toggle("active", s.guidance);
     const p = s.position;
-    const region =
-      p.z > 22
-        ? "山野村庄"
-        : p.z < -32
-          ? s.chapter === 2
-            ? "双石菌窝"
-            : "深山菌谷"
-          : p.x > 17
-            ? "月牙潭畔"
-            : p.x < -17 && p.z < -5
-              ? "回声坡"
-              : s.chapter === 2
-                ? "青影竹林"
-                : s.chapter === 3
-                  ? "岔路林"
-                  : "晨光林地";
+    const region = insideHouse(p.x, p.z)
+      ? "山间小屋"
+      : p.x < -43
+        ? "风铃山岭"
+        : p.x > 43 && p.z < 24
+          ? "赤石峡谷"
+          : p.z > 22
+            ? "山野村庄"
+            : p.z < -32
+              ? s.chapter === 2
+                ? "双石菌窝"
+                : "深山菌谷"
+              : p.x > 17
+                ? "月牙潭畔"
+                : p.x < -17 && p.z < -5
+                  ? "回声坡"
+                  : s.chapter === 2
+                    ? "青影竹林"
+                    : s.chapter === 3
+                      ? "岔路林"
+                      : "晨光林地";
     $("region-label").textContent = region;
     if (region !== this.location) {
       this.location = region;

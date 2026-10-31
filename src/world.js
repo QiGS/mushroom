@@ -1,3 +1,5 @@
+import { buildExplorationWorld } from "./exploration-world.js";
+import { EXPLORE_CLEARINGS } from "./exploration.js";
 import * as T from "three";
 import { createChestVisual } from "./chest-model.js";
 import { RIVER_NOTE, RIVER_WALKWAY } from "./navigation.js";
@@ -109,7 +111,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   const fill = new T.DirectionalLight(0x9fd7db, 0.45);
   fill.position.set(30, 20, -30);
   root.add(fill);
-  const groundGeo = new T.PlaneGeometry(180, 180, 150, 150);
+  const groundGeo = new T.PlaneGeometry(240, 240, 240, 240);
   groundGeo.rotateX(-Math.PI / 2);
   const positions = groundGeo.attributes.position,
     colors = [];
@@ -129,6 +131,11 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
             0.12 + patch * 0.065,
           );
     if (Math.hypot(x, z - 30) < 8) c.set(0xa89b71);
+    if (x < -43)
+      c.set(
+        height(x, z) > 23 ? 0x9fa58f : height(x, z) > 10 ? 0x8a9467 : 0x7a8b51,
+      );
+    if (x > 43 && z < 23) c.set(height(x, z) < 0 ? 0x6e8278 : 0xad9471);
     colors.push(c.r, c.g, c.b);
   }
   groundGeo.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
@@ -154,7 +161,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   const hillMat = material(0x748f78);
   for (let i = 0; i < 20; i++) {
     const a = (i / 20) * Math.PI * 2,
-      r = 85 + random() * 25;
+      r = 130 + random() * 25;
     const h = 14 + random() * 23;
     const mountain = mesh(
       new T.IcosahedronGeometry(1, 1),
@@ -167,6 +174,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     mountain.scale.set(21 + random() * 12, h, 20);
   }
   const safePoints = [
+    ...EXPLORE_CLEARINGS,
     { x: 0, z: 30, r: 10 },
     { x: 0, z: -38, r: 9 },
     { x: 25, z: -5, r: 13 },
@@ -189,10 +197,12 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     const x = (random() - 0.5) * 145,
       z = (random() - 0.5) * 145;
     if (
+      (x > 38 && z < 23) ||
       Math.abs(x - Math.sin(z * 0.08) * 6) < 5 ||
       safePoints.some((p) => Math.hypot(x - p.x, z - p.z) < p.r)
     )
       continue;
+    if (Math.abs(x) > 43 && random() < 0.82) continue;
     const h = 7 + random() * 9,
       r = 0.3 + random() * 0.45,
       y = height(x, z),
@@ -289,7 +299,10 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       z = (random() - 0.5) * 128;
     const path = Math.abs(x - Math.sin(z * 0.08) * 6);
     if (
+      x > 44 ||
+      (x < -43 && random() < 0.8) ||
       path < 2.3 ||
+      (Math.abs(x + 6) < 4.6 && Math.abs(z - 33) < 4.2) ||
       Math.hypot((x - 25) / 1.1, (z + 4) / 1.5) < 7.5 ||
       Math.hypot(x, z - 30) < 8
     )
@@ -336,7 +349,12 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   for (let i = 0; i < 280; i++) {
     const x = (random() - 0.5) * 110,
       z = (random() - 0.5) * 110;
-    if (Math.abs(x - Math.sin(z * 0.08) * 6) < 3 || Math.hypot(x, z - 30) < 8)
+    if (
+      x > 43 ||
+      Math.abs(x - Math.sin(z * 0.08) * 6) < 3 ||
+      Math.hypot(x, z - 30) < 8 ||
+      (Math.abs(x + 6) < 5 && Math.abs(z - 33) < 4.6)
+    )
       continue;
     for (let j = 0; j < 6; j++)
       ferns.push({
@@ -362,7 +380,11 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       x =
         Math.sin(z * 0.08) * 6 + (random() > 0.5 ? 1 : -1) * (3 + random() * 8),
       y = height(x, z);
-    if (Math.hypot(x, z - 30) < 8) continue;
+    if (
+      Math.hypot(x, z - 30) < 8 ||
+      (Math.abs(x + 6) < 4.6 && Math.abs(z - 33) < 4.2)
+    )
+      continue;
     stems.push({ x, y: y + 0.2, z, sx: 0.018, sy: 0.4, sz: 0.018 });
     blooms.push({
       x,
@@ -400,6 +422,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   water.castShadow = false;
   water.receiveShadow = false;
   const stones = [];
+  const surfaces = [];
   // A continuous wooden approach makes the clue platform reachable in every chapter.
   for (const [i, p] of RIVER_WALKWAY.entries()) {
     mesh(
@@ -547,28 +570,6 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   ])
     sign(p.x, p.z);
   // Village: a roof, a cooking fire, and a table that fills with unlocked dishes.
-  const house = at(-6, 33);
-  mesh(new T.BoxGeometry(5, 3.4, 4), material(0xb5a47d), house, 0, 1.7);
-  const roof = mesh(
-    new T.ConeGeometry(4.2, 2.7, 4),
-    material(0x57654a),
-    house,
-    0,
-    4.3,
-  );
-  roof.rotation.y = Math.PI / 4;
-  roof.scale.z = 0.85;
-  mesh(new T.BoxGeometry(1.1, 2, 0.1), material(0x594a36), house, 0, 1, 2.05);
-  for (const x of [-1.65, 1.65])
-    mesh(
-      new T.BoxGeometry(0.7, 0.8, 0.13),
-      material(0xf6d990, { emissive: 0xc99940, emissiveIntensity: 0.3 }),
-      house,
-      x,
-      1.9,
-      2.03,
-    );
-  colliders.push({ x: -6, z: 33, r: 3.4 });
   const camp = at(0, 30);
   const ash = mesh(
     new T.CylinderGeometry(1, 1.2, 0.15, 10),
@@ -637,7 +638,9 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     1.8,
     -1,
   );
+  colliders.push({ id: "cooking-fire", x: 4, z: 29, r: 1 });
   const table = at(-0.5, 33.5);
+  colliders.push({ id: "village-table", x: -0.5, z: 33.5, hx: 2, hz: 0.75 });
   mesh(new T.BoxGeometry(4, 0.18, 1.5), wood, table, 0, 1);
   for (const x of [-1.6, 1.6])
     for (const z of [-0.5, 0.5])
@@ -1218,7 +1221,21 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     day,
     height,
   );
+  const exploration = buildExplorationWorld(
+    root,
+    colliders,
+    interactables,
+    stones,
+    surfaces,
+  );
   function update(t, state) {
+    exploration.update(t, state);
+    sun.position.set(
+      state.position.x - 30,
+      height(state.position.x, state.position.z) + 50,
+      state.position.z + 25,
+    );
+    sun.target.position.set(state.position.x, 0, state.position.z);
     collection.update(t, state);
     time.value = t;
     for (const fn of animated) fn(t);
@@ -1233,7 +1250,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         : state.weather === "fog"
           ? 0.025
           : 0.0125;
-    scene.fog.density = fogDensity;
+    scene.fog.density = Math.abs(state.position.x) > 43 ? 0.007 : fogDensity;
     scene.fog.color.set(0xa5bca1).lerp(new T.Color(0xc49e80), dusk * 0.35);
     scene.background.copy(scene.fog.color);
     dishes.forEach((d, i) => (d.visible = state.recipes.length > i));
@@ -1255,6 +1272,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     ring.rotation.z = t * 0.3;
   }
   function sync(state) {
+    exploration.sync(state);
     collection.sync(state);
     for (const item of items) {
       const g = mushroomObjects.get(item.id);
@@ -1290,6 +1308,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   }
   return {
     collection,
+    exploration,
+    surfaces,
     root,
     colliders,
     interactables,

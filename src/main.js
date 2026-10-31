@@ -1,3 +1,24 @@
+import {
+  safeSpawn,
+  stepBody,
+  waterLevel,
+  houseUnlocked,
+  insideHouse,
+  colliderActive,
+  overlapsCollider,
+} from "./terrain.js";
+import {
+  BREAKABLES,
+  WEAPONS,
+  selectWeapon,
+  spendWeapon,
+  waterImpact,
+  strikeObject,
+  collectFieldLoot,
+  surveySpot,
+} from "./exploration.js";
+import { clearShot, inAttackArc, MONSTER_TYPES } from "./combat.js";
+import { equipmentVisual } from "./equipment-visual.js";
 import "./style.css";
 import * as T from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -122,6 +143,8 @@ class Game {
     this.velocity = new T.Vector3();
     this.vertical = 0;
     this.grounded = true;
+    this.fallPeak = this.player.root.position.y;
+    this.safePosition = { ...CAMP };
     this.nearest = null;
     this.attackTime = 0;
     this.attackCooldown = 0;
@@ -142,6 +165,7 @@ class Game {
     this.bind();
     this.makeEnemies();
     this.world.sync(this.state);
+    this.restoreSafePosition();
     this.applyQuality();
     this.loadModel();
     if (QA) import("./qa.js").then((m) => m.attachQA(this));
@@ -236,6 +260,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       );
       this.modelFallback = true;
     }
+    this.equipment = equipmentVisual(this.player, this.motion);
     $("loading-progress").style.width = "100%";
     $("loading").style.opacity = "0";
     setTimeout(() => $("loading").classList.add("hidden"), 650);
@@ -281,6 +306,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         KeyE: () => this.interact(),
         KeyF: () => this.observe(),
         KeyJ: () => this.attack(),
+        Digit1: () => this.equipWeapon("staff"),
+        Digit2: () => this.equipWeapon("axe"),
+        Digit3: () => this.equipWeapon("rifle"),
         KeyQ: () => this.dodge(),
         KeyR: () => this.throwStone(),
         ArrowUp: () => this.selectTool(-1),
@@ -324,9 +352,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         !this.photoMode
       ) {
         if (this.look.locked) {
-          if (e.button === 0) this.attack();
+          if (e.button === 0) this.primaryAction();
           return;
         }
+        if (e.button === 0) this.primaryAction();
+        if (this.ui.panel) return;
         this.look.capture();
       }
       this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
@@ -492,6 +522,16 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.ui.toast(`第 ${id} 章 · ${CHAPTERS[id - 1].name}`);
     this.ui.grandma();
   }
+  restoreSafePosition() {
+    const p = safeSpawn(this.world, this.state, this.state.position);
+    this.player.root.position.set(
+      p.x,
+      surfaceHeight(this.world, p.x, p.z),
+      p.z,
+    );
+    this.state.position = p;
+    this.fallPeak = this.player.root.position.y;
+  }
   rebuild() {
     this.route.dispose();
     this.world.dispose();
@@ -511,38 +551,48 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.vertical = 0;
     this.grounded = true;
     this.velocity.set(0, 0, 0);
+    this.fallPeak = this.player.root.position.y;
+    this.safePosition = { ...CAMP };
     this.attackTime = 0;
     this.dodgeTime = 0;
     this.invincible = 0;
+    this.restoreSafePosition();
     this.makeEnemies();
     this.applyQuality();
   }
   makeEnemies() {
     this.enemies = [];
     this.traps = [];
-    if (this.state.chapter === 1) {
-      this.traps = [{ id: "grass", x: 15, z: -7, cleared: false, cooldown: 0 }];
-      const snake = makeSnake(this.world.root, 15, -7, false);
-      snake.object.scale.setScalar(0.8);
-      this.trapSnake = snake;
-    } else {
-      const positions =
-        this.state.chapter === 2
+    const positions =
+      this.state.chapter === 1
+        ? [[15, -7, "grass-snake", "leaf"]]
+        : this.state.chapter === 2
           ? [
-              [-9, 7, "guard"],
-              [17, -10, "patrol"],
-              [0, -29, "boss"],
+              [-9, 7, "guard", "leaf"],
+              [17, -10, "patrol", "leaf"],
+              [0, -29, "boss", "boss"],
             ]
           : [
-              [29, 5, "patrol"],
-              [-10, -24, "boss"],
+              [29, 5, "patrol", "leaf"],
+              [-10, -24, "boss", "boss"],
             ];
-      for (const [x, z, id] of positions) {
-        const enemy = makeSnake(this.world.root, x, z, id === "boss");
-        enemy.id = id;
-        enemy.object.visible = !this.state.defeated.includes(id);
-        this.enemies.push(enemy);
-      }
+    positions.push(
+      [-70, -18, "ridge-snake", "frost"],
+      [79, -48, "gorge-snake", "rock"],
+    );
+    for (const [x, z, id, kind] of positions) {
+      const type = MONSTER_TYPES[kind],
+        enemy = makeSnake(this.world.root, x, z, kind === "boss");
+      Object.assign(enemy, {
+        id,
+        name: type.name,
+        kind: type.kind,
+        hp: type.hp,
+        maxHp: type.hp,
+      });
+      enemy.segments[0].material.color.setHex(type.color);
+      enemy.object.visible = !this.state.defeated.includes(id);
+      this.enemies.push(enemy);
     }
     this.attackRing = new T.Mesh(
       new T.RingGeometry(0.7, 2, 28, 1, -0.7, 1.4),
@@ -610,6 +660,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   settle() {
     const result = settle(this.state);
     if (!result.ok) return this.result(result);
+    this.world.sync(this.state);
     this.save();
     this.audio.play("win");
     this.ui.settlement(result.summary);
@@ -642,6 +693,58 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.state.stamina -= 20;
     this.audio.play("swing");
   }
+  equipWeapon(id) {
+    if (!selectWeapon(this.state, id))
+      return this.ui.toast("先在山货铺购买并按 G 装备这件武器。");
+    this.save();
+    this.ui.toast(`已切换${WEAPONS[id].name} · 左键使用`);
+  }
+  primaryAction() {
+    if (!this.started || this.ui.panel || this.photoMode) return;
+    this.player.root.rotation.y = this.yaw + Math.PI;
+    this.findInteraction();
+    const p = this.player.root.position;
+    const threat = this.enemies.some(
+      (e) =>
+        e.hp > 0 &&
+        !this.state.defeated.includes(e.id) &&
+        inAttackArc(
+          p,
+          e,
+          this.player.root.rotation.y,
+          WEAPONS[this.state.weapon].range,
+          this.state.weapon === "rifle",
+        ),
+    );
+    const breakable = BREAKABLES.some(
+      (b) =>
+        !this.state.broken.includes(b.id) &&
+        inAttackArc(
+          p,
+          b,
+          this.player.root.rotation.y,
+          WEAPONS[this.state.weapon].range,
+          this.state.weapon === "rifle",
+        ) &&
+        Math.abs(terrainHeight(b.x, b.z) - p.y) < 3 &&
+        clearShot(
+          this.world,
+          this.state,
+          { x: p.x, y: p.y + 1.15, z: p.z },
+          { ...b, y: terrainHeight(b.x, b.z) + 0.5 },
+          b.id,
+        ),
+    );
+    if (
+      !threat &&
+      !breakable &&
+      this.nearest &&
+      this.nearest.type !== "breakable" &&
+      inAttackArc(p, this.nearest, this.player.root.rotation.y, 3.1)
+    )
+      return this.interact();
+    this.attack();
+  }
   attack() {
     if (
       !this.started ||
@@ -650,37 +753,113 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.photoMode
     )
       return;
+    const s = this.state,
+      weapon = s.weapon,
+      w = WEAPONS[weapon],
+      gun = weapon === "rifle",
+      p = this.player.root.position;
     this.attackTime = 0.28;
-    this.attackCooldown = 0.42;
-    this.audio.play("swing");
-    const p = this.player.root.position,
-      forward = new T.Vector2(
-        Math.sin(this.player.root.rotation.y),
-        Math.cos(this.player.root.rotation.y),
+    this.attackCooldown = w.cooldown;
+    this.audio.play(gun ? "stone" : "swing");
+    const from = { x: p.x, y: p.y + 1.15, z: p.z };
+    const targets = [
+      ...this.enemies
+        .filter(
+          (e) => e.hp > 0 && !s.defeated.includes(e.id) && e.cooldown <= 0,
+        )
+        .map((e) => ({
+          type: "enemy",
+          x: e.x,
+          z: e.z,
+          y: e.object.position.y + 0.5,
+          value: e,
+          id: e.id,
+        })),
+      ...BREAKABLES.filter((b) => !s.broken.includes(b.id)).map((b) => ({
+        type: "prop",
+        ...b,
+        y: terrainHeight(b.x, b.z) + 0.5,
+        value: b,
+      })),
+    ]
+      .filter(
+        (t) =>
+          inAttackArc(p, t, this.player.root.rotation.y, w.range, gun) &&
+          Math.abs(t.y - p.y) < (gun ? 18 : 3) &&
+          clearShot(this.world, s, from, t, t.id),
+      )
+      .sort(
+        (a, b) =>
+          Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z),
       );
-    for (const e of this.enemies) {
-      if (e.hp <= 0 || e.cooldown > 0 || this.state.defeated.includes(e.id))
-        continue;
-      const d = new T.Vector2(e.x - p.x, e.z - p.z);
-      if (
-        d.length() < 2.7 + (e.boss ? 0.7 : 0) &&
-        forward.dot(d.normalize()) > -0.15
-      ) {
-        e.hp -= e.state === "stunned" ? 2 : 1;
-        this.burst(e.object.position, 0xcbe794, 12);
-        e.object.scale.multiplyScalar(1.04);
-        this.audio.play("hit");
-        if (e.hp <= 0) this.defeat(e);
-        else {
-          e.cooldown = 0.4;
-          if (e.state === "idle" || e.state === "recover") {
-            e.state = "recover";
-            e.timer = 0.35;
-          }
+    const hit = targets[0];
+    let spent = gun;
+    if (hit?.type === "enemy") {
+      const e = hit.value;
+      e.hp -= w.damage * (e.state === "stunned" ? 2 : 1);
+      spent = true;
+      this.burst(e.object.position, 0xcbe794, 12);
+      this.audio.play("hit");
+      if (e.hp <= 0) this.defeat(e);
+      else {
+        e.cooldown = 0.3;
+        if (e.state === "idle" || e.state === "recover") {
+          e.state = "recover";
+          e.timer = 0.4;
         }
       }
+    } else if (hit?.type === "prop") {
+      const r = strikeObject(s, hit.value, weapon);
+      if (!r.ok) this.ui.toast(r.message);
+      else {
+        spent = true;
+        this.burst(
+          new T.Vector3(hit.x, hit.y, hit.z),
+          hit.kind === "grass" ? 0xa5b873 : 0xc3a879,
+          14,
+        );
+        if (this.world.exploration.hit(hit.id, r.damage)) {
+          s.broken.push(hit.id);
+          this.world.sync(s);
+          this.route.invalidate();
+          this.ui.toast(`${hit.name}散开了 · 靠近按 E 或左键拾取`);
+        } else this.ui.toast(`${hit.name}出现裂痕，再击打一次。`);
+      }
+    } else if (!gun && this.nearest?.type === "echo") this.interact();
+    if (gun) {
+      const end = hit
+        ? new T.Vector3(hit.x, hit.y, hit.z)
+        : new T.Vector3(
+            p.x + Math.sin(this.player.root.rotation.y) * w.range,
+            p.y + 0.8,
+            p.z + Math.cos(this.player.root.rotation.y) * w.range,
+          );
+      const geo = new T.BufferGeometry().setFromPoints([
+          new T.Vector3(from.x, from.y, from.z),
+          end,
+        ]),
+        mat = new T.LineBasicMaterial({
+          color: 0xffd99b,
+          transparent: true,
+          opacity: 0.85,
+        });
+      const line = new T.Line(geo, mat);
+      this.scene.add(line);
+      this.particles.push({
+        mesh: line,
+        velocity: new T.Vector3(),
+        life: 0.13,
+        geo,
+        mat,
+      });
+      this.burst(new T.Vector3(from.x, from.y, from.z), 0xffcc72, 5);
     }
-    if (this.nearest?.type === "echo") this.interact();
+    if (spent) {
+      spendWeapon(s);
+      if (s.weapon !== weapon)
+        this.ui.toast(`${w.name}${gun ? "弹药耗尽" : "耐久耗尽"} · 已换回竹杖`);
+      this.save();
+    }
   }
   defeat(e) {
     e.hp = 0;
@@ -697,7 +876,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           this.state.achievements.push("青影徽章");
         this.ui.toast("青影化成一阵竹叶 · 获得徽章、疾风草鞋与回复果");
         this.audio.play("discover");
-      } else this.ui.toast("竹叶青离开了 · +8 竹叶币 · 回复果 +1");
+      } else this.ui.toast(`${e.name}离开了 · +8 竹叶币 · 回复果 +1`);
     }
     this.world.sync(this.state);
     this.save();
@@ -743,7 +922,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const s = this.state;
     if (!id || !s.tools[id])
       return this.ui.toast("道具栏为空，探索宝箱和河心石台可以获得道具。");
-    if (["fruit", "hat", "shoes"].includes(id)) {
+    if (["fruit", "hat", "shoes", "axe", "rifle", "boots"].includes(id)) {
       const result = activateTool(s, id);
       this.result(result);
       if (result.ok) this.audio.play("bell");
@@ -841,6 +1020,31 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const item = this.nearest;
     if (!item) return;
     const s = this.state;
+    if (item.type === "shop") return this.ui.shop();
+    if (item.type === "house" || item.type === "house-rest") {
+      if (!houseUnlocked(s))
+        return this.ui.toast("完成第一章并返村料理后，这间小屋就会为你开放。");
+      return this.ui.house();
+    }
+    if (item.type === "breakable") {
+      this.player.root.rotation.y = Math.atan2(
+        item.x - this.player.root.position.x,
+        item.z - this.player.root.position.z,
+      );
+      return this.attack();
+    }
+    if (item.type === "field-loot") {
+      const r = collectFieldLoot(s, item.id);
+      this.result(r);
+      if (r.ok) this.audio.play("collect");
+      return;
+    }
+    if (item.type === "survey") {
+      const r = surveySpot(s, item.id);
+      this.result(r);
+      if (r.ok) this.audio.play("discover");
+      return;
+    }
     if (item.type === "river-note") {
       if (s.riverNoteFound) return;
       s.riverNoteFound = true;
@@ -1181,49 +1385,38 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       dz = this.dodgeDir.y * 10 * dt;
     }
     const old = p.clone();
-    p.x = clamp(p.x + dx, -51, 51);
-    p.z = clamp(p.z + dz, -49, 39);
-    for (const c of this.world.colliders) {
-      const dist = Math.hypot(p.x - c.x, p.z - c.z),
-        r = c.r + 0.3;
-      if (dist < r && dist > 0.001) {
-        p.x = c.x + ((p.x - c.x) / dist) * r;
-        p.z = c.z + ((p.z - c.z) / dist) * r;
-      }
-    }
-    if (
-      this.state.chapter === 3 &&
-      !this.state.gateOpen &&
-      p.z < -32.5 &&
-      Math.abs(p.x) < 5
-    ) {
-      p.z = -32.5;
-    }
-    let floor = surfaceHeight(this.world, p.x, p.z);
-    const stone = this.world.stones.find(
-      (s) => Math.hypot(p.x - s.x, p.z - s.z) < s.r + 0.1,
-    );
-    if (stone) floor = Math.max(floor, stone.y);
-    if (p.z > 11 && p.z < 17 && Math.abs(p.x - Math.sin(14 * 0.08) * 6) < 2)
-      floor = Math.max(floor, terrainHeight(0, 14) + 0.45);
-    this.vertical -= 15 * dt;
-    p.y += this.vertical * dt;
-    if (p.y <= floor) {
-      p.y = floor;
+    const body = {
+      position: p,
+      vertical: this.vertical,
+      grounded: this.grounded,
+      fallPeak: this.fallPeak,
+    };
+    const event = stepBody(this.world, this.state, body, dx, dz, dt);
+    this.vertical = body.vertical;
+    this.grounded = body.grounded;
+    this.fallPeak = body.fallPeak;
+    if (event.water) {
+      const protectedByBoots = this.state.gear.boots > 0;
+      const waterDamage = waterImpact(this.state);
+      const safe = this.safePosition;
+      p.set(safe.x, surfaceHeight(this.world, safe.x, safe.z), safe.z);
       this.vertical = 0;
       this.grounded = true;
-    } else this.grounded = false;
-    if (
-      Math.hypot((p.x - 25) / 8.5, (p.z + 4) / 13) < 1.12 &&
-      floor < -0.35 &&
-      p.y < 0.1 &&
-      !stone
-    ) {
-      p.set(16, terrainHeight(16, -4), -4);
-      this.vertical = 0;
-      this.ui.toast("脚下一滑，回到安全岸边。收获还好好的。");
-      this.state.elapsed += 8;
-    }
+      this.fallPeak = p.y;
+      this.velocity.set(0, 0, 0);
+      this.environmentHit(
+        waterDamage,
+        protectedByBoots
+          ? "防水鞋减轻了落水伤害 · 返回岸边"
+          : "落水了 · 失去 2 点生命，返回安全岸边",
+      );
+    } else if (event.landed)
+      this.environmentHit(
+        event.landed,
+        `跌落冲击 · 失去 ${event.landed} 点生命`,
+      );
+    if (this.grounded && !Number.isFinite(waterLevel(p.x, p.z)))
+      this.safePosition = { x: p.x, z: p.z };
     const facingBefore = this.player.root.rotation.y;
     if (moving) {
       const angle = Math.atan2(m.x, m.y);
@@ -1304,6 +1497,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           this.invincible <= 0 || Math.floor(this.gameTime * 12) % 2 === 0;
       }
     }
+    this.equipment?.update(this.state.weapon);
     this.player.basket.scale.setScalar(1 + basketCount(this.state) / 100);
     this.attackRing.visible = this.attackTime > 0;
     if (this.attackRing.visible) {
@@ -1312,6 +1506,24 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.attackRing.material.opacity = this.attackTime;
     }
     this.state.position = { x: p.x, z: p.z };
+  }
+  environmentHit(amount, message) {
+    this.state.health -= amount;
+    this.state.hits++;
+    this.invincible = 1.7;
+    this.audio.play("hit");
+    if (this.state.health <= 0) {
+      const p = this.player.root.position;
+      p.set(CAMP.x, surfaceHeight(this.world, CAMP.x, CAMP.z), CAMP.z);
+      this.state.health = 5;
+      this.state.stamina = 100;
+      this.vertical = 0;
+      this.grounded = true;
+      this.fallPeak = p.y;
+      this.velocity.set(0, 0, 0);
+      this.ui.toast("向导把你送回村庄 · 收获保留，先休息一下。");
+    } else this.ui.toast(message + " · 选中回复果按 G 恢复");
+    this.save();
   }
   hurt(enemy) {
     if (this.invincible > 0) return;
@@ -1341,6 +1553,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.state.health = 5;
       this.state.stamina = 100;
       this.vertical = 0;
+      this.grounded = true;
+      this.fallPeak = this.player.root.position.y;
+      this.velocity.set(0, 0, 0);
       if (enemy) {
         enemy.hp = enemy.maxHp;
         enemy.x = enemy.home.x;
@@ -1353,7 +1568,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         "回到最近的休息点 · 菌子与探索记录全部保留，可以再试一次。",
       );
       this.save();
-    } else this.ui.toast("受了点惊吓 · H 使用回复果，Q 侧向闪避");
+    } else {
+      this.ui.toast("受伤了 · 选中回复果按 G 使用，Q 侧向闪避");
+      this.save();
+    }
   }
   updateEnemies(dt) {
     const p = this.player.root.position;
@@ -1409,7 +1627,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         e.z += e.dir.y * (e.boss ? 12 : 10) * dt;
         if (dist < (e.boss ? 1.5 : 0.9)) this.hurt(e);
         const collision = this.world.colliders.find(
-          (c) => Math.hypot(e.x - c.x, e.z - c.z) < c.r + 0.45,
+          (c) =>
+            colliderActive(c, this.state) &&
+            overlapsCollider(c, e.x, e.z, 0.45),
         );
         if (collision) {
           e.state = "stunned";
@@ -1504,6 +1724,15 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     let best = null,
       bestDist = Infinity;
     for (const item of this.world.interactables) {
+      if (
+        ["breakable", "field-loot"].includes(item.type) &&
+        !item.object.visible
+      )
+        continue;
+      if (item.type === "house-rest" && !houseUnlocked(this.state)) continue;
+      if (item.type === "survey" && this.state.surveyed.includes(item.id))
+        continue;
+      if (Math.abs(item.object.position.y - p.y) > 3.2) continue;
       if (item.type === "river-note" && this.state.riverNoteFound) continue;
       if (item.type === "specimen" && !item.object.visible) continue;
       if (
@@ -1544,7 +1773,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     if (best) {
       this.world.ring.position.set(
         best.x,
-        Math.max(0.1, terrainHeight(best.x, best.z)) + 0.04,
+        surfaceHeight(this.world, best.x, best.z) + 0.04,
         best.z,
       );
       this.world.ring.scale.setScalar(best.type === "mushroom" ? 0.7 : 1.3);
@@ -1557,7 +1786,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       desired.set(p.x + 7 + orbit * 3, p.y + 4.8, p.z + 7);
       target.set(p.x - 1, p.y + 1.2, p.z - 7);
     } else {
-      const d = this.photoMode ? this.distance * 1.5 : this.distance;
+      const d = insideHouse(p.x, p.z)
+        ? 3.3
+        : this.photoMode
+          ? this.distance * 1.5
+          : this.distance;
       target.set(p.x, p.y + 1.3, p.z);
       desired.set(
         p.x + Math.sin(this.yaw) * Math.cos(this.pitch) * d,
@@ -1573,6 +1806,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       delta.normalize();
       let limit = length;
       for (const c of this.world.colliders) {
+        if (!colliderActive(c, this.state) || c.hx !== undefined) continue;
         const cx = c.x - target.x,
           cz = c.z - target.z;
         const along = cx * delta.x + cz * delta.z;
@@ -1683,6 +1917,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         this.rescued = true;
         this.player.root.position.set(0, terrainHeight(0, 28), 28);
         this.vertical = 0;
+        this.grounded = true;
+        this.fallPeak = this.player.root.position.y;
+        this.velocity.set(0, 0, 0);
         this.ui.toast(
           "夜色来了，向导把你平安接回村口。所有收获都保留，按时奖励未获得。",
         );

@@ -65,7 +65,7 @@ export class DesktopLook {
   syncHint() {
     if (this.hint)
       this.hint.textContent = this.locked
-        ? "移动鼠标环视 · 左键挥杖 · Esc 暂停"
+        ? "移动鼠标环视 · 左键攻击 / 互动 · Esc 暂停"
         : "点击画面控制视角 · 拖动也可环视";
   }
 }

@@ -13,6 +13,9 @@ export function attachQA(game) {
     game.player.root.position.set(x, surfaceHeight(game.world, x, z), z);
     game.state.position = { x, z };
     game.vertical = 0;
+    game.grounded = true;
+    game.fallPeak = game.player.root.position.y;
+    game.velocity.set(0, 0, 0);
     game.clearInput();
     game.findInteraction();
   };
@@ -60,6 +63,89 @@ export function attachQA(game) {
   add("QA 线索", () => {
     const item = activeClues(game.state)[0];
     if (item) move(item.x, item.z + 0.3);
+  });
+  add("QA 商店", () => {
+    move(8, 26.8);
+    game.state.coins = 500;
+    game.save();
+  });
+  add("QA 桌子", () => {
+    move(-0.5, 31);
+    game.yaw = Math.PI;
+    game.keys.add("KeyW");
+    for (let i = 0; i < 180; i++) game.updatePlayer(1 / 60);
+    game.keys.clear();
+  });
+  add("QA 门外", () => {
+    move(-6, 38);
+    game.yaw = 0;
+    game.pitch = 0.35;
+  });
+  add("QA 进屋", () => {
+    move(-6, 38);
+    game.yaw = 0;
+    game.keys.add("KeyW");
+    for (let i = 0; i < 80; i++) game.updatePlayer(1 / 60);
+    game.keys.clear();
+  });
+  add("QA 高草", () => {
+    move(-8, 20.5);
+    game.yaw = 0;
+    game.pitch = 0.4;
+  });
+  add("QA 竹子", () => {
+    move(-30, 5);
+    game.yaw = 0;
+    game.pitch = 0.4;
+  });
+  add("QA 游蛇", () => {
+    const e = game.enemies.find(
+      (e) => !e.boss && !game.state.defeated.includes(e.id),
+    );
+    if (e) {
+      move(e.x, e.z + 2.5);
+      game.yaw = 0;
+      game.pitch = 0.35;
+      game.player.root.rotation.y = Math.PI;
+    }
+  });
+  add("QA 山巅", () => {
+    move(-68, -27);
+    game.yaw = -1.1;
+    game.pitch = 0.24;
+    game.distance = 12;
+  });
+  add("QA 峡谷", () => {
+    move(51, -30);
+    game.yaw = -Math.PI / 2;
+    game.pitch = 0.3;
+    game.distance = 10;
+  });
+  add("QA 过吊桥", () => {
+    move(50, -30);
+    game.yaw = -Math.PI / 2;
+    game.keys.add("KeyW");
+    for (let i = 0; i < 540 && game.player.root.position.x < 78; i++)
+      game.updatePlayer(1 / 60);
+    game.keys.clear();
+  });
+  add("QA 落水", () => {
+    move(30, -4);
+    game.state.health = 5;
+    game.safePosition = { x: 15, z: -4 };
+    game.updatePlayer(0.05);
+  });
+  add("QA 跌落", () => {
+    move(-42, -29);
+    game.state.health = 5;
+    game.player.root.position.y += 12;
+    game.fallPeak = game.player.root.position.y;
+    game.grounded = false;
+    for (let i = 0; i < 120 && !game.grounded; i++) game.updatePlayer(1 / 60);
+  });
+  add("QA 边缘", () => {
+    move(-90, 15);
+    game.yaw = -Math.PI / 2;
   });
   add("QA 图鉴", () => game.ui.guide());
   add("QA 河心", () => move(RIVER_NOTE.x, RIVER_NOTE.z + 0.4));
@@ -149,7 +235,7 @@ export function attachQA(game) {
   setInterval(() => {
     const p = game.player.root.position;
     status.textContent =
-      `${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} | 最近: ${game.nearest?.name || "无"} | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
+      `${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} 高${p.y.toFixed(1)} HP${game.state.health} | 武器:${game.state.weapon} | 最近: ${game.nearest?.name || "无"} | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
       (game.desktopControls
         ? ` | 鼠标:${game.look?.locked ? "已捕获" : "自由"} | 镜头:${game.yaw.toFixed(2)},${game.pitch.toFixed(2)} | 骨骼:${game.motion?.rig.skeleton.bones.length || 0} | 步速:${game.motion?.speed.toFixed(2) || 0}`
         : "");

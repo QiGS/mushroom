@@ -173,7 +173,7 @@ test("damaged and unexpected saves recover finite bounded defaults", () => {
   });
   assert.equal(s.chapter, 3);
   assert.ok(Number.isFinite(s.position.x));
-  assert.equal(s.position.z, -50);
+  assert.equal(s.position.z, -94);
   assert.equal(s.health, 1);
   assert.equal(basketCount(s), 24);
   assert.deepEqual(s.gate, [0, 0, 2]);

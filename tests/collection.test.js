@@ -1,3 +1,4 @@
+import { overlapsCollider } from "../src/terrain.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
@@ -191,9 +192,7 @@ test("every treasure and specimen has a dry accessible interaction point in all 
             z = p.z + Math.sin(angle) * (p.radius - 0.2);
           return (
             dry(x, z) &&
-            world.colliders.every(
-              (c) => Math.hypot(x - c.x, z - c.z) > c.r + 0.4,
-            )
+            world.colliders.every((c) => !overlapsCollider(c, x, z, 0.4))
           );
         }).some(Boolean);
         assert.ok(reachable, `${chapter}/${p.id} blocked`);

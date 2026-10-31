@@ -1,3 +1,5 @@
+import { WORLD_BOUNDS, terrainHeight } from "./terrain.js";
+export { terrainHeight } from "./terrain.js";
 import {
   newCollection,
   sanitizeCollection,
@@ -132,16 +134,6 @@ export function seededRandom(seed = 73419) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-export function terrainHeight(x, z) {
-  const h =
-    Math.sin(x * 0.07) * 0.85 +
-    Math.cos(z * 0.09) * 0.65 +
-    Math.sin((x + z) * 0.12) * 0.36 +
-    Math.cos(x * 0.18 - z * 0.1) * 0.22;
-  const lake = Math.hypot((x - 25) / 8.5, (z + 4) / 13);
-  const blend = Math.max(0, Math.min(1, (1.2 - lake) / 0.3));
-  return h * (1 - blend) - 1.1 * blend;
-}
 export function newGame() {
   return {
     version: 2,
@@ -177,6 +169,12 @@ export function newGame() {
     completed: false,
     settled: false,
     tools: newTools(),
+    gear: { axe: 0, rifle: 0, boots: 0 },
+    weapon: "staff",
+    timber: 0,
+    broken: [],
+    looted: [],
+    surveyed: [],
     selectedTool: "fruit",
     shielded: false,
     boostTime: 0,
@@ -197,8 +195,8 @@ export function sanitizeSave(raw) {
   s.chapter = Math.floor(finite(raw.chapter, 1, 1, 3));
   s.unlocked = Math.floor(finite(raw.unlocked, 1, s.chapter, 3));
   s.position = {
-    x: finite(raw.position?.x, 0, -55, 55),
-    z: finite(raw.position?.z, 27, -50, 40),
+    x: finite(raw.position?.x, 0, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX),
+    z: finite(raw.position?.z, 27, WORLD_BOUNDS.minZ, WORLD_BOUNDS.maxZ),
   };
   for (const p of SPECIES)
     s.inventory[p.id] = Math.floor(finite(raw.inventory?.[p.id], 0, 0, 36));
@@ -210,6 +208,7 @@ export function sanitizeSave(raw) {
     ["elapsed", 99999],
     ["hits", 999],
     ["boostTime", 8],
+    ["timber", 9999],
   ])
     s[key] = finite(raw[key], s[key], 0, max);
   s.capacity = raw.capacity === 36 ? 36 : 24;
@@ -237,6 +236,9 @@ export function sanitizeSave(raw) {
   ])
     s[key] = raw[key] === true;
   for (const key of [
+    "broken",
+    "looted",
+    "surveyed",
     "collected",
     "nests",
     "chests",
@@ -270,6 +272,12 @@ export function sanitizeSave(raw) {
   s.day = Math.max(1, Math.floor(s.day));
   s.collection = sanitizeCollection(raw.collection, s.chapter, s.day);
   s.tools = sanitizeTools(raw.tools, raw);
+  for (const [id, limit] of Object.entries({ axe: 30, rifle: 12, boots: 5 }))
+    s.gear[id] = Math.floor(finite(raw.gear?.[id], 0, 0, limit));
+  s.weapon =
+    ["axe", "rifle"].includes(raw.weapon) && s.gear[raw.weapon] > 0
+      ? raw.weapon
+      : "staff";
   s.selectedTool = raw.selectedTool;
   normalizeToolSelection(s);
   if (
@@ -278,8 +286,8 @@ export function sanitizeSave(raw) {
     Number.isFinite(raw.waypoint.z)
   ) {
     s.waypoint = {
-      x: finite(raw.waypoint.x, 0, -51, 51),
-      z: finite(raw.waypoint.z, 0, -49, 39),
+      x: finite(raw.waypoint.x, 0, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX),
+      z: finite(raw.waypoint.z, 0, WORLD_BOUNDS.minZ, WORLD_BOUNDS.maxZ),
       kind: ["river", "treasure", "nest", "landmark", "camp"].includes(
         raw.waypoint.kind,
       )
@@ -300,6 +308,10 @@ export function startChapter(old, chapter, weather) {
     "capacity",
     "totalCollected",
     "tools",
+    "gear",
+    "weapon",
+    "timber",
+    "surveyed",
     "selectedTool",
     "shielded",
     "settings",
