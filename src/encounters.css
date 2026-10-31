@@ -1,0 +1,246 @@
+#scope-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 8;
+  overflow: hidden;
+}
+#scope-overlay[hidden] {
+  display: none;
+}
+.scope-glass {
+  position: relative;
+  width: min(70vh, 70vw);
+  aspect-ratio: 1;
+  border: 2px solid #ede8c88c;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 100vmax #07130ec9,
+    inset 0 0 60px #07130e70;
+  color: #f2edcf;
+}
+.scope-glass:before,
+.scope-glass:after {
+  content: "";
+  position: absolute;
+  background: #f2edcfaa;
+  box-shadow: 0 0 2px #000;
+}
+.scope-glass:before {
+  height: 1px;
+  left: 4%;
+  right: 4%;
+  top: 50%;
+}
+.scope-glass:after {
+  width: 1px;
+  top: 4%;
+  bottom: 4%;
+  left: 50%;
+}
+.scope-glass i {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #dfce9b;
+  left: calc(50% - 6px);
+  top: calc(50% - 6px);
+  border-radius: 50%;
+}
+.scope-glass b {
+  position: absolute;
+  width: 26%;
+  height: 12px;
+  border: 1px solid #f2edcf80;
+  border-top: 0;
+  left: 37%;
+  top: 62%;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 19%,
+    #f2edcf70 19% 20%
+  );
+}
+.scope-readout {
+  position: absolute;
+  top: 16%;
+  width: 100%;
+  text-align: center;
+  letter-spacing: 0.2em;
+  font-size: 18px;
+}
+.scope-glass small {
+  position: absolute;
+  bottom: 7%;
+  width: 100%;
+  text-align: center;
+  line-height: 1.8;
+  font-size: 12px;
+}
+.rifle-status {
+  z-index: 12 !important;
+  white-space: nowrap;
+  font-size: 13px !important;
+}
+.map-sheet {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) 210px;
+  gap: 18px;
+  align-items: start;
+  margin-top: 10px;
+}
+.map-sheet .map-large-wrap {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border: 1px solid #84917a;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #dce1c9;
+}
+.map-sheet canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: crosshair;
+}
+.map-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.map-toolbar span {
+  margin-right: auto;
+  font-size: 12px;
+  color: #68705b;
+}
+.map-toolbar button {
+  font-size: 12px;
+  padding: 7px 12px;
+}
+.map-toolbar button[aria-pressed="true"] {
+  background: #496451;
+  color: #fff0cb;
+}
+.boss-map-card {
+  padding: 17px;
+  background: #e3dcc3;
+  border: 1px solid #aeb397;
+  border-radius: 12px;
+}
+.boss-map-card img {
+  width: 100%;
+  height: 110px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 4px #39372e22);
+}
+.boss-map-card > small {
+  letter-spacing: 0.12em;
+  color: #8b6253;
+  font-size: 11px;
+}
+.boss-map-card h3 {
+  margin: 8px 0;
+  font-size: 23px;
+}
+.boss-map-card p {
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 9px 0;
+  color: #5c6553;
+}
+.boss-map-card button {
+  width: 100%;
+  font-size: 12px;
+  padding: 10px;
+}
+.boss-map-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  border-block: 1px solid #abb295;
+  padding: 9px 0;
+}
+.boss-map-card .boss-life {
+  height: 4px;
+  background: #ccc6ad;
+  margin: 10px 0;
+}
+.boss-life i {
+  display: block;
+  height: 100%;
+  background: #986658;
+}
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 12px;
+}
+.map-legend b {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+.travel-loadout {
+  font-size: 12px;
+  color: #7b5b41;
+  margin: 8px 0 14px;
+}
+#equipped-tools {
+  gap: 4px;
+  flex-wrap: wrap;
+}
+#equipped-tools button {
+  font-size: 11px;
+  padding: 5px 8px;
+}
+@media (max-width: 720px) {
+  .map-sheet {
+    grid-template-columns: 1fr;
+  }
+  .boss-map-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .boss-map-card img {
+    display: none;
+  }
+  .boss-map-card p {
+    grid-column: 1/-1;
+  }
+  .scope-glass {
+    width: 84vw;
+  }
+  .rifle-status {
+    bottom: 150px !important;
+  }
+}
+
+#hud.is-scoped #boss-bar {
+  z-index: 12;
+}
+#hud.is-scoped .vitals,
+#hud.is-scoped #toolbelt {
+  z-index: 12;
+}
+#hud.is-scoped #location-banner,
+#hud.is-scoped #narrator,
+#hud.is-scoped #route-status {
+  visibility: hidden;
+}
+#hud.is-scoped .rifle-status {
+  top: auto;
+  bottom: 26%;
+  background: #15271dc9;
+  padding: 7px 12px;
+  border-radius: 4px;
+}

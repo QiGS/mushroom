@@ -44,6 +44,8 @@ test("legacy equipment migrates once and consumed tools cannot reappear on reloa
     stew: 0,
     axe: 0,
     rifle: 0,
+    sniper: 0,
+    cannon: 0,
     boots: 0,
     fruit: 3,
     compass: 1,
@@ -183,9 +185,9 @@ test("route display toggles, updates to a changed target, and removes its geomet
   const previous = guide.key;
   s.waypoint = { x: -5, z: 23, kind: "treasure" };
   guide.update(0.1, s, s.position);
-  assert.equal(guide.key,previous);
-  s.talked=true;
-  guide.update(.1,s,s.position);
+  assert.equal(guide.key, previous);
+  s.talked = true;
+  guide.update(0.1, s, s.position);
   assert.notEqual(guide.key, previous);
   assert.equal(guide.target.kind, "task");
   s.guidance = false;

@@ -21,7 +21,7 @@ import { buildWorld } from "../src/world.js";
 
 function finishExploration(s) {
   s.talked = true;
-  s.defeated.push("boss", "ant-queen");
+  s.defeated.push("boss", "ant-queen", "butterfly-queen", "scorpion-king");
   s.echoSolved = true;
   s.landmarks = ["stone", "moon", "trees"];
   s.gate = [0, 1, 2];
@@ -37,11 +37,11 @@ function finishExploration(s) {
   }
   return s;
 }
-test("all three chapters can be completed in all three weather patterns within the base basket", () => {
+test("all five chapters can be completed in all three weather patterns within the base basket", () => {
   for (const weather of ["sun", "rain", "fog"]) {
     let s = newGame();
     s.weather = weather;
-    for (let ch = 1; ch <= 3; ch++) {
+    for (let ch = 1; ch <= 5; ch++) {
       if (ch > 1) s = startChapter(s, ch, weather);
       finishExploration(s);
       assert.equal(requirementsMet(s), true);
@@ -49,7 +49,7 @@ test("all three chapters can be completed in all three weather patterns within t
       assert.equal(settle(s).ok, true);
     }
     assert.equal(s.completed, true);
-    assert.equal(s.recipes.length, 3);
+    assert.equal(s.recipes.length, 5);
   }
 });
 test("same mushroom and same chapter settlement cannot award twice", () => {
@@ -171,7 +171,7 @@ test("damaged and unexpected saves recover finite bounded defaults", () => {
     settings: { sensitivity: NaN },
     gate: ["x", -2, 9],
   });
-  assert.equal(s.chapter, 3);
+  assert.equal(s.chapter, 5);
   assert.ok(Number.isFinite(s.position.x));
   assert.equal(s.position.z, -94);
   assert.equal(s.health, 1);
@@ -205,7 +205,7 @@ test("consumable cannot be spent at full health or when empty", () => {
   assert.equal(heal(s).ok, false);
 });
 test("weather clues match the generated nest and generation is deterministic", () => {
-  for (let ch = 1; ch <= 3; ch++) {
+  for (let ch = 1; ch <= 5; ch++) {
     const a = createMushrooms(ch, "rain");
     assert.deepEqual(a, createMushrooms(ch, "rain"));
     assert.ok(a.some((i) => i.nest === "rain-nest"));
@@ -214,7 +214,7 @@ test("weather clues match the generated nest and generation is deterministic", (
   }
 });
 test("all chapter scenes build with finite geometry and accessible primary ingredients", () => {
-  for (let ch = 1; ch <= 3; ch++) {
+  for (let ch = 1; ch <= 5; ch++) {
     const scene = new T.Scene(),
       world = buildWorld(scene, ch, "sun");
     world.root.traverse((o) => {

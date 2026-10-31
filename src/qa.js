@@ -1,3 +1,5 @@
+import { BOSSES, loadGun, gunAmmo } from "./progression.js";
+import { collect, requirementsMet } from "./state.js";
 // Local development only. This module is excluded from production builds.
 import { terrainHeight, CHAPTERS, newGame } from "./state.js";
 import {
@@ -55,6 +57,83 @@ export function attachQA(game) {
       game.updateEnemies(1 / 60);
     }
     game.ui.update(0.1);
+  });
+  for (const ch of [4, 5])
+    add(`QA 第${ch}章主线`, () => {
+      game.travelChapter(ch);
+      game.state.coins = 2000;
+      game.save();
+    });
+  for (const ch of [4, 5])
+    add(`QA ${ch === 4 ? "毒蝶" : "毒蝎"}战`, () => {
+      game.travelChapter(ch, true);
+      game.invincible = 300;
+      game.state.coins = 2000;
+      game.yaw = 0;
+      game.pitch = -0.18;
+      game.save();
+    });
+  add("QA 新武器补给", () => {
+    for (const id of ["rifle", "sniper", "cannon"]) {
+      game.state.gear[id] = 24;
+      loadGun(game.state, id);
+    }
+    game.equipWeapon(BOSSES[game.state.chapter]?.weapon || "rifle");
+    game.save();
+  });
+  add("QA 首领瞄准", () => {
+    const boss = game.enemies.find((e) => e.encounter && e.hp > 0);
+    if (!boss) return;
+    boss.state = boss.flying ? "hover" : "stunned";
+    boss.timer = 60;
+    game.invincible = 300;
+    move(boss.x, boss.z + 15);
+    game.distance = 4;
+    const p = game.player.root.position;
+    game.yaw = Math.atan2(p.x - boss.x, p.z - boss.z);
+    game.pitch = -Math.atan2(
+      boss.object.position.y + (boss.flying ? 2.2 : 1.3) - (p.y + 1.5),
+      15,
+    );
+  });
+  add("QA 首领收尾", () => {
+    const boss = game.enemies.find((e) => e.encounter && e.hp > 0);
+    if (boss) boss.hp = 1;
+  });
+  add("QA 霰弹群攻", () => {
+    game.travelChapter(4, true);
+    game.state.gear.rifle = 12;
+    loadGun(game.state, "rifle");
+    move(24, -19);
+    game.invincible = 300;
+    game.equipWeapon("rifle");
+    game.yaw = 0;
+    game.pitch = 0;
+    const targets = game.enemies.filter((e) => !e.boss && e.hp > 0).slice(0, 3);
+    targets.forEach((e, i) => {
+      e.x = 24 + (i - 1) * 1.2;
+      e.z = -26;
+      e.home = { x: e.x, z: e.z };
+      e.object.position.set(e.x, terrainHeight(e.x, e.z), e.z);
+      e.state = "stunned";
+      e.timer = 60;
+      e.hp = e.maxHp = 8;
+      e.object.visible = true;
+    });
+    game.updateEnemies(1 / 60);
+    game.updateCamera(2);
+  });
+  add("QA 任务采集", () => {
+    for (const [id, need] of Object.entries(
+      CHAPTERS[game.state.chapter - 1].requirements,
+    )) {
+      for (const item of game.world.items.filter((i) => i.species === id)) {
+        if (game.state.inventory[id] >= need) break;
+        collect(game.state, item);
+      }
+    }
+    game.world.sync(game.state);
+    game.save();
   });
   add("QA 第三章主线", () => {
     game.travelChapter(3);
@@ -518,7 +597,12 @@ export function attachQA(game) {
   setInterval(() => {
     const p = game.player.root.position;
     status.textContent =
-      `GL几何:${game.renderer.info.memory.geometries} 纹理:${game.renderer.info.memory.textures} 像素比:${game.renderer.getPixelRatio().toFixed(2)} 帧均值:${game.frameAverage.toFixed(1)} 怪:${game.enemies.filter((e) => e.hp > 0).length} 弹:${game.state.rifleLoaded}/${game.state.gear.rifle} 路径:${game.route.points.length} | ` +
+      `GL几何:${game.renderer.info.memory.geometries} 纹理:${game.renderer.info.memory.textures} 像素比:${game.renderer.getPixelRatio().toFixed(2)} 帧均值:${game.frameAverage.toFixed(1)} 怪:${game.enemies.filter((e) => e.hp > 0).length} 弹:${gunAmmo(game.state)}/${game.state.gear[game.state.weapon]} 开镜:${game.scoped} FOV:${game.camera.fov.toFixed(1)} 炮:${game.artillery.length} 毒弹:${game.poisonBolts.length} 首领:${game.enemies
+        .filter((e) => e.boss)
+        .map((e) => e.name + "=" + e.hp + "/" + e.maxHp + "/" + e.state)
+        .join(
+          ",",
+        )} 交付:${requirementsMet(game.state)} 路径:${game.route.points.length} | ` +
       `第${fieldDay(game.state)}天 ${game.state.weather} 明天:${nextWeather(game.state)} 燃料:${game.state.fireFuel.toFixed(3)} 床:${game.state.bedOwned} 预报:${game.state.forecastOwned} 遇蛇:${game.state.ambushes.length} 菌:${game.world.items.length} 相机:${game.camera.position
         .toArray()
         .map((n) => n.toFixed(2))

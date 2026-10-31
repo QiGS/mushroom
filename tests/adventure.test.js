@@ -134,6 +134,7 @@ test("shop purchases debit currency once, equipment leaves the belt and expended
   spendWeapon(s);
   assert.equal(s.weapon, "staff");
   assert.equal(selectWeapon(s, "axe"), false);
+  s.unlocked = 3;
   purchase(s, "rifle");
   activateTool(s, "rifle");
   spendWeapon(s);
@@ -188,7 +189,7 @@ test("weapon arcs respect range and facing, terrain and furniture stop shots, an
   );
   assert.equal(
     new Set(Object.values(MONSTER_TYPES).map((m) => m.kind)).size,
-    6,
+    8,
   );
 });
 test("edge warning grows gradually and remains clear in the original village", () => {

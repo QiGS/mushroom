@@ -133,7 +133,17 @@ try {
     "campfire",
     "bed",
     "weather-vane",
-    "canyon-one", "canyon-two", "poison-ant", "fallen-log", "rock-two", "rock-three",
+    "canyon-one",
+    "canyon-two",
+    "poison-ant",
+    "fallen-log",
+    "rock-two",
+    "rock-three",
+    "poison-butterfly",
+    "poison-scorpion",
+    "shotgun",
+    "sniper",
+    "cannon",
   ]) {
     const r = await fetch(`${url}assets/props/${id}.glb`, {
       ...options,
@@ -143,8 +153,28 @@ try {
     assert.equal(r.headers.get("content-type"), "model/gltf-binary");
   }
   const music = `${url}assets/audio/jingmai-bgm.mp3`;
-  for(const file of ['ui/wild-mushrooms-title.webp',...['axe','rifle','boots','rice','water','salt','herb'].map(id=>`tools/${id}.webp`)]) {
-    const r=await fetch(`${url}assets/${file}`,{...options,method:'HEAD'});assert.equal(r.status,200,file);assert.equal(r.headers.get('content-type'),'image/webp');
+  for (const file of [
+    "ui/wild-mushrooms-title.webp",
+    "bosses/poison-butterfly.webp",
+    "bosses/poison-scorpion.webp",
+    ...[
+      "axe",
+      "rifle",
+      "sniper",
+      "cannon",
+      "boots",
+      "rice",
+      "water",
+      "salt",
+      "herb",
+    ].map((id) => `tools/${id}.webp`),
+  ]) {
+    const r = await fetch(`${url}assets/${file}`, {
+      ...options,
+      method: "HEAD",
+    });
+    assert.equal(r.status, 200, file);
+    assert.equal(r.headers.get("content-type"), "image/webp");
   }
   const audio = await fetch(music, { ...options, method: "HEAD" });
   assert.equal(audio.status, 200);

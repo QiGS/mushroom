@@ -1,12 +1,17 @@
+import { BOSSES } from "./progression.js";
 // Story locations and rewards are deterministic, so hints, map and actors agree.
 export function grandmaPlace(s) {
   if (s.chapter === 1) return { x: 1, z: 29, area: "村口" };
+  if (s.chapter === 4) return { x: 12, z: 10, area: "花雾山径" };
+  if (s.chapter === 5) return { x: -34, z: -27, area: "赤岩驿亭" };
   if (s.chapter === 2) return { x: -15, z: 12, area: "竹林歇脚处" };
   if (s.gateOpen) return { x: 9, z: -27, area: "菌谷石门旁" };
   if (s.uncle) return { x: -19, z: -7, area: "回声坡茶棚" };
   return { x: -18, z: 8, area: "雾山岔路" };
 }
 export const GRANDMA_CLEARINGS = [
+  { x: 12, z: 10, r: 4 },
+  { x: -34, z: -27, r: 4 },
   { x: -15, z: 12, r: 3.5 },
   { x: 9, z: -27, r: 4 },
   { x: -19, z: -7, r: 3.5 },
@@ -15,6 +20,13 @@ export const GRANDMA_CLEARINGS = [
 export const STORY_LINES = {
   "chapter-1": "雨停了。奶奶说，找到一朵以后，先别急着走。",
   "chapter-2": "竹影深处有嘶嘶声。这一趟，得抬头看路，也得留心脚下。",
+  "chapter-4": "菌谷安静下来，花雾却飞上了半空。那不是花瓣，是毒蝶的鳞粉。",
+  "chapter-5": "峡谷里响起石头碎裂的声音。最后一篮好菌子，藏在那副硬甲后面。",
+  "butterfly-arrival": "它飞得太高了。架稳狙击枪，等翅膀停下的那一刻。",
+  "butterfly-victory": "鳞粉散去了。山风穿过翅影，花雾终于露出原来的颜色。",
+  "scorpion-arrival": "那副硬甲挡住了去路。先躲尾针，再把它引向岩壁。",
+  "scorpion-victory": "巨钳落下，赤岩归于安静。回去吧，最后一锅汤还等着你。",
+  "final-feast": "五段山路，五锅菌香。把山野的故事，带回了同一张桌子。",
   "chapter-3": "雾里多了细碎的脚步声。菌谷的泥土，像是被什么翻动过。",
   nest: "这块地有点东西。",
   colony: "捅了菌子窝了！！",
@@ -53,10 +65,12 @@ export function harvestAchievements(
     }
   return earned;
 }
-export const BOSS_DESTINATIONS = {
-  2: { x: 0, z: -21, name: "青影 · 竹林首领", id: "boss" },
-  3: { x: 0, z: -33.5, name: "毒蚁母巢 · 菌谷首领", id: "ant-queen" },
-};
+export const BOSS_DESTINATIONS = Object.fromEntries(
+  Object.entries(BOSSES).map(([chapter, b]) => [
+    chapter,
+    { ...b.approach, name: b.name + " · " + b.kind, id: b.id },
+  ]),
+);
 export function prepareBossTrip(s) {
   const dest = BOSS_DESTINATIONS[s.chapter];
   if (!dest) return null;

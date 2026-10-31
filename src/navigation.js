@@ -1,3 +1,4 @@
+import { BOSSES } from "./progression.js";
 import {
   terrainHeight,
   WORLD_BOUNDS,
@@ -51,6 +52,7 @@ export function navigationTarget(s) {
       ...s.waypoint,
       name:
         {
+          boss: BOSSES[s.chapter]?.name || "首领位置",
           river: "河心线索",
           treasure: "探索宝箱",
           nest: "菌窝线索",

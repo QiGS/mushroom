@@ -1,3 +1,5 @@
+import { BOSSES, WEAPONS } from "./progression.js";
+import { bossMapMarker, drawMapSymbol, mapViewport } from "./map-markers.js";
 import { toolArt } from "./tool-art.js";
 import { grandmaPlace, BOSS_DESTINATIONS } from "./story.js";
 import { cycleTimeScale } from "./seasons.js";
@@ -263,69 +265,88 @@ export class UI {
     const s = this.game.state,
       ch = CHAPTERS[s.chapter - 1];
     const steps =
-      s.chapter === 1
+      s.chapter >= 4
         ? [
-            ["村口的嘱托", ch.hint, s.talked],
+            ["山路上的来信", ch.hint, s.talked],
             [
-              "落叶下面的小秘密",
-              "沿零散菌子找倒木，靠近落叶按 E，发现至少 1 处菌窝。",
-              s.nests.length > 0,
+              "行前整备",
+              `到山货铺购买${WEAPONS[BOSSES[s.chapter].weapon].name}，在道具栏按 G 装备。${BOSSES[s.chapter].hint}`,
+              (s.gear[BOSSES[s.chapter].weapon] || 0) > 0,
             ],
             [
-              "带着收获回家",
-              `山野菌 ${s.inventory.wild} / 12。天黑前返回村口有额外奖励，入夜光线变暗，怪物增多；可以继续探索或回村补给。`,
+              "守住这一片山野",
+              `${BOSSES[s.chapter].name} · ${BOSSES[s.chapter].hp} 生命。${BOSSES[s.chapter].hint}`,
+              s.defeated.includes(BOSSES[s.chapter].id),
+            ],
+            [
+              "带回新的风味",
+              `采齐任务菌子，按 V 返回${grandmaPlace(s).area}，向奶奶交付。`,
               s.settled,
             ],
           ]
-        : s.chapter === 2
+        : s.chapter === 1
           ? [
+              ["村口的嘱托", ch.hint, s.talked],
               [
-                "竹杖在手",
-                "J 攻击 / Q 闪避 / R 投石。抬头嘶声和地面直线是突进预警，停顿时反击。",
-                s.talked,
+                "落叶下面的小秘密",
+                "沿零散菌子找倒木，靠近落叶按 E，发现至少 1 处菌窝。",
+                s.nests.length > 0,
               ],
               [
-                "竹林夺菌",
-                `竹香菌 ${s.inventory.bamboo}/12 · 金伞菌 ${s.inventory.gold}/8。北方双石后的菌窝由青影守护。`,
-                requirementsMet(s),
-              ],
-              [
-                "回村开饭",
-                "击败青影后收集金伞菌，回村完成加料、盖盖、开锅。",
+                "带着收获回家",
+                `山野菌 ${s.inventory.wild} / 12。天黑前返回村口有额外奖励，入夜光线变暗，怪物增多；可以继续探索或回村补给。`,
                 s.settled,
               ],
             ]
-          : [
-              [
-                "找到采菌大叔",
-                "西侧缺口石附近有新鲜脚印。大叔的竹篮支线不会阻塞主线。",
-                s.uncle,
-              ],
-              [
-                "让路标记住来路",
-                `回声石 ${s.landmarks.includes("stone") ? "✓" : "○"} · 月牙潭 ${s.landmarks.includes("moon") ? "✓" : "○"} · 抱抱树 ${s.landmarks.includes("trees") ? "✓" : "○"}。靠近岔路树按 E 系布条，可回收。`,
-                s.landmarks.length === 3,
-              ],
-              [
-                "打开深山菌谷",
-                "三声短响找到回声通路；石门顺序：石纹 → 月纹 → 双树。",
-                s.gateOpen,
-              ],
-              [
-                "守住最后的菌谷",
-                "击退毒蚁母巢：躲开酸液圈，先清小蚁；首领撞上岩石时攻击毒囊。",
-                s.defeated.includes("ant-queen"),
-              ],
-              [
-                "凭记忆回家",
-                `云团菌 ${s.inventory.cloud}/10 · 月牙菌 ${s.inventory.crescent}/6。到石门旁找奶奶交付，解锁云雾菌煲。`,
-                s.settled,
-              ],
-            ];
+          : s.chapter === 2
+            ? [
+                [
+                  "竹杖在手",
+                  "J 攻击 / Q 闪避 / R 投石。抬头嘶声和地面直线是突进预警，停顿时反击。",
+                  s.talked,
+                ],
+                [
+                  "竹林夺菌",
+                  `竹香菌 ${s.inventory.bamboo}/12 · 金伞菌 ${s.inventory.gold}/8。北方双石后的菌窝由青影守护。`,
+                  requirementsMet(s),
+                ],
+                [
+                  "回村开饭",
+                  "击败青影后收集金伞菌，回村完成加料、盖盖、开锅。",
+                  s.settled,
+                ],
+              ]
+            : [
+                [
+                  "找到采菌大叔",
+                  "西侧缺口石附近有新鲜脚印。大叔的竹篮支线不会阻塞主线。",
+                  s.uncle,
+                ],
+                [
+                  "让路标记住来路",
+                  `回声石 ${s.landmarks.includes("stone") ? "✓" : "○"} · 月牙潭 ${s.landmarks.includes("moon") ? "✓" : "○"} · 抱抱树 ${s.landmarks.includes("trees") ? "✓" : "○"}。靠近岔路树按 E 系布条，可回收。`,
+                  s.landmarks.length === 3,
+                ],
+                [
+                  "打开深山菌谷",
+                  "三声短响找到回声通路；石门顺序：石纹 → 月纹 → 双树。",
+                  s.gateOpen,
+                ],
+                [
+                  "守住最后的菌谷",
+                  "击退毒蚁母巢：躲开酸液圈，先清小蚁；首领撞上岩石时攻击毒囊。",
+                  s.defeated.includes("ant-queen"),
+                ],
+                [
+                  "凭记忆回家",
+                  `云团菌 ${s.inventory.cloud}/10 · 月牙菌 ${s.inventory.crescent}/6。到石门旁找奶奶交付，解锁云雾菌煲。`,
+                  s.settled,
+                ],
+              ];
     this.show(
       ch.name,
       "JOURNAL / CHAPTER 0" + s.chapter,
-      `<div class="journal-list">${steps.map(([title, body, done], i) => `<div class="journal-entry ${done ? "done" : ""}"><span class="journal-number">0${i + 1}</span><div><h3>${title}</h3><p>${body}</p></div></div>`).join("")}</div><p class="panel-subtitle" style="margin-top:22px">已解锁菜谱：${s.recipes.join("、") || "等待第一道山野风味"}<br>探索称号：${s.achievements.join("、") || "旅程才刚刚开始"}</p><div class="panel-footer"><span>主线 ${s.recipes.length} / 3 · 累计采集 ${s.totalCollected} 朵</span><button id="guide-hint">向导提示</button></div>`,
+      `<div class="journal-list">${steps.map(([title, body, done], i) => `<div class="journal-entry ${done ? "done" : ""}"><span class="journal-number">0${i + 1}</span><div><h3>${title}</h3><p>${body}</p></div></div>`).join("")}</div><p class="panel-subtitle" style="margin-top:22px">已解锁菜谱：${s.recipes.join("、") || "等待第一道山野风味"}<br>探索称号：${s.achievements.join("、") || "旅程才刚刚开始"}</p><div class="panel-footer"><span>主线 ${s.recipes.length} / ${CHAPTERS.length} · 累计采集 ${s.totalCollected} 朵</span><button id="guide-hint">向导提示</button></div>`,
       "journal",
     );
     $("guide-hint").onclick = () => {
@@ -343,7 +364,7 @@ export class UI {
     this.show(
       "山野驿路",
       "CHAPTERS & BOSS ENCOUNTERS",
-      `<p class="panel-subtitle">L 随时打开 · 可直接进入任意章节，或传送到首领战入口。保留行囊、金币、图鉴与已有成就；跳关不会自动领取通关奖励。</p><div class="travel-grid">${CHAPTERS.map((ch) => `<article class="travel-card"><small>第 ${ch.id} 章</small><h3>${ch.name}</h3><p>${ch.intro}</p><button data-travel="${ch.id}">前往本章</button>${BOSS_DESTINATIONS[ch.id] ? `<button data-boss-travel="${ch.id}">直达 ${BOSS_DESTINATIONS[ch.id].name}</button>` : ""}</article>`).join("")}</div><div class="panel-footer"><span>V 只引导主线 · K 查看旅途手记</span><button id="travel-journal">旅途手记</button></div>`,
+      `<p class="panel-subtitle">L 随时打开 · 可直接进入任意章节，或传送到首领战入口。保留行囊、金币、图鉴与已有成就；跳关不会自动领取通关奖励。</p><div class="travel-grid">${CHAPTERS.map((ch) => `<article class="travel-card"><small>第 ${ch.id} 章</small><h3>${ch.name}</h3><p>${ch.intro}</p>${BOSSES[ch.id] ? `<div class="travel-loadout">首领 ${BOSSES[ch.id].hp} 生命${BOSSES[ch.id].weapon ? ` · ${WEAPONS[BOSSES[ch.id].weapon].name}` : ""}</div>` : ""}<button data-travel="${ch.id}">前往本章</button>${BOSS_DESTINATIONS[ch.id] ? `<button data-boss-travel="${ch.id}">直达 ${BOSS_DESTINATIONS[ch.id].name}</button>` : ""}</article>`).join("")}</div><div class="panel-footer"><span>V 只引导主线 · K 查看旅途手记</span><button id="travel-journal">旅途手记</button></div>`,
       "travel",
     );
     document
@@ -424,7 +445,7 @@ export class UI {
             if (!r.ok)
               return this.grandma(r.message + "\n" + missionTarget(s).hint);
             this.game.world.sync(s);
-            if (s.chapter === 3) this.game.narrator.say("ending");
+            if (s.completed) this.game.narrator.say("final-feast");
             this.game.save();
             this.game.audio.play("win");
             const reward = r.summary || r;
@@ -543,7 +564,7 @@ export class UI {
     this.show(
       "这一篮，有故事",
       "A GOOD DAY IN THE WILD",
-      `<div class="ending"><div class="ending-symbol">♧</div><h3>${summary.recipe}</h3><p>“菌子挺客气，邻居不太好说话。”<br>新的山野风味，已经摆上村庄的餐桌。</p><div class="ending-stats"><div><strong>${summary.collected}</strong><span>采到菌子</span></div><div><strong>${summary.nests}</strong><span>发现菌窝</span></div><div><strong>${summary.chests}</strong><span>隐藏宝箱</span></div></div><p class="panel-subtitle">${summary.onTime ? "按时归来 ✓" : "披星归来 · 收获全部保留"} · +${summary.coins} 竹叶币<br>${s.completed ? "山野菌宴的三道菜齐了。谢谢你，把森林的味道带回家。" : `已解锁：${CHAPTERS[s.unlocked - 1].name}`}</p><button id="next-trip" class="panel-action">${s.completed ? "看看我们的菌宴" : "下一段山野旅程"} →</button></div>`,
+      `<div class="ending"><div class="ending-symbol">♧</div><h3>${summary.recipe}</h3><p>“菌子挺客气，邻居不太好说话。”<br>新的山野风味，已经摆上村庄的餐桌。</p><div class="ending-stats"><div><strong>${summary.collected}</strong><span>采到菌子</span></div><div><strong>${summary.nests}</strong><span>发现菌窝</span></div><div><strong>${summary.chests}</strong><span>隐藏宝箱</span></div></div><p class="panel-subtitle">${summary.onTime ? "按时归来 ✓" : "披星归来 · 收获全部保留"} · +${summary.coins} 竹叶币<br>${s.completed ? "山野菌宴的五道菜齐了。谢谢你，把森林的味道带回家。" : `已解锁：${CHAPTERS[s.unlocked - 1].name}`}</p><button id="next-trip" class="panel-action">${s.completed ? "看看我们的菌宴" : "下一段山野旅程"} →</button></div>`,
       "settlement",
     );
     $("next-trip").onclick = () =>
@@ -554,7 +575,7 @@ export class UI {
     this.show(
       "山野菌宴",
       "GATHER ROUND THE TABLE",
-      `<p class="camp-intro">“采完菌子，不如留下来吃顿饭。”</p><div class="species-grid">${CHAPTERS.map((ch, i) => `<div class="species-card ${s.recipes.includes(ch.recipe) ? "" : "locked"}">${mushroomSVG(["#c8a571", "#c2ba65", "#a9c9c7"][i])}<h3>${ch.recipe}</h3><small>${s.recipes.includes(ch.recipe) ? "已上桌 · 来自你的收获" : "等待一趟新的旅程"}</small></div>`).join("")}</div><p class="panel-subtitle" style="margin-top:20px">${s.achievements.join(" · ")}</p><div class="panel-footer"><span>${s.recipes.length} / 3 道山野风味</span><button id="revisit">重游山林</button></div>`,
+      `<p class="camp-intro">“采完菌子，不如留下来吃顿饭。”</p><div class="species-grid">${CHAPTERS.map((ch, i) => `<div class="species-card ${s.recipes.includes(ch.recipe) ? "" : "locked"}">${mushroomSVG(["#c8a571", "#c2ba65", "#a9c9c7", "#b89bc0", "#c38763"][i])}<h3>${ch.recipe}</h3><small>${s.recipes.includes(ch.recipe) ? "已上桌 · 来自你的收获" : "等待一趟新的旅程"}</small></div>`).join("")}</div><p class="panel-subtitle" style="margin-top:20px">${s.achievements.join(" · ")}</p><div class="panel-footer"><span>${s.recipes.length} / ${CHAPTERS.length} 道山野风味</span><button id="revisit">重游山林</button></div>`,
       "feast",
     );
     $("revisit").onclick = () => this.chapters();
@@ -590,7 +611,7 @@ export class UI {
     this.show(
       "让旅程更合心意",
       "SETTINGS",
-      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>左键 / J</kbd>武器攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>R</kbd>猎枪装填 / 投石诱导</span><span><kbd>1 / 2 / 3</kbd>切换武器</span><span><kbd>↑ / ↓</kbd>切换道具</span><span><kbd>G</kbd>使用当前道具</span><span><kbd>V</kbd>主线虚线引导</span><span><kbd>L</kbd>跳关 / 首领战</span><span><kbd>K</kbd>旅途手记</span><span><kbd>M / B / I</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
+      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>左键 / J</kbd>武器攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>Z / 右键</kbd>狙击开镜 · 滚轮变倍</span><span><kbd>R</kbd>枪械装填 / 投石诱导</span><span><kbd>1—5</kbd>切换武器</span><span><kbd>↑ / ↓</kbd>切换道具</span><span><kbd>G</kbd>使用当前道具</span><span><kbd>V</kbd>主线虚线引导</span><span><kbd>L</kbd>跳关 / 首领战</span><span><kbd>K</kbd>旅途手记</span><span><kbd>M / B / I</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
       "settings",
     );
     $("set-sound").onclick = () => {
@@ -621,12 +642,13 @@ export class UI {
     };
   }
   map() {
+    const boss = bossMapMarker(this.game.state, this.game.enemies);
     const s = this.game.state,
       target = navigationTarget(s);
     this.show(
       "山野行路图",
       "THE WILDWOOD / MAP",
-      `<div class="map-large-wrap"><canvas id="large-map" width="600" height="600" aria-label="森林地图，点击标记方向"></canvas></div><div class="map-legend"><span>▲ 你的位置</span><span>⌂ 村庄</span><span>◇ 已发现菌窝</span><span>⚑ 红布路标</span></div><p class="map-note">V 虚线只跟随主线剧情；地图上的支线标记由指南针指示。</p>`,
+      `<div class="map-toolbar"><span>第 ${s.chapter} 章 · 北向上 · 点击地图标记</span><button id="map-zoom" aria-pressed="${!!this.mapZoom}">${this.mapZoom ? "查看全境" : "放大身边 2×"}</button><button id="map-detail" aria-pressed="${!!this.mapEssentials}">${this.mapEssentials ? "显示全部标记" : "仅主线与首领"}</button></div><div class="map-sheet"><div class="map-large-wrap"><canvas id="large-map" width="600" height="600" aria-label="山野地图，首领位置与服务点，点击标记方向"></canvas></div><aside class="boss-map-card">${boss ? `<small>CHAPTER 0${s.chapter} / ${boss.defeated ? "已击退" : "首领情报"}</small>${s.chapter >= 4 ? `<img src="${import.meta.env.BASE_URL}assets/bosses/poison-${boss.species}.webp" alt="${boss.name}"/>` : ""}<h3>${boss.name}</h3><div class="boss-map-stats"><span>${boss.kind}</span><b>${Math.ceil(boss.health)} / ${boss.hp}</b></div><div class="boss-life"><i style="width:${(boss.health / boss.hp) * 100}%"></i></div><p>${boss.hint}</p>${boss.weapon ? `<p>推荐装备：<b>${WEAPONS[boss.weapon].name}</b><br>基础伤害 ${WEAPONS[boss.weapon].damage} · 弱点伤害 ${WEAPONS[boss.weapon].damage * 2}</p>` : ""}<button id="map-boss-track" ${boss.defeated ? "disabled" : ""}>${boss.defeated ? "这片山野已安宁" : "罗盘追踪首领"}</button>` : `<small>初见山野</small><h3>慢慢走，低头看。</h3><p>第一章没有首领。循着主线，找到倒木边的第一处菌窝。</p>`}<p>金色空心圈：当前目标<br>红褐色徽记：首领<br>绿色徽记：村庄服务</p></aside></div><div class="map-legend"><span><b style="background:#d1a65a"></b>旅人 / 当前方向</span><span><b style="background:#986658"></b>首领 / 危险</span><span><b style="background:#4e7563"></b>山货铺 / 奶奶</span><span><b style="background:#a6894b"></b>菌窝 / 收藏线索</span></div><p class="map-note">首领会在大小地图同步显示；击退后变为绿色勾号。V 始终只跟随主线剧情。</p>`,
       "map",
     );
     this.drawMap($("large-map").getContext("2d"), 600, true);
@@ -634,6 +656,22 @@ export class UI {
       "beforeend",
       `<div class="map-route-summary"><div><strong>⌖ ${target.name}</strong><small>距离 ${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · 道具栏指南针 ×${s.tools.compass}</small></div><button id="map-guide-toggle">V · ${s.guidance ? "关闭" : "显示"}虚线引导</button></div><p class="map-compass-hint">右上罗盘指示目标方向 · 金色标记为当前目标 · 河心石台可沿浮桥抵达</p>${!s.riverNoteFound ? '<div class="map-clues"><button class="river-note" id="map-river"><span>▤</span><div><b>河心石台 · 未拾取的便笺</b><small>点击后由罗盘指向便笺 · V 始终引导主线</small></div></button></div>' : ""}${this.collection.cluesMarkup()}<div class="explore-map-links">${EXPLORATION_SPOTS.map((p) => `<button data-explore="${p.id}">◇ ${p.name}</button>`).join("")}<button data-explore="shop">山货铺</button></div>`,
     );
+    $("map-zoom").onclick = () => {
+      this.mapZoom = !this.mapZoom;
+      this.map();
+    };
+    $("map-detail").onclick = () => {
+      this.mapEssentials = !this.mapEssentials;
+      this.map();
+    };
+    if ($("map-boss-track"))
+      $("map-boss-track").onclick = () => {
+        s.guidance = false;
+        s.collection.track = null;
+        this.waypoint = { x: boss.x, z: boss.z, kind: "boss" };
+        this.game.save();
+        this.map();
+      };
     $("map-guide-toggle").onclick = () => {
       this.game.toggleGuidance();
       this.map();
@@ -662,24 +700,31 @@ export class UI {
         }),
     );
     $("large-map").onclick = (e) => {
-      const r = e.currentTarget.getBoundingClientRect();
+      const r = e.currentTarget.getBoundingClientRect(),
+        view = mapViewport(s, true, this.mapZoom ? 2 : 1);
+      s.guidance = false;
       this.waypoint = {
         kind: "custom",
         x: Math.max(
           WORLD_BOUNDS.minX,
           Math.min(
             WORLD_BOUNDS.maxX,
-            ((e.clientX - r.left) / r.width) * MAP_SPACE.span + MAP_SPACE.x,
+            ((e.clientX - r.left) / r.width) * view.span + view.x,
           ),
         ),
         z: Math.max(
           WORLD_BOUNDS.minZ,
           Math.min(
             WORLD_BOUNDS.maxZ,
-            ((e.clientY - r.top) / r.height) * MAP_SPACE.span + MAP_SPACE.z,
+            ((e.clientY - r.top) / r.height) * view.span + view.z,
           ),
         ),
       };
+      if (
+        boss &&
+        Math.hypot(this.waypoint.x - boss.x, this.waypoint.z - boss.z) < 6
+      )
+        this.waypoint = { x: boss.x, z: boss.z, kind: "boss" };
       this.game.state.collection.track = null;
       this.game.save();
       this.toast("已记下方向，指南针会为你指路。");
@@ -688,9 +733,11 @@ export class UI {
   }
   drawMap(ctx, size, large = false) {
     const s = this.game.state;
-    const scale = size / MAP_SPACE.span,
-      px = (x) => (x - MAP_SPACE.x) * scale,
-      pz = (z) => (z - MAP_SPACE.z) * scale;
+    const view = mapViewport(s, large, this.mapZoom ? 2 : 1),
+      essential = large && this.mapEssentials;
+    const scale = size / view.span,
+      px = (x) => (x - view.x) * scale,
+      pz = (z) => (z - view.z) * scale;
     ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = large ? "#dce1c9" : "#b3c5a0";
     ctx.fillRect(0, 0, size, size);
@@ -698,17 +745,25 @@ export class UI {
     for (let x = -92; x < 92; x += 4)
       for (let z = -94; z < 56; z += 4) {
         const h = terrainHeight(x, z);
-        if (x < -43 || (x > 43 && z < 24)) {
+        if (x < -43 || (x > 43 && z < 24) || canyonAt(x, z)) {
           ctx.fillStyle =
-            h > 23
-              ? "#9a9e86"
-              : h > 10
-                ? "#a3aa86"
-                : h < -4
-                  ? "#638f89"
-                  : x > 43
-                    ? "#bea783"
-                    : "#a7b58e";
+            canyonAt(x, z)?.id === "canyon-two"
+              ? h > 6
+                ? "#af8761"
+                : "#ccb28a"
+              : canyonAt(x, z)?.id === "canyon-one"
+                ? h > 6
+                  ? "#819b85"
+                  : "#91b6ae"
+                : h > 23
+                  ? "#9a9e86"
+                  : h > 10
+                    ? "#a3aa86"
+                    : h < -4
+                      ? "#638f89"
+                      : x > 43
+                        ? "#bea783"
+                        : "#a7b58e";
           ctx.fillRect(px(x), pz(z), 4 * scale + 0.5, 4 * scale + 0.5);
         }
       }
@@ -787,9 +842,10 @@ export class UI {
     ctx.fillStyle = "#496d4d";
     ctx.font = `${large ? 19 : 13}px JingmaiRounded, sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("⌂", px(0), pz(30));
+    drawMapSymbol(ctx, "camp", px(-6), pz(33), large ? 10 : 5, "#4e7563");
+    drawMapSymbol(ctx, "shop", px(8), pz(27.3), large ? 10 : 5, "#4e7563");
     for (const n of NESTS)
-      if (s.nests.includes(n.id)) {
+      if (!essential && s.nests.includes(n.id)) {
         ctx.fillStyle = "#997237";
         ctx.fillText("◇", px(n.x), pz(n.z));
       }
@@ -800,11 +856,11 @@ export class UI {
       ctx.fillText("⚑", px(m.x), pz(m.z));
     }
     if (large) {
-      ctx.font = '12px "Microsoft YaHei",sans-serif';
+      ctx.font = "12px JingmaiRounded,sans-serif";
       ctx.fillStyle = "#4a6549";
       ctx.fillText("村口 · 归途", px(0), pz(30) + 22);
       ctx.fillText("旧木桥", px(4), pz(14) + 16);
-      ctx.fillText("月牙潭", px(25), pz(-4));
+      ctx.fillText("月牙潭", px(25), pz(-4) + 35 * scale);
       if (s.chapter === 2) ctx.fillText("双石菌窝", px(0), pz(-38));
       if (s.chapter === 3) {
         for (const l of LANDMARKS)
@@ -813,7 +869,7 @@ export class UI {
         if (s.gateOpen) ctx.fillText("深山菌谷", px(0), pz(-40));
       }
     }
-    for (const box of TREASURES) {
+    for (const box of essential ? [] : TREASURES) {
       const opened = s.collection.opened.includes(box.id);
       if (
         !opened &&
@@ -824,7 +880,7 @@ export class UI {
       ctx.font = `${large ? 17 : 12}px JingmaiRounded, sans-serif`;
       ctx.fillText(opened ? "▫" : "▣", px(box.x), pz(box.z));
     }
-    for (const clue of activeClues(s)) {
+    for (const clue of essential ? [] : activeClues(s)) {
       const rarity = RARITIES[clue.species.rarity];
       ctx.strokeStyle = rarity.color;
       ctx.fillStyle = rarity.color + "22";
@@ -874,7 +930,7 @@ export class UI {
     ctx.moveTo(px(49), pz(-30));
     ctx.lineTo(px(79), pz(-30));
     ctx.stroke();
-    for (const p of EXPLORATION_SPOTS) {
+    for (const p of essential ? [] : EXPLORATION_SPOTS) {
       ctx.fillStyle = s.surveyed.includes(p.id) ? "#697f56" : "#9c783e";
       ctx.font = `${large ? 14 : 10}px JingmaiRounded, sans-serif`;
       ctx.fillText("◇", px(p.x), pz(p.z));
@@ -903,7 +959,52 @@ export class UI {
       ctx.font = "12px JingmaiRounded, sans-serif";
       ctx.fillText("奶奶 · " + granny.area, px(granny.x), pz(granny.z) - 12);
       ctx.fillText("赤岩峡谷", px(-25), pz(-67));
-      ctx.fillText("苔溪深峡", px(65), pz(-66));
+      ctx.fillText("苔溪深峡", px(32), pz(-68));
+    }
+    drawMapSymbol(
+      ctx,
+      "granny",
+      px(granny.x),
+      pz(granny.z),
+      large ? 9 : 5,
+      "#627f58",
+    );
+    const boss = bossMapMarker(s, this.game.enemies);
+    if (boss) {
+      if (large && !boss.defeated) {
+        ctx.fillStyle = "#98665816";
+        ctx.strokeStyle = "#98665888";
+        ctx.setLineDash([4, 5]);
+        ctx.beginPath();
+        ctx.arc(
+          px(boss.x),
+          pz(boss.z),
+          (boss.radius || 9) * scale,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      drawMapSymbol(
+        ctx,
+        boss.icon,
+        px(boss.x),
+        pz(boss.z),
+        large ? 14 : 8,
+        boss.species === "butterfly" ? "#866183" : "#986658",
+        boss.defeated,
+      );
+      if (large) {
+        ctx.font = "bold 12px JingmaiRounded,sans-serif";
+        ctx.fillStyle = "#6e493d";
+        ctx.fillText(
+          boss.name + (boss.defeated ? " · 已击退" : ""),
+          px(boss.x),
+          pz(boss.z) - 22,
+        );
+      }
     }
     if (navTarget) {
       ctx.strokeStyle = "#d39435";
@@ -995,31 +1096,37 @@ export class UI {
     $("route-status").classList.toggle("active", s.guidance);
     const p = s.position;
     const canyon = canyonAt(p.x, p.z);
-    const region = canyon
-      ? canyon.id === "canyon-one"
-        ? "苔溪深峡"
-        : "赤岩峡谷"
-      : insideHouse(p.x, p.z)
-        ? "山间小屋"
-        : p.x < -43
-          ? "风铃山岭"
-          : p.x > 43 && p.z < 24
-            ? "赤石峡谷"
-            : p.z > 22
-              ? "山野村庄"
-              : p.z < -32
-                ? s.chapter === 2
-                  ? "双石菌窝"
-                  : "深山菌谷"
-                : p.x > 17
-                  ? "月牙潭畔"
-                  : p.x < -17 && p.z < -5
-                    ? "回声坡"
-                    : s.chapter === 2
-                      ? "青影竹林"
-                      : s.chapter === 3
-                        ? "岔路林"
-                        : "晨光林地";
+    const region =
+      s.chapter >= 4 &&
+      Math.hypot(p.x - BOSSES[s.chapter].x, p.z - BOSSES[s.chapter].z) < 25
+        ? s.chapter === 4
+          ? "花雾空域"
+          : "赤岩前哨"
+        : canyon
+          ? canyon.id === "canyon-one"
+            ? "苔溪深峡"
+            : "赤岩峡谷"
+          : insideHouse(p.x, p.z)
+            ? "山间小屋"
+            : p.x < -43
+              ? "风铃山岭"
+              : p.x > 43 && p.z < 24
+                ? "赤石峡谷"
+                : p.z > 22
+                  ? "山野村庄"
+                  : p.z < -32
+                    ? s.chapter === 2
+                      ? "双石菌窝"
+                      : "深山菌谷"
+                    : p.x > 17
+                      ? "月牙潭畔"
+                      : p.x < -17 && p.z < -5
+                        ? "回声坡"
+                        : s.chapter === 2
+                          ? "青影竹林"
+                          : s.chapter === 3
+                            ? "岔路林"
+                            : "晨光林地";
     $("region-label").textContent = region;
     if (region !== this.location) {
       this.location = region;

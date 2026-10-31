@@ -1,3 +1,10 @@
+import { BOSSES, isGun, gunAmmo, loadGun, damageFor } from "./progression.js";
+import {
+  makeEncounter,
+  updateEncounter,
+  updatePoisonBolts,
+  encounterHint,
+} from "./boss-encounters.js";
 import { Narrator } from "./narrator.js";
 import { BOSS_DESTINATIONS, prepareBossTrip } from "./story.js";
 import { makeAnt, updateAnt } from "./ant-enemy.js";
@@ -44,8 +51,8 @@ import {
   inAttackArc,
   MONSTER_TYPES,
   rifleTarget,
-  rifleAmmo,
-  loadRifle,
+  shotgunTargets,
+  blastTargets,
 } from "./combat.js";
 import { equipmentVisual } from "./equipment-visual.js";
 import "./style.css";
@@ -172,6 +179,10 @@ class Game {
     this.ui = new UI(this);
     this.narrator = new Narrator(this);
     this.acidPools = [];
+    this.poisonBolts = [];
+    this.artillery = [];
+    this.scoped = false;
+    this.scopeZoom = 2;
     this.reloadTime = 0;
     this.swarmSerial = 0;
     this.hudTime = 0;
@@ -367,11 +378,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         Digit1: () => this.equipWeapon("staff"),
         Digit2: () => this.equipWeapon("axe"),
         Digit3: () => this.equipWeapon("rifle"),
+        Digit4: () => this.equipWeapon("sniper"),
+        Digit5: () => this.equipWeapon("cannon"),
+        KeyZ: () => this.toggleScope(),
         KeyQ: () => this.dodge(),
         KeyR: () =>
-          this.state.weapon === "rifle"
-            ? this.reloadRifle()
-            : this.throwStone(),
+          isGun(this.state.weapon) ? this.reloadRifle() : this.throwStone(),
         ArrowUp: () => this.selectTool(-1),
         ArrowDown: () => this.selectTool(1),
         KeyV: () => this.toggleGuidance(),
@@ -408,6 +420,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.pointer = null;
     this.canvas.addEventListener("pointerdown", (e) => {
       if (this.ui.blocking) return;
+      if (e.button === 2 && this.state.weapon === "sniper") {
+        this.toggleScope();
+        return;
+      }
       if (
         this.look &&
         e.pointerType === "mouse" &&
@@ -442,7 +458,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         (e.clientX - this.pointer.x) * 0.005 * this.state.settings.sensitivity;
       this.pitch = clamp(
         this.pitch + (e.clientY - this.pointer.y) * 0.003,
-        0.08,
+        isGun(this.state.weapon) ? -1.2 : 0.08,
         1.15,
       );
       this.pointer.x = e.clientX;
@@ -456,7 +472,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       "wheel",
       (e) => {
         e.preventDefault();
-        this.distance = clamp(this.distance + e.deltaY * 0.008, 3.5, 14);
+        if (this.scoped)
+          this.scopeZoom = clamp(this.scopeZoom - Math.sign(e.deltaY), 2, 6);
+        else this.distance = clamp(this.distance + e.deltaY * 0.008, 3.5, 14);
       },
       { passive: false },
     );
@@ -507,6 +525,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     $("hud").append(boss);
   }
   clearInput() {
+    this.scoped = false;
     this.keys?.clear();
     this.joystick = { x: 0, y: 0 };
     this.pointer = null;
@@ -605,7 +624,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.narrator.say("chapter-" + id);
     this.ui.toast(
       boss
-        ? `已抵达${BOSS_DESTINATIONS[id].name} · 准备战斗`
+        ? `已抵达${BOSS_DESTINATIONS[id].name} · ${BOSSES[id].weapon && !this.state.gear[BOSSES[id].weapon] ? "尚未装备" + WEAPONS[BOSSES[id].weapon].name + "，按 V 返回山货铺补给" : "准备战斗"}`
         : `第 ${id} 章 · V 引导主线剧情`,
     );
   }
@@ -660,6 +679,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     }
     for (const p of this.acidPools || []) disposeObject(p.mesh);
     this.acidPools = [];
+    for (const p of [...(this.poisonBolts || []), ...(this.artillery || [])])
+      disposeObject(p.mesh);
+    this.poisonBolts = [];
+    this.artillery = [];
+    this.scoped = false;
     this.enemies = [];
     disposeObject(this.attackRing);
     this.attackRing = null;
@@ -677,11 +701,23 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
               [17, -10, "patrol", "leaf"],
               [0, -29, "boss", "boss"],
             ]
-          : [
-              [29, 5, "patrol", "leaf"],
-              [-10, -24, "tree-guard", "rock"],
-              [0, -41, "ant-queen", "antQueen"],
-            ];
+          : this.state.chapter >= 4
+            ? [
+                [
+                  BOSSES[this.state.chapter].x,
+                  BOSSES[this.state.chapter].z,
+                  BOSSES[this.state.chapter].id,
+                  BOSSES[this.state.chapter].species,
+                ],
+                [-12, -5, "late-guard", "rock"],
+                [34, -16, "late-scout", "frost"],
+                [-40, -19, "late-scout-two", "rock"],
+              ]
+            : [
+                [29, 5, "patrol", "leaf"],
+                [-10, -24, "tree-guard", "rock"],
+                [0, -41, "ant-queen", "antQueen"],
+              ];
     for (const [x, z, id, kind] of [
       [-17, 0, "bamboo-scout", "leaf"],
       [19, -18, "lake-scout", "frost"],
@@ -690,7 +726,16 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       [20, 0, "mist-scout-2", "frost"],
       [-4, -34, "nest-ant-1", "ant"],
       [4, -38, "nest-ant-2", "ant"],
-    ].slice(0, this.state.chapter === 1 ? 0 : this.state.chapter === 2 ? 3 : 7))
+    ].slice(
+      0,
+      this.state.chapter === 1
+        ? 0
+        : this.state.chapter === 2
+          ? 3
+          : this.state.chapter === 3
+            ? 7
+            : 5,
+    ))
       positions.push([x, z, id, kind]);
     positions.push(
       [-70, -18, "ridge-snake", "frost"],
@@ -721,9 +766,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   }
   spawnEnemy(x, z, id, kind = "leaf", night = false) {
     const type = MONSTER_TYPES[kind],
-      enemy = kind.startsWith("ant")
-        ? makeAnt(this.world.root, x, z, kind === "antQueen")
-        : makeSnake(this.world.root, x, z, kind === "boss");
+      enemy = ["butterfly", "scorpion"].includes(kind)
+        ? makeEncounter(this.world.root, x, z, kind)
+        : kind.startsWith("ant")
+          ? makeAnt(this.world.root, x, z, kind === "antQueen")
+          : makeSnake(this.world.root, x, z, kind === "boss");
     Object.assign(enemy, {
       id,
       species: kind,
@@ -1006,12 +1053,16 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     if (!selectWeapon(this.state, id))
       return this.ui.toast("先在山货铺购买并按 G 装备这件武器。");
     this.save();
-    this.ui.toast(`已切换${WEAPONS[id].name} · 左键使用`);
+    this.scoped = false;
+    this.reloadTime = 0;
+    this.ui.toast(
+      `已切换${WEAPONS[id].name} · 左键使用${id === "sniper" ? " · 右键 / Z 开镜" : ""}`,
+    );
   }
   primaryAction(event) {
     if (!this.started || this.ui.blocking || this.photoMode) return;
     this.player.root.rotation.y = this.yaw + Math.PI;
-    if (this.state.weapon === "rifle") return this.attack();
+    if (isGun(this.state.weapon)) return this.attack();
     this.findInteraction();
     const p = this.player.root.position;
     let aimed = null;
@@ -1101,7 +1152,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.photoMode
     )
       return;
-    if (this.state.weapon === "rifle") return this.fireRifle();
+    if (isGun(this.state.weapon)) return this.fireRifle();
     const s = this.state,
       weapon = s.weapon,
       w = WEAPONS[weapon],
@@ -1145,14 +1196,14 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     let spent = gun;
     if (hit?.type === "enemy") {
       const e = hit.value;
-      e.hp -= w.damage * (e.state === "stunned" ? 2 : 1);
+      e.hp -= damageFor(weapon, e);
       spent = true;
       this.burst(e.object.position, 0xcbe794, 12);
       this.audio.play("hit");
       if (e.hp <= 0) this.defeat(e);
       else {
         e.cooldown = 0.3;
-        if (e.state === "idle" || e.state === "recover") {
+        if (!e.encounter && (e.state === "idle" || e.state === "recover")) {
           e.state = "recover";
           e.timer = 0.4;
         }
@@ -1210,37 +1261,42 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.save();
     }
   }
-  reloadRifle() {
+  toggleScope() {
     if (
+      !this.started ||
       this.ui.blocking ||
-      this.state.weapon !== "rifle" ||
-      this.reloadTime > 0 ||
-      rifleAmmo(this.state) >= Math.min(4, this.state.gear.rifle)
+      this.photoMode ||
+      this.state.weapon !== "sniper"
     )
       return;
-    this.reloadTime = 1.35;
-    this.ui.toast("装填中…");
+    this.scoped = !this.scoped;
+  }
+  reloadRifle() {
+    const s = this.state,
+      w = WEAPONS[s.weapon];
+    if (
+      this.ui.blocking ||
+      !isGun(s.weapon) ||
+      this.reloadTime > 0 ||
+      gunAmmo(s) >= Math.min(w.magazine, s.gear[s.weapon])
+    )
+      return;
+    this.reloadWeapon = s.weapon;
+    this.reloadTime = w.reload;
+    this.ui.toast(`${w.name}装填中…`);
   }
   updateReload(dt) {
     if (this.reloadTime <= 0) return;
     this.reloadTime = Math.max(0, this.reloadTime - dt);
-    if (this.reloadTime === 0 && this.state.weapon === "rifle") {
-      loadRifle(this.state);
+    if (!this.reloadTime && this.state.weapon === this.reloadWeapon) {
+      loadGun(this.state);
       this.audio.play("stone");
       this.save();
     }
   }
-  fireRifle() {
+  combatTargets() {
     const s = this.state;
-    if (this.reloadTime > 0) return;
-    if (!rifleAmmo(s)) {
-      this.reloadRifle();
-      return;
-    }
-    const p = this.player.root.position,
-      from = { x: p.x, y: p.y + 1.25, z: p.z };
-    const dir = this.camera.getWorldDirection(new T.Vector3());
-    const targets = [
+    return [
       ...this.enemies
         .filter(
           (e) => e.hp > 0 && e.object.visible && !s.defeated.includes(e.id),
@@ -1250,9 +1306,25 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           id: e.id,
           value: e,
           x: e.x,
-          y: e.object.position.y + (e.ant && e.boss ? 1.1 : 0.5),
           z: e.z,
-          radius: e.boss ? 1.4 : e.ant ? 0.6 : 0.75,
+          y:
+            e.object.position.y +
+            (e.flying
+              ? 2.2
+              : e.species === "scorpion"
+                ? 1.3
+                : e.ant && e.boss
+                  ? 1.1
+                  : 0.5),
+          radius: e.flying
+            ? 2
+            : e.species === "scorpion"
+              ? 1.8
+              : e.boss
+                ? 1.4
+                : e.ant
+                  ? 0.6
+                  : 0.75,
         })),
       ...BREAKABLES.filter((b) => !s.broken.includes(b.id)).map((b) => ({
         ...b,
@@ -1262,75 +1334,43 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         radius: 0.7,
       })),
     ];
-    const hit = rifleTarget(
-      this.world,
-      s,
-      this.camera.position,
-      dir,
-      from,
-      targets,
-    );
-    this.player.root.rotation.y = Math.atan2(dir.x, dir.z);
-    this.attackTime = 0.25;
-    this.attackCooldown = 0.65;
-    s.rifleLoaded--;
-    spendWeapon(s);
-    this.audio.play("shot");
-    this.pitch = Math.min(1.2, this.pitch + 0.025);
-    if (hit?.type === "enemy") {
-      const e = hit.value,
-        damage =
-          4 *
-          (e.state === "stunned"
-            ? 2
-            : e.species === "rock" && e.state === "windup"
-              ? 0.5
-              : 1);
-      e.hp -= damage;
-      e.cooldown = 0.1;
-      this.burst(e.object.position, 0xe8ce7c, 10);
-      if (e.hp <= 0) this.defeat(e);
-    } else if (hit?.type === "prop") {
-      const result = strikeObject(s, hit.value, "rifle");
+  }
+  applyWeaponHit(hit, weapon) {
+    const s = this.state;
+    if (hit.type === "enemy") {
+      const e = hit.value;
+      if (e.hp <= 0) return;
+      const damage = damageFor(weapon, e);
+      if (!damage) {
+        this.ui.toast(
+          e.flying ? "毒鳞挡住了攻击 · 仅狙击枪可以击穿" : "等待首领露出弱点",
+        );
+        return;
+      }
+      e.hp = Math.max(0, e.hp - damage);
+      if (!e.boss) {
+        e.state = "stunned";
+        e.timer = 0.35;
+      }
+      this.burst(new T.Vector3(hit.x, hit.y, hit.z), 0xe8ce7c, 8);
+      if (!e.hp) this.defeat(e);
+    } else if (!s.broken.includes(hit.id)) {
+      const result = strikeObject(s, hit.value, weapon);
       if (result.ok && this.world.exploration.hit(hit.id, result.damage)) {
         s.broken.push(hit.id);
         this.world.sync(s);
         this.route.invalidate();
       } else if (!result.ok) this.ui.toast(result.message);
     }
-    const end = hit
-      ? new T.Vector3(hit.x, hit.y, hit.z)
-      : this.camera.position.clone().addScaledVector(dir, 29);
-    const direction = end
-      .clone()
-      .sub(new T.Vector3(from.x, from.y, from.z))
-      .normalize();
-    let distance = Math.min(
-      22,
-      end.distanceTo(new T.Vector3(from.x, from.y, from.z)),
-    );
-    for (let d = 0.5; d < distance; d += 0.5) {
-      const t = {
-        x: from.x + direction.x * d,
-        y: from.y + direction.y * d,
-        z: from.z + direction.z * d,
-      };
-      if (!clearShot(this.world, s, from, t, hit?.id)) {
-        distance = d - 0.5;
-        break;
-      }
-    }
-    end.set(from.x, from.y, from.z).addScaledVector(direction, distance);
-    const geo = new T.BufferGeometry().setFromPoints([
-      new T.Vector3(from.x, from.y, from.z),
-      end,
-    ]);
+  }
+  shotTrail(from, end, color = 0xffdf8a) {
+    const geo = new T.BufferGeometry().setFromPoints([from, end]);
     const mat = new T.LineBasicMaterial({
-        color: 0xffdf8a,
-        transparent: true,
-        opacity: 0.9,
-      }),
-      line = new T.Line(geo, mat);
+      color,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const line = new T.Line(geo, mat);
     this.scene.add(line);
     this.particles.push({
       mesh: line,
@@ -1339,10 +1379,142 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       geo,
       mat,
     });
-    this.burst(new T.Vector3(from.x, from.y, from.z), 0xffc96f, 4);
-    if (s.weapon !== "rifle") this.ui.toast("猎枪弹药用尽 · 已换回竹杖");
+  }
+  fireRifle() {
+    const s = this.state,
+      id = s.weapon,
+      w = WEAPONS[id];
+    if (!isGun(id) || this.reloadTime > 0) return;
+    if (!gunAmmo(s)) {
+      this.reloadRifle();
+      return;
+    }
+    const p = this.player.root.position,
+      from = new T.Vector3(p.x, p.y + 1.35, p.z);
+    const dir = this.camera.getWorldDirection(new T.Vector3()),
+      targets = this.combatTargets();
+    const hits =
+      id === "rifle"
+        ? shotgunTargets(
+            this.world,
+            s,
+            this.camera.position,
+            dir,
+            from,
+            targets,
+          )
+        : [
+            rifleTarget(
+              this.world,
+              s,
+              this.camera.position,
+              dir,
+              from,
+              targets,
+              w.range,
+            ),
+          ].filter(Boolean);
+    const end = hits.length
+      ? new T.Vector3(hits[0].x, hits[0].y, hits[0].z)
+      : this.camera.position.clone().addScaledVector(dir, w.range);
+    const vector = end.clone().sub(from).normalize();
+    let distance = Math.min(w.range, end.distanceTo(from));
+    for (let d = 0.5; d < distance; d += 0.5) {
+      const next = from.clone().addScaledVector(vector, d);
+      if (!clearShot(this.world, s, from, next, hits[0]?.id)) {
+        distance = Math.max(0.25, d - 0.55);
+        break;
+      }
+    }
+    end.copy(from).addScaledVector(vector, distance);
+    this.player.root.rotation.y = Math.atan2(dir.x, dir.z);
+    this.attackTime = 0.25;
+    this.attackCooldown = w.cooldown;
+    s[id + "Loaded"]--;
+    spendWeapon(s);
+    this.audio.play("shot");
+    this.pitch = Math.max(-1.2, this.pitch - (id === "cannon" ? 0.07 : 0.018));
+    if (id === "cannon") {
+      const mesh = new T.Mesh(
+        new T.SphereGeometry(0.17, 8, 6),
+        new T.MeshBasicMaterial({ color: 0xffd184 }),
+      );
+      mesh.position.copy(from);
+      this.scene.add(mesh);
+      this.artillery.push({
+        mesh,
+        end,
+        velocity: vector.multiplyScalar(30),
+        life: 2,
+      });
+    } else {
+      for (const hit of hits) this.applyWeaponHit(hit, id);
+      this.shotTrail(from, end);
+      if (id === "rifle")
+        for (const hit of hits.slice(1))
+          this.shotTrail(from, new T.Vector3(hit.x, hit.y, hit.z));
+    }
+    this.burst(from, 0xffc96f, 4);
+    if (s.weapon !== id) {
+      this.scoped = false;
+      this.ui.toast(`${w.name}弹药用尽 · 已换回竹杖`);
+    }
     this.save();
   }
+  updateArtillery(dt) {
+    for (let i = this.artillery.length - 1; i >= 0; i--) {
+      const p = this.artillery[i],
+        before = p.mesh.position.clone(),
+        targets = this.combatTargets();
+      const travel = p.velocity.length() * dt;
+      p.life -= dt;
+      const arriving = p.mesh.position.distanceTo(p.end) <= travel;
+      if (arriving) p.mesh.position.copy(p.end);
+      else p.mesh.position.addScaledVector(p.velocity, dt);
+      const collision = targets.find(
+        (t) =>
+          p.mesh.position.distanceTo(new T.Vector3(t.x, t.y, t.z)) <
+          (t.radius || 0.5) + 0.2,
+      );
+      const blocked = !clearShot(
+        this.world,
+        this.state,
+        before,
+        p.mesh.position,
+        collision?.id,
+      );
+      if (arriving || collision || blocked || p.life <= 0) {
+        if (blocked) p.mesh.position.copy(before);
+        const point = p.mesh.position.clone();
+        for (const hit of blastTargets(this.world, this.state, point, targets))
+          this.applyWeaponHit(hit, "cannon");
+        const geo = new T.SphereGeometry(0.5, 12, 8),
+          mat = new T.MeshBasicMaterial({
+            color: 0xffb866,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false,
+          });
+        const flash = new T.Mesh(geo, mat);
+        flash.position.copy(point);
+        this.scene.add(flash);
+        this.particles.push({
+          mesh: flash,
+          velocity: new T.Vector3(),
+          life: 0.35,
+          grow: 12,
+          geo,
+          mat,
+        });
+        this.burst(point, 0xffd382, 18);
+        disposeObject(p.mesh);
+        p.mesh.removeFromParent();
+        this.artillery.splice(i, 1);
+        this.save();
+      }
+    }
+  }
+
   defeat(e) {
     e.hp = 0;
     e.object.visible = false;
@@ -1352,7 +1524,14 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.state.defeated.push(e.id);
       this.state.coins += e.boss ? 35 : 8;
       grantTool(this.state, "fruit");
-      if (e.species === "antQueen") {
+      if (e.encounter) {
+        this.state.achievements.push(
+          e.species === "butterfly" ? "穿云逐蝶" : "赤岩破甲者",
+        );
+        this.state.coins += e.species === "butterfly" ? 45 : 125;
+        this.narrator.say(e.species + "-victory");
+        this.ui.toast(`${e.name}已击退 · 采齐菌子，去找奶奶交付。`);
+      } else if (e.species === "antQueen") {
         if (!this.state.achievements.includes("菌谷守护者"))
           this.state.achievements.push("菌谷守护者");
         this.narrator.say("ant-victory");
@@ -1389,7 +1568,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       z = p.z + Math.cos(this.player.root.rotation.y) * 7;
     this.burst(new T.Vector3(x, terrainHeight(x, z) + 0.2, z), 0xded8b8, 14);
     for (const e of this.enemies)
-      if (e.hp > 0 && Math.hypot(e.x - x, e.z - z) < 14) {
+      if (e.hp > 0 && !e.boss && Math.hypot(e.x - x, e.z - z) < 14) {
         e.state = "investigate";
         e.timer = 6;
         e.lure = { x, z };
@@ -1428,6 +1607,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         "shoes",
         "axe",
         "rifle",
+        "sniper",
+        "cannon",
         "boots",
         "grilled",
         "soup",
@@ -1439,7 +1620,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     ) {
       const result = activateTool(s, id);
       this.result(result);
-      if (result.ok) this.audio.play("bell");
+      if (result.ok) {
+        this.scoped = false;
+        this.reloadTime = 0;
+        this.audio.play("bell");
+      }
       this.ui.updateToolbelt();
       return;
     }
@@ -1670,7 +1855,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     }
     if (item.type === "combat-tube") {
       for (const e of this.enemies)
-        if (e.hp > 0) {
+        if (e.hp > 0 && !e.encounter) {
           e.state = "investigate";
           e.timer = 5;
           e.lure = { x: item.x, z: item.z };
@@ -1707,7 +1892,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       }
       s.chests.push(item.id);
       const extraTool = {
-        id: { 1: "compass", 2: "hat", 3: "bell" }[s.chapter],
+        id: { 1: "compass", 2: "hat", 3: "bell", 4: "fruit", 5: "hat" }[
+          s.chapter
+        ],
         quantity: s.chapter === 1 ? 2 : 1,
       };
       grantTool(s, extraTool.id, extraTool.quantity);
@@ -1885,7 +2072,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         ((this.keys.has("PageDown") ? 1 : 0) -
           (this.keys.has("PageUp") ? 1 : 0)) *
           dt,
-      this.desktopControls ? -0.35 : 0.08,
+      isGun(this.state.weapon) ? -1.2 : this.desktopControls ? -0.35 : 0.08,
       this.desktopControls ? 1.2 : 1.15,
     );
     const sprint =
@@ -1899,6 +2086,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         : sprint
           ? 6.5
           : 3.6;
+    if (this.scoped) speed *= 0.4;
     if (this.slowTime > 0) speed *= 0.45;
     if (this.collectTime > 0) speed *= 0.1;
     this.state.stamina = clamp(
@@ -2039,7 +2227,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           this.invincible <= 0 || Math.floor(this.gameTime * 12) % 2 === 0;
       }
     }
-    this.equipment?.update(this.state.weapon);
+    if (isGun(this.state.weapon) && this.dodgeTime <= 0)
+      this.player.root.rotation.y = this.yaw + Math.PI;
+    this.equipment?.update(this.state.weapon, this.pitch);
     this.player.basket.scale.setScalar(1 + basketCount(this.state) / 100);
     this.attackRing.visible = this.attackTime > 0;
     if (this.attackRing.visible) {
@@ -2131,9 +2321,13 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       if (e.hp <= 0 || this.state.defeated.includes(e.id)) continue;
       const range = Math.hypot(p.x - e.x, p.z - e.z);
       const locked = e.ant && !this.state.gateOpen;
-      e.object.visible = !locked && range < 60;
-      if (locked || range > 34) {
+      e.object.visible = !locked && range < (e.encounter ? 80 : 60);
+      if (locked || range > (e.flying ? 70 : 34)) {
         e.telegraph.visible = e.sweep.visible = false;
+        continue;
+      }
+      if (e.encounter) {
+        updateEncounter(this, e, dt);
         continue;
       }
       if (e.ant) {
@@ -2252,7 +2446,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       (e) =>
         e.boss &&
         e.hp > 0 &&
-        Math.hypot(p.x - e.x, p.z - e.z) < 18 &&
+        Math.hypot(p.x - e.x, p.z - e.z) <
+          (e.flying ? 65 : e.encounter ? 30 : 18) &&
         !this.state.defeated.includes(e.id),
     );
     $("boss-bar").classList.toggle("hidden", !boss);
@@ -2260,13 +2455,17 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       $("boss-bar").classList.toggle("ant-boss", !!boss.ant);
       $("boss-bar").querySelector("span").textContent =
         `${boss.kind} · ${boss.name}  ${Math.max(0, boss.hp)} / ${boss.maxHp}`;
-      $("boss-bar").querySelector("small").textContent = boss.ant
-        ? `阶段 ${boss.phase} / 3 · ${boss.state === "stunned" ? "毒囊暴露 · 反击伤害翻倍" : "Q 闪避 · 离开酸液 · 优先清理蚁群"}`
-        : "观察预警 · 侧闪 · 等它露出破绽";
+      $("boss-bar").querySelector("small").textContent = boss.encounter
+        ? `阶段 ${boss.phase} / 3 · ${encounterHint(boss)}`
+        : boss.ant
+          ? `阶段 ${boss.phase} / 3 · ${boss.state === "stunned" ? "毒囊暴露 · 反击伤害翻倍" : "Q 闪避 · 离开酸液 · 优先清理蚁群"}`
+          : "观察预警 · 侧闪 · 等它露出破绽";
       $("boss-bar").querySelector("i").style.width =
         `${(boss.hp / boss.maxHp) * 100}%`;
     }
     this.updateAcid(dt);
+    updatePoisonBolts(this, dt);
+    this.updateArtillery(dt);
     for (const trap of this.traps) {
       if (trap.cleared) continue;
       trap.cooldown = Math.max(0, trap.cooldown - dt);
@@ -2380,6 +2579,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         p.y + 1.4 + Math.sin(this.pitch) * d,
         p.z + Math.cos(this.yaw) * Math.cos(this.pitch) * d,
       );
+      if (isGun(this.state.weapon) && !this.photoMode && !this.scoped) {
+        desired.x += Math.cos(this.yaw) * 0.95;
+        desired.z -= Math.sin(this.yaw) * 0.95;
+        desired.y += 0.3;
+      }
+      if (this.scoped) desired.set(p.x, p.y + 1.5, p.z);
       desired.y = Math.max(
         desired.y,
         terrainHeight(desired.x, desired.z) + 0.6,
@@ -2411,8 +2616,27 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     // rendering the inside of the traveler's head, hat or backpack.
     const bodyDistance = this.camera.position.distanceTo(target);
     this.player.root.visible =
-      !this.started || bodyDistance > (this.player.root.visible ? 1.05 : 1.2);
-    this.camera.lookAt(target);
+      !this.scoped &&
+      (!this.started || bodyDistance > (this.player.root.visible ? 1.05 : 1.2));
+    if (this.started && isGun(this.state.weapon) && !this.photoMode) {
+      const forward = new T.Vector3(
+        -Math.sin(this.yaw) * Math.cos(this.pitch),
+        -Math.sin(this.pitch),
+        -Math.cos(this.yaw) * Math.cos(this.pitch),
+      );
+      this.camera.lookAt(
+        this.camera.position.clone().addScaledVector(forward, 100),
+      );
+    } else this.camera.lookAt(target);
+    const fov = this.scoped
+      ? (2 * Math.atan(Math.tan((26 * Math.PI) / 180) / this.scopeZoom) * 180) /
+        Math.PI
+      : 52;
+    const next = T.MathUtils.damp(this.camera.fov, fov, 16, dt);
+    if (Math.abs(this.camera.fov - next) > 0.001) {
+      this.camera.fov = next;
+      this.camera.updateProjectionMatrix();
+    }
   }
   burst(pos, color, count) {
     const geo = new T.SphereGeometry(0.045, 4, 3),
@@ -2543,9 +2767,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
+      if (p.grow) p.mesh.scale.addScalar(p.grow * dt);
       p.velocity.y -= 4 * dt;
       p.mesh.position.addScaledVector(p.velocity, dt);
-      p.mesh.scale.setScalar(Math.max(0, p.life));
+      if (!p.grow) p.mesh.scale.setScalar(Math.max(0, p.life));
+      else p.mat.opacity = Math.max(0, p.life);
       if (p.life <= 0) {
         this.scene.remove(p.mesh);
         this.particles.splice(i, 1);

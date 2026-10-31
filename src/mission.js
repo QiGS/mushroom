@@ -1,3 +1,4 @@
+import { BOSSES, WEAPONS } from "./progression.js";
 import {
   CHAPTERS,
   SPECIES,
@@ -33,6 +34,20 @@ export function missionTarget(s) {
       "向奶奶交付",
       `食材和探索目标已齐，到${granny.area}找奶奶交付食材。`,
     );
+  if (s.chapter >= 4 && !s.defeated.includes(BOSSES[s.chapter].id)) {
+    const b = BOSSES[s.chapter],
+      w = WEAPONS[b.weapon];
+    if (!s.gear[b.weapon])
+      return target(
+        8,
+        27.3,
+        s.tools[b.weapon] ? "装备" + w.name : "准备" + w.name,
+        s.tools[b.weapon]
+          ? `已购入${w.name}，按 ↑ / ↓ 选中后按 G 装备。`
+          : `到村口大叔处购买${w.name}（${w.price}竹叶币）。可卖出收藏菌筹钱；${b.hint}`,
+      );
+    return target(b.approach.x, b.approach.z, "击退" + b.name, b.hint);
+  }
   if (s.chapter === 3) {
     if (!s.uncle)
       return target(
@@ -116,7 +131,8 @@ export function missionTarget(s) {
         missing.includes(p.species) &&
         !s.collected.includes(p.id) &&
         (!p.boss || s.defeated.includes("boss")) &&
-        (!p.gate || s.gateOpen),
+        (!p.gate || s.gateOpen) &&
+        (!p.encounter || s.defeated.includes(p.encounter)),
     )
     .sort(
       (a, b) =>

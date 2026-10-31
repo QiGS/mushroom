@@ -1,3 +1,4 @@
+import { BOSSES, WEAPONS } from "./progression.js";
 import { colliderActive, overlapsCollider, terrainHeight } from "./terrain.js";
 import { collidersNear } from "./spatial.js";
 export function clearShot(world, s, from, to, ignoreId) {
@@ -35,12 +36,29 @@ export function inAttackArc(from, target, angle, range, gun = false) {
   );
 }
 export const MONSTER_TYPES = {
+  butterfly: {
+    name: BOSSES[4].name,
+    kind: BOSSES[4].kind,
+    hp: BOSSES[4].hp,
+    color: 0xb57aaf,
+  },
+  scorpion: {
+    name: BOSSES[5].name,
+    kind: BOSSES[5].kind,
+    hp: BOSSES[5].hp,
+    color: 0xa36d42,
+  },
   leaf: { name: "竹叶青", kind: "林间游蛇", hp: 4, color: 0x82ab58 },
-  boss: { name: "青影", kind: "竹叶青首领", hp: 14, color: 0x4d9864 },
+  boss: { name: "青影", kind: "竹叶青首领", hp: BOSSES[2].hp, color: 0x4d9864 },
   rock: { name: "岩纹蛇", kind: "峡谷精英", hp: 8, color: 0xae815a },
   frost: { name: "霜叶蛇", kind: "山岭精英", hp: 6, color: 0xa2b5b2 },
   ant: { name: "毒蚂蚁", kind: "母巢蚁群", hp: 3, color: 0xaa5b3d },
-  antQueen: { name: "毒蚁母巢", kind: "菌谷首领", hp: 64, color: 0x9b4d3b },
+  antQueen: {
+    name: "毒蚁母巢",
+    kind: "菌谷首领",
+    hp: BOSSES[3].hp,
+    color: 0x9b4d3b,
+  },
 };
 export function antPhase(hp, maxHp) {
   return hp <= maxHp * 0.35 ? 3 : hp <= maxHp * 0.7 ? 2 : 1;
@@ -102,4 +120,42 @@ export function rifleAmmo(s) {
 export function loadRifle(s) {
   s.rifleLoaded = Math.min(4, s.gear.rifle);
   return s.rifleLoaded;
+}
+
+// Shotgun selects every visible target inside its cone; one trigger spends one shell.
+export function shotgunTargets(world, s, eye, direction, muzzle, targets) {
+  const w = WEAPONS.rifle,
+    n = Math.hypot(direction.x, direction.y, direction.z) || 1;
+  return targets.filter((t) => {
+    const dx = t.x - eye.x,
+      dy = t.y - eye.y,
+      dz = t.z - eye.z,
+      along = (dx * direction.x + dy * direction.y + dz * direction.z) / n;
+    const lateral = Math.sqrt(
+      Math.max(0, dx * dx + dy * dy + dz * dz - along * along),
+    );
+    return (
+      along > 0 &&
+      Math.hypot(t.x - muzzle.x, t.y - muzzle.y, t.z - muzzle.z) <= w.range &&
+      lateral <=
+        (t.radius || 0.6) +
+          Math.hypot(t.x - muzzle.x, t.y - muzzle.y, t.z - muzzle.z) *
+            w.spread &&
+      clearShot(world, s, eye, t, t.id) &&
+      clearShot(world, s, muzzle, t, t.id)
+    );
+  });
+}
+export function blastTargets(
+  world,
+  s,
+  point,
+  targets,
+  radius = WEAPONS.cannon.splash,
+) {
+  return targets.filter(
+    (t) =>
+      Math.hypot(t.x - point.x, t.y - point.y, t.z - point.z) <=
+        radius + (t.radius || 0.5) && clearShot(world, s, point, t, t.id),
+  );
 }

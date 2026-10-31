@@ -1,4 +1,5 @@
 const illustrated = new Set([
+  "sniper", "cannon",
   "note",
   "hat",
   "fruit",

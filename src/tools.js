@@ -1,3 +1,4 @@
+import { WEAPONS, isGun, loadGun } from "./progression.js";
 import { houseUnlocked } from "./terrain.js";
 export const TOOL_DEFS = [
   {
@@ -49,13 +50,15 @@ export const TOOL_DEFS = [
     color: "#d2be8b",
     description: "装备 30 耐久伐竹斧；左键砍竹或近战，2 键切换。",
   },
-  {
-    id: "rifle",
-    name: "猎枪",
-    icon: "⌁",
-    color: "#c9b091",
-    description: "装备 12 发猎枪；左键按准星射击，4 发弹匣，R 装填，3 键切换。",
-  },
+  ...Object.entries(WEAPONS)
+    .filter(([, w]) => w.gun)
+    .map(([id, w]) => ({
+      id,
+      name: w.name,
+      icon: "⌁",
+      color: "#c9b091",
+      description: `G 装备 ${w.supply} 发；${w.key} 键切换，左键射击，R 装填。${id === "sniper" ? "右键 / Z 开镜，滚轮调整倍率。" : id === "rifle" ? "近距离可同时命中多个敌人。" : "炮击造成范围高额伤害。"}`,
+    })),
   {
     id: "boots",
     name: "防水鞋",
@@ -206,15 +209,20 @@ export function activateTool(s, id) {
     return { ok: false, message: "护身效果仍在，斗笠先留着吧。" };
   if (id === "shoes" && s.boostTime > 0)
     return { ok: false, message: "疾风效果仍在，草鞋先留着吧。" };
-  if (["axe", "rifle", "boots"].includes(id)) {
-    if (s.gear[id] > 0)
+  if (["axe", "boots"].includes(id) || isGun(id)) {
+    if (!isGun(id) && s.gear[id] > 0)
       return { ok: false, message: "现有装备还可使用，先把这件留在道具栏。" };
+    if (isGun(id) && s.gear[id] >= WEAPONS[id].capacity)
+      return { ok: false, message: "弹药已装满，补给先留在道具栏。" };
     consumeTool(s, id);
-    s.gear[id] = { axe: 30, rifle: 12, boots: 5 }[id];
+    s.gear[id] = isGun(id)
+      ? Math.min(WEAPONS[id].capacity, (s.gear[id] || 0) + WEAPONS[id].supply)
+      : { axe: 30, boots: 5 }[id];
+    if (isGun(id)) loadGun(s, id);
     if (id !== "boots") s.weapon = id;
     return {
       ok: true,
-      message: `${TOOL_DEFS.find((t) => t.id === id).name}已装备 · ${id === "boots" ? "落水伤害降低" : "左键使用，1 / 2 / 3 切换武器"}`,
+      message: `${TOOL_DEFS.find((t) => t.id === id).name}已装备 · ${id === "boots" ? "落水伤害降低" : "左键使用，数字 1—5 切换武器"}`,
     };
   }
   if (!["fruit", "hat", "shoes"].includes(id))

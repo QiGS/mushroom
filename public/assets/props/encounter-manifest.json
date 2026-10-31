@@ -1,0 +1,37 @@
+[
+  {
+    "id": "poison-butterfly",
+    "source": "new/毒蝴蝶3d.glb",
+    "sourceTriangles": 500000,
+    "triangles": 14000,
+    "bytes": 1878632
+  },
+  {
+    "id": "poison-scorpion",
+    "source": "new/毒蝎子.glb",
+    "sourceTriangles": 1963659,
+    "triangles": 16000,
+    "bytes": 972888
+  },
+  {
+    "id": "shotgun",
+    "source": "new/霰弹枪.glb",
+    "sourceTriangles": 1995086,
+    "triangles": 6000,
+    "bytes": 656156
+  },
+  {
+    "id": "sniper",
+    "source": "new/狙击枪.glb",
+    "sourceTriangles": 1951146,
+    "triangles": 6500,
+    "bytes": 768624
+  },
+  {
+    "id": "cannon",
+    "source": "new/手持炮.glb",
+    "sourceTriangles": 1923105,
+    "triangles": 6500,
+    "bytes": 830568
+  }
+]

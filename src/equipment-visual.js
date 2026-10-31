@@ -1,4 +1,6 @@
 import * as T from "three";
+import { addProp } from "./prop-model.js";
+import { WEAPONS, isGun } from "./progression.js";
 export function equipmentVisual(player, motion) {
   const holder = new T.Group(),
     axe = new T.Group(),
@@ -7,8 +9,11 @@ export function equipmentVisual(player, motion) {
   parent.add(holder);
   holder.position.set(0.02, motion ? -0.02 : 1.02, 0.1);
   if (!motion) holder.position.x = 0.4;
-  holder.add(axe, rifle);
-  rifle.rotation.x = motion ? 1.4 : 0;
+  holder.add(axe);
+  const gunHolder = new T.Group();
+  player.root.add(gunHolder);
+  gunHolder.position.set(0.38, 1.14, 0.28);
+  gunHolder.add(rifle);
   const wood = new T.MeshStandardMaterial({ color: 0x795335, roughness: 0.9 }),
     metal = new T.MeshStandardMaterial({
       color: 0x91a7a2,
@@ -43,12 +48,26 @@ export function equipmentVisual(player, motion) {
   );
   barrel.rotation.x = Math.PI / 2;
   add(rifle, new T.BoxGeometry(0.05, 0.1, 0.05), metal, 0, 0.13, 0.76);
+  const guns = new Map();
   return {
-    update(weapon) {
+    update(weapon, pitch = 0) {
+      gunHolder.rotation.x = pitch;
       axe.visible = weapon === "axe";
-      rifle.visible = weapon === "rifle";
+      if (isGun(weapon) && !guns.has(weapon)) {
+        const group = new T.Group();
+        gunHolder.add(group);
+        const prop = addProp(group, WEAPONS[weapon].art, {
+          width: weapon === "sniper" ? 1.45 : 1.1,
+          rotation: weapon === "cannon" ? Math.PI / 2 : -Math.PI / 2,
+        });
+        prop.group.position.set(0, -0.32, 0.35);
+        if (weapon === "cannon") group.rotation.x = 0.2;
+        guns.set(weapon, { group, prop });
+      }
+      for (const [id, g] of guns) g.group.visible = id === weapon;
+      rifle.visible = isGun(weapon) && !guns.get(weapon)?.prop.loaded;
       player.staff.visible = weapon === "staff";
-      if (weapon === "rifle" && motion) {
+      if (isGun(weapon) && motion) {
         const b = motion.rig.bones;
         b.rightArm.rotation.x = -1.1;
         b.rightForearm.rotation.x = -0.3;

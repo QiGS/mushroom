@@ -1,3 +1,5 @@
+import { WEAPONS, weaponUnlocked } from "./progression.js";
+export { WEAPONS } from "./progression.js";
 import { grantTool } from "./tools.js";
 import { houseUnlocked } from "./terrain.js";
 export const SHOP = [
@@ -57,13 +59,16 @@ export const SHOP = [
     icon: "⚒",
     detail: "G 装备 · 30 耐久 · 近战伤害 2 · 可砍竹与木箱",
   },
-  {
-    id: "rifle",
-    price: 100,
-    name: "猎枪",
-    icon: "⌁",
-    detail: "G 装备 · 12 发 · 4 发弹匣，R 装填 · 伤害 4 · 射程 22 米",
-  },
+  ...Object.entries(WEAPONS)
+    .filter(([, w]) => w.gun)
+    .map(([id, w]) => ({
+      id,
+      name: w.name,
+      icon: "⌁",
+      price: w.price,
+      chapter: w.chapter,
+      detail: `第 ${w.chapter} 章解锁 · G 装备 ${w.supply} 发 · 伤害 ${w.damage} · ${id === "rifle" ? "锥形群体攻击" : id === "sniper" ? "右键 / Z 开镜，专破毒蝶鳞甲" : "爆炸波及 5.5 米范围"} · R 装填`,
+    })),
   {
     id: "boots",
     price: 30,
@@ -196,14 +201,14 @@ export const EXPLORE_CLEARINGS = [
   ...Array.from({ length: 16 }, (_, i) => ({ x: 49 + i * 2, z: -30, r: 3 })),
   ...Array.from({ length: 20 }, (_, i) => ({ x: -68, z: 16 - i * 2.4, r: 3 })),
 ];
-export const WEAPONS = {
-  staff: { name: "竹杖", damage: 1, range: 3, cooldown: 0.42 },
-  axe: { name: "伐竹斧", damage: 2, range: 3.2, cooldown: 0.52 },
-  rifle: { name: "猎枪", damage: 4, range: 22, cooldown: 0.85 },
-};
 export function purchase(s, id) {
   const item = SHOP.find((p) => p.id === id);
   if (!item) return { ok: false, message: "这件商品暂未上架。" };
+  if (!weaponUnlocked(s, id))
+    return {
+      ok: false,
+      message: `这件武器在第 ${item.chapter} 章解锁后上架。`,
+    };
   if (id === "bed" && !houseUnlocked(s))
     return {
       ok: false,
@@ -222,6 +227,7 @@ export function purchase(s, id) {
   s.selectedTool = id;
   return { ok: true, message: `${item.name}已放入道具栏 · 按 G 使用或装备` };
 }
+export const availableShop = (s) => SHOP.filter((p) => weaponUnlocked(s, p.id));
 export function selectWeapon(s, id) {
   if (!WEAPONS[id] || (id !== "staff" && s.gear[id] <= 0)) return false;
   s.weapon = id;

@@ -1,3 +1,4 @@
+import { isGun } from "./progression.js";
 import { MathUtils } from "three";
 
 export class DesktopLook {
@@ -30,9 +31,15 @@ export class DesktopLook {
   }
   rotate(dx, dy) {
     const game = this.game;
-    const sensitivity = game.state.settings.sensitivity * 0.0025;
+    const sensitivity =
+      (game.state.settings.sensitivity * 0.0025) /
+      (game.scoped ? game.scopeZoom : 1);
     game.yaw -= dx * sensitivity;
-    game.pitch = MathUtils.clamp(game.pitch + dy * sensitivity, -0.35, 1.2);
+    game.pitch = MathUtils.clamp(
+      game.pitch + dy * sensitivity,
+      isGun(game.state.weapon) ? -1.2 : -0.35,
+      1.2,
+    );
   }
   capture() {
     const g = this.game;

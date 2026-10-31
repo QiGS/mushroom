@@ -217,7 +217,7 @@ export function sanitizeCollection(raw, chapter, day, weather = "rain") {
     if (c.counts[p.id] && f && typeof f === "object")
       c.foundAt[p.id] = {
         day: number(f.day, 1, 9999),
-        chapter: Math.max(1, number(f.chapter, 1, 3)),
+        chapter: Math.max(1, number(f.chapter, 1, 5)),
         source: f.source === "wild" ? "wild" : "box",
       };
   }

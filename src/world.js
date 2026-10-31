@@ -1,3 +1,4 @@
+import { BOSSES } from "./progression.js";
 import { grandmaPlace, GRANDMA_CLEARINGS } from "./story.js";
 import { CANYONS, canyonAt, baseTerrainHeight } from "./terrain.js";
 import { disposeObject, bakePainted } from "./resources.js";
@@ -241,6 +242,9 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     ...NIGHT_SPAWNS.map(([x, z]) => ({ x, z, r: 3 })),
     ...EXPLORE_CLEARINGS,
     ...GRANDMA_CLEARINGS,
+    ...(chapter >= 4
+      ? [{ ...BOSSES[chapter], r: BOSSES[chapter].radius + 9 }]
+      : []),
     ...CANYONS.map((c) => ({
       x: c.x,
       z: c.z,
@@ -767,12 +771,12 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     for (const z of [-0.5, 0.5])
       mesh(new T.BoxGeometry(0.15, 1, 0.15), wood, table, x, 0.5, z);
   const dishes = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < CHAPTERS.length; i++) {
     const dish = mesh(
       new T.SphereGeometry(0.36, 12, 8, 0, 6.28, 0, Math.PI / 2),
       material(0xa06f3e),
       table,
-      (i - 1) * 1.15,
+      (i - 2) * 0.74,
       1.1,
       0,
     );
@@ -1068,6 +1072,50 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       object: tube,
       radius: 2.3,
     });
+  }
+  if (chapter >= 4) {
+    const b = BOSSES[chapter],
+      arena = new T.Group();
+    root.add(arena);
+    if (chapter === 5) {
+      for (const a of [0, 0.7, 2.45, Math.PI]) {
+        const x = b.x + Math.cos(a) * 11,
+          z = b.z + Math.sin(a) * 11;
+        const rock = mesh(
+          new T.IcosahedronGeometry(1.4, 1),
+          material(0xa78a61),
+          arena,
+          x,
+          height(x, z) + 0.8,
+          z,
+        );
+        rock.scale.set(1.2, 1.15, 0.85);
+        colliders.push({ id: "arena-rock-" + a, x, z, r: 1.45, height: 2.5 });
+      }
+    } else {
+      const blooms = [];
+      for (let i = 0; i < 42; i++) {
+        const a = i * 2.399,
+          r = 8 + (i % 4) * 1.2,
+          x = b.x + Math.cos(a) * r,
+          z = b.z + Math.sin(a) * r;
+        blooms.push({
+          x,
+          y: height(x, z) + 0.18,
+          z,
+          sx: 0.18,
+          sy: 0.22,
+          sz: 0.18,
+          color: i % 2 ? 0xb49abd : 0xe1b9c9,
+        });
+      }
+      instances(
+        new T.IcosahedronGeometry(1, 0),
+        material(0xffffff),
+        blooms,
+        arena,
+      );
+    }
   }
   const chestAt =
     chapter === 1
@@ -1479,13 +1527,20 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         : state.weather === "fog"
           ? 0.025
           : 0.0125;
-    scene.fog.density = Math.abs(state.position.x) > 43 ? 0.0045 : fogDensity;
+    scene.fog.density =
+      state.chapter >= 4
+        ? 0.006
+        : Math.abs(state.position.x) > 43
+          ? 0.0045
+          : fogDensity;
     scene.fog.color
       .set(0xa5bca1)
       .lerp(new T.Color(0xc49e80), dusk * 0.35)
       .lerp(new T.Color(0x0b172b), night);
     scene.background.copy(scene.fog.color);
-    dishes.forEach((d, i) => (d.visible = state.recipes.length > i));
+    dishes.forEach(
+      (d, i) => (d.visible = state.recipes.includes(CHAPTERS[i].recipe)),
+    );
     if (badger && !state.basketReturned) {
       badger.rotation.y = Math.sin(t * 0.4) * 0.5;
       badger.position.y = height(-31, 0) + Math.sin(t * 4) * 0.03;
@@ -1515,7 +1570,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         (!item.gate ||
           (state.gateOpen &&
             (chapter !== 3 || state.defeated.includes("ant-queen")))) &&
-        (!item.boss || state.defeated.includes("boss"));
+        (!item.boss || state.defeated.includes("boss")) &&
+        (!item.encounter || state.defeated.includes(item.encounter));
     }
     for (const [id, g] of nestObjects)
       g.visible = items.some((p) => p.nest === id) && !state.nests.includes(id);

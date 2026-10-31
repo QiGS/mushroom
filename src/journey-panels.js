@@ -10,7 +10,7 @@ import {
 } from "./cooking.js";
 import { SPECIES, CHAPTERS } from "./state.js";
 import { journalImage } from "./collection.js";
-import { SHOP, purchase } from "./exploration.js";
+import { availableShop, purchase } from "./exploration.js";
 import { houseUnlocked } from "./terrain.js";
 const foodArt = (p) =>
   `<span class="ingredient-art">${p.key?.startsWith("find:") ? `<img src="${journalImage(p.id)}" alt=""/>` : p.key?.startsWith("food:") ? `<svg viewBox="0 0 64 52" aria-hidden="true"><path d="M27 24h11l6 23c-7 4-17 4-24 0z" fill="#e7d9b2"/><path d="M5 25C6-7 58-7 59 25c-10 12-43 12-54 0" fill="${p.color || "#bd9c68"}"/><ellipse cx="22" cy="14" rx="6" ry="3" fill="#f7eccb" opacity=".8"/></svg>` : toolArt(p)}</span>`;
@@ -97,15 +97,17 @@ export class JourneyPanels {
       ch = CHAPTERS[s.chapter - 1];
     const goods =
       mode === "tools"
-        ? SHOP.map((p) => {
-            const fixture = p.id === "bed" || p.id === "weatherVane";
-            const owned =
-              fixture &&
-              (s.tools[p.id] > 0 ||
-                s[p.id === "bed" ? "bedOwned" : "forecastOwned"]);
-            const locked = p.id === "bed" && !houseUnlocked(s);
-            return `<article class="shop-item"><span>${toolArt(p)}</span><h3>${p.name}</h3><p>${p.detail}</p><button data-tool-buy="${p.id}" ${owned || locked || s.coins < p.price ? "disabled" : ""}>${owned ? "已购入 · 永久设施" : locked ? "完成第一章后可购买" : `购买 ${p.name} · ${p.price} 竹叶币`}</button></article>`;
-          }).join("")
+        ? availableShop(s)
+            .map((p) => {
+              const fixture = p.id === "bed" || p.id === "weatherVane";
+              const owned =
+                fixture &&
+                (s.tools[p.id] > 0 ||
+                  s[p.id === "bed" ? "bedOwned" : "forecastOwned"]);
+              const locked = p.id === "bed" && !houseUnlocked(s);
+              return `<article class="shop-item"><span>${toolArt(p)}</span><h3>${p.name}</h3><p>${p.detail}</p><button data-tool-buy="${p.id}" ${owned || locked || s.coins < p.price ? "disabled" : ""}>${owned ? "已购入 · 永久设施" : locked ? "完成第一章后可购买" : `购买 ${p.name} · ${p.price} 竹叶币`}</button></article>`;
+            })
+            .join("")
         : mode === "ingredients"
           ? [
               ...PANTRY.map((p) => ({ ...p, key: "pantry:" + p.id })),

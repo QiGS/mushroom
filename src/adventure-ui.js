@@ -1,7 +1,8 @@
 import * as T from "three";
 import { boundaryIntensity } from "./terrain.js";
 import { WEAPONS } from "./exploration.js";
-import { rifleAmmo } from './combat.js';
+import { gunAmmo, isGun, weaponUnlocked } from "./progression.js";
+import "./encounters.css";
 import "./adventure.css";
 export class AdventureUI {
   constructor(game) {
@@ -23,7 +24,16 @@ export class AdventureUI {
     this.aim.id = "aim-reticle";
     this.aim.textContent = "+";
     document.getElementById("hud").append(this.aim);
-    this.ammo=document.createElement('div');this.ammo.className='rifle-status';this.ammo.hidden=true;document.getElementById('hud').append(this.ammo);
+    this.scope = document.createElement("div");
+    this.scope.id = "scope-overlay";
+    this.scope.hidden = true;
+    this.scope.innerHTML =
+      '<div class="scope-glass"><i></i><b></b><span class="scope-readout"></span><small>毒鳞穿透 · 左键射击<br>右键 / Z 收镜 · 滚轮变倍</small></div>';
+    document.getElementById("hud").append(this.scope);
+    this.ammo = document.createElement("div");
+    this.ammo.className = "rifle-status";
+    this.ammo.hidden = true;
+    document.getElementById("hud").append(this.ammo);
   }
   update() {
     const g = this.game,
@@ -44,14 +54,25 @@ export class AdventureUI {
       const node = this.elements.get(e.id),
         distance = Math.hypot(e.x - s.position.x, e.z - s.position.z);
       this.vector
-        .set(e.x, e.object.position.y + (e.boss ? 2.1 : 1.25), e.z)
+        .set(
+          e.x,
+          e.object.position.y +
+            (e.flying
+              ? 5.1
+              : e.species === "scorpion"
+                ? 3.6
+                : e.boss
+                  ? 2.1
+                  : 1.25),
+          e.z,
+        )
         .project(g.camera);
       const visible =
         !g.ui.blocking &&
         e.hp > 0 &&
         e.object.visible &&
         !s.defeated.includes(e.id) &&
-        distance < 23 &&
+        distance < (e.boss ? 65 : 23) &&
         this.vector.z > -1 &&
         this.vector.z < 1 &&
         Math.abs(this.vector.x) < 1.12 &&
@@ -65,15 +86,16 @@ export class AdventureUI {
           `${Math.max(0, e.hp)} / ${e.maxHp}${e.state === "stunned" ? " · 眩晕" : ""}`;
       }
     }
-    const signature = JSON.stringify([s.weapon, s.gear, s.timber]);
+    const signature = JSON.stringify([s.weapon, s.gear, s.timber, s.unlocked]);
     if (signature !== this.last) {
       this.last = signature;
       this.gear.innerHTML = `<span class="equipment-caption">装备</span>${Object.entries(
         WEAPONS,
       )
+        .filter(([id]) => weaponUnlocked(s, id) || s.gear[id] > 0)
         .map(
           ([id, w], i) =>
-            `<button data-weapon="${id}" aria-pressed="${s.weapon === id}" ${id !== "staff" && !s.gear[id] ? "disabled" : ""}><kbd>${i + 1}</kbd>${w.name}${id === "staff" ? "" : ` <b>${s.gear[id]}${id === "rifle" ? "发" : "耐久"}</b>`}</button>`,
+            `<button data-weapon="${id}" aria-pressed="${s.weapon === id}" ${id !== "staff" && !s.gear[id] ? "disabled" : ""}><kbd>${w.key}</kbd>${w.name}${id === "staff" ? "" : ` <b>${s.gear[id]}${isGun(id) ? "发" : "耐久"}</b>`}</button>`,
         )
         .join(
           "",
@@ -85,8 +107,19 @@ export class AdventureUI {
     const edge = boundaryIntensity(s.position.x, s.position.z);
     this.edge.style.opacity = g.ui.blocking ? "0" : String(edge * 0.85);
     this.edge.classList.toggle("near-edge", edge > 0.08);
-    this.aim.hidden = !!g.ui.blocking || s.weapon !== "rifle";
-    this.ammo.hidden=this.aim.hidden;
-    if(!this.ammo.hidden)this.ammo.textContent=g.reloadTime>0?`装填中 ${g.reloadTime.toFixed(1)}s`:`${rifleAmmo(s)} / ${s.gear.rifle} 发 · R 装填`;
+    this.aim.hidden = !!g.ui.blocking || !isGun(s.weapon) || g.scoped;
+    this.ammo.hidden = !!g.ui.blocking || !isGun(s.weapon);
+    this.scope.hidden = !g.scoped || !!g.ui.blocking;
+    document
+      .getElementById("hud")
+      .classList.toggle("is-scoped", !this.scope.hidden);
+    if (g.scoped)
+      this.scope.querySelector(".scope-readout").textContent =
+        `${g.scopeZoom}× 狙击镜`;
+    if (!this.ammo.hidden)
+      this.ammo.textContent =
+        g.reloadTime > 0
+          ? `装填中 ${g.reloadTime.toFixed(1)}s`
+          : `${WEAPONS[s.weapon].name} · ${gunAmmo(s)} / ${s.gear[s.weapon]} 发 · R 装填${s.weapon === "sniper" ? " · Z / 右键开镜" : ""}`;
   }
 }

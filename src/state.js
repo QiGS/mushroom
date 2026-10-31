@@ -1,3 +1,4 @@
+import { MAX_CHAPTER, WEAPONS, BOSSES, isGun } from "./progression.js";
 import { WORLD_BOUNDS, terrainHeight } from "./terrain.js";
 import { fieldDay, dayPeriod, TIME_SCALES } from "./seasons.js";
 import { grandmaPlace } from "./story.js";
@@ -126,6 +127,30 @@ export const CHAPTERS = [
       "山里的雾一阵浓一阵淡。先去西侧找采菌大叔，路口记得系上红布。你家在后面那边。",
     hint: "脚印通向西侧缺口石旁的大叔。会响的石头、月牙潭、抱抱树，是菌谷入口的线索。",
   },
+  {
+    id: 4,
+    name: "花雾逐蝶",
+    english: "WINGS ABOVE THE WILDWOOD",
+    region: "花雾高地",
+    duration: 1080,
+    requirements: { crescent: 8, gold: 6 },
+    recipe: "花雾清菌汤",
+    intro:
+      "花雾高地落下了有毒的鳞粉。大叔新到的狙击枪能穿透毒蝶的鳞甲，先准备好，再抬头寻找它。",
+    hint: "在大叔处购入狙击枪，沿东侧山径进入花雾空域；毒蝶只会被狙击枪击中。",
+  },
+  {
+    id: 5,
+    name: "赤岩终宴",
+    english: "THE LAST FEAST",
+    region: "赤岩峡谷",
+    duration: 1200,
+    requirements: { cloud: 10, gold: 8 },
+    recipe: "峡谷丰收煲",
+    intro:
+      "峡谷口的岩石被巨钳翻开了。买好手持大炮，等毒蝎王撞上岩壁，再把最后一篮菌子带回来。",
+    hint: "先在大叔处购买手持大炮，前往赤岩峡谷南口。尾针落下前离开红圈，撞石后的背甲最脆弱。",
+  },
 ];
 export function seededRandom(seed = 73419) {
   return () => {
@@ -181,9 +206,11 @@ export function newGame() {
     pantry: { water: 3, rice: 2, salt: 2, herb: 1 },
     cooked: [],
     houseLoot: {},
-    gear: { axe: 0, rifle: 0, boots: 0 },
+    gear: { axe: 0, rifle: 0, sniper: 0, cannon: 0, boots: 0 },
     weapon: "staff",
     rifleLoaded: 0,
+    sniperLoaded: 0,
+    cannonLoaded: 0,
     timber: 0,
     broken: [],
     looted: [],
@@ -205,8 +232,8 @@ const finite = (v, f, min, max) =>
 export function sanitizeSave(raw) {
   const s = newGame();
   if (!raw || raw.version !== 2) return s;
-  s.chapter = Math.floor(finite(raw.chapter, 1, 1, 3));
-  s.unlocked = Math.floor(finite(raw.unlocked, 1, s.chapter, 3));
+  s.chapter = Math.floor(finite(raw.chapter, 1, 1, MAX_CHAPTER));
+  s.unlocked = Math.floor(finite(raw.unlocked, 1, s.chapter, MAX_CHAPTER));
   s.position = {
     x: finite(raw.position?.x, 0, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX),
     z: finite(raw.position?.z, 27, WORLD_BOUNDS.minZ, WORLD_BOUNDS.maxZ),
@@ -322,15 +349,27 @@ export function sanitizeSave(raw) {
     : [];
   for (const id of ["house-fruit", "house-note", "house-hat"])
     s.houseLoot[id] = finite(raw.houseLoot?.[id], 0, 0, s.playSeconds + 180);
-  for (const [id, limit] of Object.entries({ axe: 30, rifle: 12, boots: 5 }))
+  for (const [id, limit] of Object.entries({
+    axe: 30,
+    rifle: 96,
+    sniper: 60,
+    cannon: 32,
+    boots: 5,
+  }))
     s.gear[id] = Math.floor(finite(raw.gear?.[id], 0, 0, limit));
   s.weapon =
-    ["axe", "rifle"].includes(raw.weapon) && s.gear[raw.weapon] > 0
+    (raw.weapon === "axe" || isGun(raw.weapon)) && s.gear[raw.weapon] > 0
       ? raw.weapon
       : "staff";
-  s.rifleLoaded = Math.floor(
-    finite(raw.rifleLoaded, 0, 0, Math.min(4, s.gear.rifle)),
-  );
+  for (const [id, w] of Object.entries(WEAPONS))
+    if (w.gun)
+      s[id + "Loaded"] = Math.floor(
+        finite(raw[id + "Loaded"], 0, 0, Math.min(w.magazine, s.gear[id])),
+      );
+  // Completing the original three chapters now unlocks the new expedition.
+  if (CHAPTERS.slice(0, 3).every((ch) => s.recipes.includes(ch.recipe)))
+    s.unlocked = Math.max(s.unlocked, 4);
+  s.completed = CHAPTERS.every((ch) => s.recipes.includes(ch.recipe));
   s.selectedTool = raw.selectedTool;
   normalizeToolSelection(s);
   if (
@@ -341,7 +380,7 @@ export function sanitizeSave(raw) {
     s.waypoint = {
       x: finite(raw.waypoint.x, 0, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX),
       z: finite(raw.waypoint.z, 0, WORLD_BOUNDS.minZ, WORLD_BOUNDS.maxZ),
-      kind: ["river", "treasure", "nest", "landmark", "camp"].includes(
+      kind: ["river", "treasure", "nest", "landmark", "camp", "boss"].includes(
         raw.waypoint.kind,
       )
         ? raw.waypoint.kind
@@ -367,6 +406,8 @@ export function startChapter(old, chapter, weather) {
     "gear",
     "weapon",
     "rifleLoaded",
+    "sniperLoaded",
+    "cannonLoaded",
     "timber",
     "surveyed",
     "bedOwned",
@@ -386,7 +427,7 @@ export function startChapter(old, chapter, weather) {
     old.fireFuel - (1 - (old.elapsed % dayPeriod(old)) / dayPeriod(old)),
   );
   s.collection = nextCollectionTrip(old.collection || newCollection());
-  s.weather = weather || ["rain", "sun", "fog"][s.chapter - 1];
+  s.weather = weather || ["rain", "sun", "fog", "sun", "sun"][s.chapter - 1];
   return s;
 }
 export function basketCount(s) {
@@ -406,6 +447,8 @@ export function collect(s, item) {
     return { ok: false, message: "石门后仍有未解的秘密。" };
   if (item.gate && s.chapter === 3 && !s.defeated.includes("ant-queen"))
     return { ok: false, message: "毒蚁母巢正守着菌谷，先击退它与蚁群。" };
+  if (item.encounter && !s.defeated.includes(item.encounter))
+    return { ok: false, message: "这里的菌子正被首领守着，先击退它。" };
   if (item.boss && !s.defeated.includes("boss"))
     return { ok: false, message: "青影仍守着这处菌窝。" };
   if (item.species !== "giant" && basketCount(s) >= s.capacity)
@@ -424,7 +467,8 @@ export function requirementsMet(s) {
     ) &&
     (s.chapter !== 1 || s.nests.length >= 1) &&
     (s.chapter !== 2 || s.defeated.includes("boss")) &&
-    (s.chapter !== 3 || (s.gateOpen && s.defeated.includes("ant-queen")))
+    (s.chapter !== 3 || (s.gateOpen && s.defeated.includes("ant-queen"))) &&
+    (s.chapter < 4 || s.defeated.includes(BOSSES[s.chapter].id))
   );
 }
 export function settle(s) {
@@ -451,9 +495,9 @@ export function settle(s) {
   for (const [id, n] of Object.entries(ch.requirements)) s.inventory[id] -= n;
   s.coins += summary.coins;
   if (first) s.recipes.push(ch.recipe);
-  s.unlocked = Math.max(s.unlocked, Math.min(3, s.chapter + 1));
+  s.unlocked = Math.max(s.unlocked, Math.min(MAX_CHAPTER, s.chapter + 1));
   s.settled = true;
-  s.completed = s.recipes.length === 3;
+  s.completed = CHAPTERS.every((ch) => s.recipes.includes(ch.recipe));
   s.health = 5;
   s.stamina = 100;
   if (s.chapter === 1 && !s.achievements.includes("采菌新手"))
@@ -508,7 +552,7 @@ export function quest(s) {
     return {
       title: s.completed ? "山野菌宴，开席啦" : "今天的收获上桌了",
       detail: s.completed
-        ? "三道山野菜已集齐，可重游挑战探索成就"
+        ? "五道山野菜已集齐，可重游挑战探索成就"
         : "到村口公告牌选择下一段旅程",
       step: `第 ${s.chapter} 章 · 已完成`,
     };
@@ -529,7 +573,7 @@ export function quest(s) {
     detail: requirementsMet(s)
       ? `到${grandmaPlace(s).area}把收获交给奶奶`
       : progress,
-    step: `第 ${s.chapter} 章 · ${s.chapter === 3 ? `地标 ${s.landmarks.length}/3` : s.chapter === 2 ? "留心草丛里的动静" : `菌窝 ${Math.min(s.nests.length, 1)}/1`}`,
+    step: `第 ${s.chapter} 章 · ${s.chapter >= 4 ? (s.defeated.includes(BOSSES[s.chapter].id) ? "首领已击退" : BOSSES[s.chapter].name) : s.chapter === 3 ? `地标 ${s.landmarks.length}/3` : s.chapter === 2 ? "留心草丛里的动静" : `菌窝 ${Math.min(s.nests.length, 1)}/1`}`,
   };
 }
 export function createMushrooms(chapter, weather = "rain", day = 1) {
@@ -574,6 +618,14 @@ export function createMushrooms(chapter, weather = "rain", day = 1) {
     group("crescent", 0, -38, 3, "gold-nest", { gate: true });
     group("giant", 0, -42, 1, null, { gate: true });
     group("cloud", 16, -10, 3, "lake-nest");
+  }
+  if (chapter === 4) {
+    group("crescent", 17, -23, 8);
+    group("gold", 23, -37, 8, null, { encounter: "butterfly-queen" });
+  }
+  if (chapter === 5) {
+    group("cloud", -16, -21, 16);
+    group("gold", -24, -43, 10, null, { encounter: "scorpion-king" });
   }
   if (weather === "rain")
     group(
