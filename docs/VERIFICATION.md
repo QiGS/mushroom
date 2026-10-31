@@ -149,3 +149,11 @@ macOS 的自动化启动检查不覆盖 Finder 双击、系统安全提示或 Sa
 - Windows 和 macOS 使用相同前端；Mac 启动与打包由仓库的 Apple 芯片/Intel CI 验证。没有宣称完成实体 Mac 的画面帧率、鼠标手感或 Gatekeeper 人工验收。
 
 本轮截图：`five-chapter-map.jpg`、`butterfly-scope.jpg`、`scorpion-encounter.jpg`。截图为 Windows Edge 的开发验收画面，QA 设置不进入正式成品。
+
+## 采菌遇蛇画面停住修复（2026-10-31）
+
+- Windows Edge 复现：采菌触发竹叶青后，`AdventureUI.update` 持续抛出 `Cannot set properties of undefined (setting 'hidden')`，中断每帧最后的场景绘制。原因是怪物列表原地追加，而血条仅在列表引用改变时重建。
+- 血条改为按当前怪物 ID 增量同步：新怪物先创建节点再更新，离场或换日改名的旧节点移除，未变化的怪物复用节点。无需读取新存档，原有采菌概率和战斗规则保持一致。
+- 新增四项直接执行真实 HUD 更新的回归测试，覆盖原地追加、等长替换、夜间 ID 连续二十次变化、击败和清理。旧逻辑下三项失败，修复后完整 100 项测试通过。
+- 独立 QA 存档实机连续采到两条蛇，血条由 7/7 增至 9/9；入夜正常显示夜行怪物，换日清理至 7/7，雨后再次采菌遇蛇增至 8/8。渲染帧持续推进，移动与头顶血量正常，修复后的浏览器未捕获警告或错误。
+- 正式构建及 Windows 启动器检查通过；Windows/macOS 便携包使用相同修复。

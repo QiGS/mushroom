@@ -294,22 +294,27 @@ export function attachQA(game) {
   });
   add("QA 采菌遇蛇", () => {
     const s = game.state;
-    s.collected = [];
-    s.ambushes = [];
     s.health = 5;
+    game.invincible = 30;
     s.nests = ["fallen-log", "lake-nest", "old-tree", "rain-nest", "mist-nest"];
+    game.world.sync(s);
     const item = game.world.interactables.find(
       (i) =>
         i.type === "mushroom" &&
+        i.object.visible &&
+        i.species !== "giant" &&
+        !s.collected.includes(i.id) &&
         Math.hypot(i.x, i.z - 30) > 12 &&
+        !game.enemies.some(
+          (e) => e.hp > 0 && Math.hypot(e.x - i.x, e.z - i.z) < 6,
+        ) &&
         harvestSnakeChance(s, `mushroom-${i.id}`),
     );
-    game.world.sync(s);
     if (item) {
       move(item.x, item.z + 0.7);
       game.nearest = item;
       game.interact();
-    }
+    } else game.ui.toast("本日没有合适的遇蛇菌，换日后再试。");
   });
   add("QA 交付准备", () => {
     for (const [id, n] of Object.entries(
@@ -597,7 +602,7 @@ export function attachQA(game) {
   setInterval(() => {
     const p = game.player.root.position;
     status.textContent =
-      `GL几何:${game.renderer.info.memory.geometries} 纹理:${game.renderer.info.memory.textures} 像素比:${game.renderer.getPixelRatio().toFixed(2)} 帧均值:${game.frameAverage.toFixed(1)} 怪:${game.enemies.filter((e) => e.hp > 0).length} 弹:${gunAmmo(game.state)}/${game.state.gear[game.state.weapon]} 开镜:${game.scoped} FOV:${game.camera.fov.toFixed(1)} 炮:${game.artillery.length} 毒弹:${game.poisonBolts.length} 首领:${game.enemies
+      `渲染帧:${game.renderer.info.render.frame} 血条:${game.ui.adventure.elements.size}/${game.enemies.length} GL几何:${game.renderer.info.memory.geometries} 纹理:${game.renderer.info.memory.textures} 像素比:${game.renderer.getPixelRatio().toFixed(2)} 帧均值:${game.frameAverage.toFixed(1)} 怪:${game.enemies.filter((e) => e.hp > 0).length} 弹:${gunAmmo(game.state)}/${game.state.gear[game.state.weapon]} 开镜:${game.scoped} FOV:${game.camera.fov.toFixed(1)} 炮:${game.artillery.length} 毒弹:${game.poisonBolts.length} 首领:${game.enemies
         .filter((e) => e.boss)
         .map((e) => e.name + "=" + e.hp + "/" + e.maxHp + "/" + e.state)
         .join(

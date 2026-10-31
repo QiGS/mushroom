@@ -2,8 +2,6 @@ import * as T from "three";
 import { boundaryIntensity } from "./terrain.js";
 import { WEAPONS } from "./exploration.js";
 import { gunAmmo, isGun, weaponUnlocked } from "./progression.js";
-import "./encounters.css";
-import "./adventure.css";
 export class AdventureUI {
   constructor(game) {
     this.game = game;
@@ -38,21 +36,25 @@ export class AdventureUI {
   update() {
     const g = this.game,
       s = g.state;
-    if (this.enemies !== g.enemies) {
-      this.enemies = g.enemies;
-      this.labels.replaceChildren();
-      this.elements.clear();
-      for (const e of g.enemies) {
-        const node = document.createElement("div");
+    // Harvest ambushes append in place; night enemies also change IDs in place.
+    // Reconcile actual IDs instead of treating array identity as a roster version.
+    const ids = new Set(g.enemies.map((e) => e.id));
+    for (const [id, node] of this.elements) {
+      if (!ids.has(id)) {
+        node.remove();
+        this.elements.delete(id);
+      }
+    }
+    for (const e of g.enemies) {
+      let node = this.elements.get(e.id);
+      if (!node) {
+        node = document.createElement("div");
         node.className = "enemy-label";
         node.innerHTML = `<strong>${e.name}</strong><small>${e.kind}</small><div><i></i></div><b></b>`;
         this.labels.append(node);
         this.elements.set(e.id, node);
       }
-    }
-    for (const e of g.enemies) {
-      const node = this.elements.get(e.id),
-        distance = Math.hypot(e.x - s.position.x, e.z - s.position.z);
+      const distance = Math.hypot(e.x - s.position.x, e.z - s.position.z);
       this.vector
         .set(
           e.x,

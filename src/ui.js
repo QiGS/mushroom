@@ -16,6 +16,8 @@ import { JourneyPanels } from "./journey-panels.js";
 import { daylight } from "./journey.js";
 import { missionTarget } from "./mission.js";
 import { AdventureUI } from "./adventure-ui.js";
+import "./encounters.css";
+import "./adventure.css";
 import { SHOP, purchase, EXPLORATION_SPOTS } from "./exploration.js";
 import {
   MAP_SPACE,
