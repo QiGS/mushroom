@@ -1,3 +1,11 @@
+import {
+  fieldDay,
+  advanceCalendar,
+  harvestSnakeChance,
+  WEATHER_NAMES,
+} from "./seasons.js";
+import { constrainCamera } from "./camera-collision.js";
+import { canWalk } from "./navigation.js";
 import { isChest, mouseChest, reachableInteraction } from "./interaction.js";
 import {
   safeSpawn,
@@ -89,8 +97,7 @@ const QA =
 const storageKey = QA ? SAVE_KEY + "-qa" : SAVE_KEY;
 const v3 = new T.Vector3(),
   target = new T.Vector3(),
-  desired = new T.Vector3(),
-  cameraRay = new T.Raycaster();
+  desired = new T.Vector3();
 
 class Game {
   constructor() {
@@ -135,7 +142,7 @@ class Game {
       this.scene,
       this.state.chapter,
       this.state.weather,
-      this.state.day,
+      fieldDay(this.state),
     );
     this.route = new RouteGuide(this.scene, this.world);
     this.player = makeTraveler();
@@ -165,7 +172,7 @@ class Game {
     this.waterTimer = 0;
     this.trailLight = new T.PointLight(0xabcbe5, 0, 7, 2);
     this.trailLight.position.set(0, 1.8, 0);
-    this.player.root.add(this.trailLight);
+    this.scene.add(this.trailLight);
     this.nearest = null;
     this.attackTime = 0;
     this.attackCooldown = 0;
@@ -308,24 +315,28 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           "PageDown",
           "Tab",
         ].includes(e.code) &&
-        !this.ui.panel
+        !this.ui.blocking
       )
         e.preventDefault();
       if (e.repeat) return;
+      if (this.ui.dialog.active) {
+        this.ui.dialog.key(e);
+        return;
+      }
       if ((e.code === "KeyE" || e.code === "Escape") && this.ui.notice.active) {
         e.preventDefault();
-        this.ui.notice.close();
+        e.code === "KeyE" ? this.ui.notice.advance() : this.ui.notice.close();
         return;
       }
       if (e.code === "Escape") {
         if (this.look && performance.now() - this.look.releasedAt < 250) return;
         if (this.photoMode) this.photo(false);
-        else if (this.ui.panel) this.ui.close();
+        else if (this.ui.blocking) this.ui.close();
         else if (this.started) this.ui.settings();
         return;
       }
       if (!this.started) return;
-      if (this.ui.panel) return;
+      if (this.ui.blocking) return;
       this.keys.add(e.code);
       if (this.photoMode) return;
       const actions = {
@@ -356,7 +367,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     });
     window.addEventListener("blur", () => {
       this.clearInput();
-      if (this.started && !this.ui.panel && !this.photoMode) this.ui.settings();
+      if (this.started && !this.ui.blocking && !this.photoMode)
+        this.ui.settings();
     });
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
@@ -370,7 +382,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     if (this.desktopControls) this.look = new DesktopLook(this);
     this.pointer = null;
     this.canvas.addEventListener("pointerdown", (e) => {
-      if (this.ui.panel) return;
+      if (this.ui.blocking) return;
       if (
         this.look &&
         e.pointerType === "mouse" &&
@@ -382,7 +394,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           return;
         }
         if (e.button === 0) this.primaryAction(e);
-        if (this.ui.panel) return;
+        if (this.ui.blocking) return;
         this.look.capture();
       }
       this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
@@ -568,7 +580,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.scene,
       this.state.chapter,
       this.state.weather,
-      this.state.day,
+      fieldDay(this.state),
     );
     this.route = new RouteGuide(this.scene, this.world);
     this.world.sync(this.state);
@@ -612,21 +624,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     NIGHT_SPAWNS.forEach(([x, z, kind], i) =>
       positions.push([x, z, `night-${i}`, kind, true]),
     );
+    positions.push(...this.state.ambushes.map((p) => [p.x, p.z, p.id, "leaf"]));
     for (const [x, z, id, kind, night] of positions) {
-      const type = MONSTER_TYPES[kind],
-        enemy = makeSnake(this.world.root, x, z, kind === "boss");
-      Object.assign(enemy, {
-        id,
-        name: type.name,
-        kind: type.kind,
-        hp: type.hp,
-        maxHp: type.hp,
-        night: !!night,
-        nightIndex: night ? Number(id.split("-")[1]) : -1,
-      });
-      enemy.segments[0].material.color.setHex(type.color);
-      enemy.object.visible = !this.state.defeated.includes(id);
-      this.enemies.push(enemy);
+      this.spawnEnemy(x, z, id, kind, night);
     }
     this.nightSignature = "";
     this.updateNightPopulation();
@@ -643,6 +643,89 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.attackRing.rotation.x = -Math.PI / 2;
     this.attackRing.visible = false;
     this.world.root.add(this.attackRing);
+  }
+  spawnEnemy(x, z, id, kind = "leaf", night = false) {
+    const type = MONSTER_TYPES[kind],
+      enemy = makeSnake(this.world.root, x, z, kind === "boss");
+    Object.assign(enemy, {
+      id,
+      name: type.name,
+      kind: type.kind,
+      hp: type.hp,
+      maxHp: type.hp,
+      night: !!night,
+      nightIndex: night ? Number(id.split("-")[1]) : -1,
+    });
+    enemy.segments[0].material.color.setHex(type.color);
+    enemy.object.visible = !this.state.defeated.includes(id);
+    this.enemies.push(enemy);
+    if (this.state.defeated.includes(id)) enemy.hp = 0;
+    return enemy;
+  }
+  maybeHarvestSnake(item, key) {
+    const s = this.state;
+    if (
+      !harvestSnakeChance(s, key) ||
+      Math.hypot(item.x, item.z - 30) < 12 ||
+      s.ambushes.length >= 6 ||
+      this.enemies.filter((e) => e.id.startsWith("forage-") && e.hp > 0)
+        .length >= 3
+    )
+      return false;
+    const id = `forage-${fieldDay(s)}-${key}`;
+    if (s.ambushes.some((p) => p.id === id)) return false;
+    let point;
+    for (let i = 0; i < 12; i++) {
+      const angle = (i * Math.PI) / 6,
+        x = item.x + Math.cos(angle) * 2.4,
+        z = item.z + Math.sin(angle) * 2.4;
+      if (
+        canWalk(this.world, s, x, z) &&
+        Math.abs(
+          surfaceHeight(this.world, x, z) - this.player.root.position.y,
+        ) < 1.3
+      ) {
+        point = { id, x, z };
+        break;
+      }
+    }
+    if (!point) return false;
+    s.ambushes.push(point);
+    const e = this.spawnEnemy(point.x, point.z, id);
+    e.state = "stunned";
+    e.timer = 1.5;
+    this.audio.play("hiss");
+    this.ui.toast(
+      "草叶沙沙作响——菌子旁钻出一条竹叶青！左键反击，Q 闪避。",
+      true,
+    );
+    return true;
+  }
+  refreshDay(dawn) {
+    const position = this.player.root.position.clone(),
+      velocity = this.velocity.clone();
+    const physics = Object.fromEntries(
+      [
+        "vertical",
+        "grounded",
+        "fallPeak",
+        "swimming",
+        "waterTimer",
+        "safePosition",
+        "invincible",
+      ].map((k) => [k, this[k]]),
+    );
+    this.state.position = { x: position.x, z: position.z };
+    this.rebuild();
+    this.player.root.position.copy(position);
+    this.velocity.copy(velocity);
+    Object.assign(this, physics);
+    this.rescued = false;
+    this.twoMinuteWarning = false;
+    this.ui.toast(
+      `第 ${dawn.day} 天 · ${WEATHER_NAMES[dawn.weather]}。${dawn.weather === "rain" ? "雨水唤醒了菌丝，林间长出了更多菌子。" : dawn.weather === "sun" ? "阳光晒干了落叶，今天菌子少一些。" : "雾气留住湿意，新的一批菌子冒头了。"}`,
+    );
+    this.save();
   }
   updateNightPopulation() {
     const clock = daylight(this.state),
@@ -719,7 +802,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.ui.settlement(result.summary);
   }
   jump() {
-    if (!this.started || this.ui.panel || !this.grounded || this.photoMode)
+    if (!this.started || this.ui.blocking || !this.grounded || this.photoMode)
       return;
     if (this.state.stamina < 9) return;
     this.state.stamina -= 9;
@@ -729,7 +812,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   dodge() {
     if (
       !this.started ||
-      this.ui.panel ||
+      this.ui.blocking ||
       this.dodgeTime > 0 ||
       this.state.stamina < 20
     )
@@ -753,7 +836,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.ui.toast(`已切换${WEAPONS[id].name} · 左键使用`);
   }
   primaryAction(event) {
-    if (!this.started || this.ui.panel || this.photoMode) return;
+    if (!this.started || this.ui.blocking || this.photoMode) return;
     this.player.root.rotation.y = this.yaw + Math.PI;
     this.findInteraction();
     const p = this.player.root.position;
@@ -839,7 +922,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   attack() {
     if (
       !this.started ||
-      this.ui.panel ||
+      this.ui.blocking ||
       this.attackCooldown > 0 ||
       this.photoMode
     )
@@ -1025,6 +1108,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         "soup",
         "riceMeal",
         "stew",
+        "bed",
+        "weatherVane",
       ].includes(id)
     ) {
       const result = activateTool(s, id);
@@ -1115,12 +1200,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   }
   interact() {
     if (this.ui.notice.active) {
-      this.ui.notice.close();
+      this.ui.notice.advance();
       return;
     }
     if (
       !this.started ||
-      this.ui.panel ||
+      this.ui.blocking ||
       this.photoMode ||
       this.collectTime > 0
     )
@@ -1129,6 +1214,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     if (!item) return;
     const s = this.state;
     if (item.type === "shop") return this.ui.shop();
+    if (item.type === "bed" && s.bedOwned) return this.ui.bed();
+    if (item.type === "forecast" && s.forecastOwned) return this.ui.forecast();
     if (item.type === "house" || item.type === "house-rest") {
       if (!houseUnlocked(s))
         return this.ui.toast("完成第一章并返村料理后，这间小屋就会为你开放。");
@@ -1184,6 +1271,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       const result = collectSpecimen(s, item.id);
       if (!result.ok) return this.result(result);
       this.collectTime = 0.55;
+      this.maybeHarvestSnake(item, `${item.type}-${item.id}`);
       this.world.sync(s);
       this.save();
       this.audio.play(result.first ? "discover" : "collect");
@@ -1221,6 +1309,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       const result = collect(s, item);
       if (!result.ok) return this.result(result);
       this.collectTime = 0.55;
+      this.maybeHarvestSnake(item, `${item.type}-${item.id}`);
       this.world.sync(s);
       this.audio.play("collect");
       this.burst(
@@ -1239,7 +1328,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       return;
     }
     if (item.type === "camp") {
-      this.ui.cooking();
+      this.ui.fire();
       return;
     }
     if (item.type === "grandma") {
@@ -1846,6 +1935,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       )
         continue;
       if (item.type === "house-rest" && !houseUnlocked(this.state)) continue;
+      if (["bed", "house-rest"].includes(item.type) && !insideHouse(p.x, p.z))
+        continue;
+      if (item.type === "bed" && !this.state.bedOwned) continue;
+      if (item.type === "forecast" && !this.state.forecastOwned) continue;
       if (item.type === "house-supply" && !supplyReady(this.state, item.id))
         continue;
       if (item.type === "survey" && this.state.surveyed.includes(item.id))
@@ -1882,7 +1975,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       if (!reachableInteraction(this.world, this.state, p, item)) continue;
       this.reachableItems.push(item);
       const d =
-        Math.hypot(item.x - p.x, item.z - p.z) - (isChest(item) ? 0.8 : 0);
+        Math.hypot(item.x - p.x, item.z - p.z) -
+        (isChest(item) ? 0.8 : item.type === "bed" ? 0.7 : 0);
       if (d < bestDist) {
         best = item;
         bestDist = d;
@@ -1908,7 +2002,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       target.set(p.x - 1, p.y + 1.2, p.z - 7);
     } else {
       const d = insideHouse(p.x, p.z)
-        ? 3.3
+        ? 2.4
         : this.photoMode
           ? this.distance * 1.5
           : this.distance;
@@ -1922,46 +2016,34 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         desired.y,
         terrainHeight(desired.x, desired.z) + 0.6,
       );
-      const delta = desired.clone().sub(target);
-      const length = delta.length();
-      delta.normalize();
-      let limit = length;
-      for (const c of this.world.colliders) {
-        if (!colliderActive(c, this.state) || c.hx !== undefined) continue;
-        const cx = c.x - target.x,
-          cz = c.z - target.z;
-        const along = cx * delta.x + cz * delta.z;
-        if (
-          along > 0 &&
-          along < limit &&
-          Math.hypot(
-            target.x + delta.x * along - c.x,
-            target.z + delta.z * along - c.z,
-          ) <
-            c.r + 0.15
-        )
-          limit = Math.max(2, along - 0.7);
-      }
-      if (Math.hypot(p.x + 6, p.z - 33) < 22) {
-        this.world.exploration.house.updateWorldMatrix(true, true);
-        cameraRay.set(target, delta);
-        cameraRay.far = limit;
-        const hit = cameraRay.intersectObjects(
-          this.world.exploration.cameraOccluders.filter((o) => o.visible),
-          false,
-        )[0];
-        if (hit) limit = Math.min(limit, Math.max(0.75, hit.distance - 0.25));
-      }
-      if (limit < length) {
-        desired.copy(target).addScaledVector(delta, limit);
-        if (this.camera.position.distanceTo(target) > limit)
-          this.camera.position.copy(desired);
-      }
+      const constrained = constrainCamera(
+        this.world,
+        this.state,
+        target,
+        desired,
+      );
+      desired.set(constrained.x, constrained.y, constrained.z);
     }
     this.camera.position.lerp(
       desired,
       1 - Math.exp(-dt * (this.look?.locked ? 18 : 6)),
     );
+    if (this.started) {
+      const constrained = constrainCamera(
+        this.world,
+        this.state,
+        target,
+        this.camera.position,
+      );
+      this.camera.position.set(constrained.x, constrained.y, constrained.z);
+    }
+    this.world.foliageFocus.copy(target);
+    this.world.foliageEye.copy(this.camera.position);
+    // Tight corners transition to an unobstructed close view, rather than
+    // rendering the inside of the traveler's head, hat or backpack.
+    const bodyDistance = this.camera.position.distanceTo(target);
+    this.player.root.visible =
+      !this.started || bodyDistance > (this.player.root.visible ? 1.05 : 1.2);
     this.camera.lookAt(target);
   }
   burst(pos, color, count) {
@@ -1999,7 +2081,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       if (!blob) return this.ui.toast("照片保存失败，请重试。", true);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `菌野-第${this.state.day}天-${Date.now()}.png`;
+      a.download = `菌野-第${fieldDay(this.state)}天-${Date.now()}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       this.ui.toast("这一刻，已经留在照片里。");
@@ -2011,10 +2093,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.lastTime = now;
     if (document.hidden) return;
     this.gameTime += dt;
-    const active = this.started && !this.ui.panel && !this.photoMode;
+    const active = this.started && !this.ui.blocking && !this.photoMode;
     if (active) {
       this.state.boostTime = Math.max(0, this.state.boostTime - dt);
-      this.state.elapsed += dt;
+      const dawn = advanceCalendar(this.state, dt * this.state.timeScale);
+      if (dawn) this.refreshDay(dawn);
       this.state.playSeconds += dt;
       for (const key of [
         "attackTime",
@@ -2038,19 +2121,20 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         }
       }
       this.audio.update(dt);
-      const ch = CHAPTERS[this.state.chapter - 1];
+      const ch = CHAPTERS[this.state.chapter - 1],
+        localTime = this.state.elapsed % (ch.duration + 240);
       if (
         !this.rescued &&
-        this.state.elapsed > ch.duration - 120 &&
+        localTime > ch.duration - 120 &&
         !this.twoMinuteWarning
       ) {
         this.twoMinuteWarning = true;
         this.ui.toast("距离天黑还有 2 分钟。" + missionTarget(this.state).hint);
       }
-      if (!this.rescued && this.state.elapsed >= ch.duration) {
+      if (!this.rescued && localTime >= ch.duration) {
         this.rescued = true;
         this.ui.toast(
-          "天黑了，更多竹叶青开始活动。可以继续探索，也可回奶奶身边补给。",
+          "天黑了，更多竹叶青开始活动。可回大叔的铺子补给，或在小屋床上睡到清晨。",
         );
         this.save();
       }
@@ -2072,9 +2156,13 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     }
     this.world.update(this.gameTime, this.state);
     this.trailLight.intensity = daylight(this.state).night * 2.2;
+    this.trailLight.position.copy(this.player.root.position).y += 1.8;
     this.route.update(dt, this.state, this.player.root.position);
     this.route.group.visible =
-      this.started && !this.photoMode && !this.ui.panel && this.state.guidance;
+      this.started &&
+      !this.photoMode &&
+      !this.ui.blocking &&
+      this.state.guidance;
     this.updateCamera(dt);
     if (this.started) this.ui.update(dt);
     for (let i = this.particles.length - 1; i >= 0; i--) {

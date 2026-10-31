@@ -6,6 +6,7 @@ import {
   createMushrooms,
   requirementsMet,
 } from "./state.js";
+import { fieldDay } from "./seasons.js";
 const layouts = new Map();
 export function missionTarget(s) {
   const target = (x, z, name, hint) => ({ x, z, name, hint, kind: "task" });
@@ -18,17 +19,17 @@ export function missionTarget(s) {
     );
   if (s.settled)
     return target(
-      1,
-      29,
-      "回村选择新旅程",
-      "这趟料理已完成。与奶奶交谈，可继续自由探索或选择下一章。",
+      4,
+      25,
+      "公告牌上的新旅程",
+      "这趟料理已完成。可继续探索，或到村口公告牌选择下一章。",
     );
   if (requirementsMet(s))
     return target(
-      4,
+      1,
       29,
-      "回村灶台烹饪",
-      "食材和探索目标已齐，回到灶台，按本章配方放料并开火。",
+      "回村向奶奶交付",
+      "食材和探索目标已齐，回村与奶奶交谈，选择交付食材。",
     );
   if (s.chapter === 3) {
     if (!s.uncle)
@@ -77,9 +78,9 @@ export function missionTarget(s) {
       "旧木桥北侧的倒木旁，靠近浅色落叶按 E，先发现一处菌窝。",
     );
   const ch = CHAPTERS[s.chapter - 1],
-    key = s.chapter + ":" + s.weather;
+    key = s.chapter + ":" + s.weather + ":" + fieldDay(s);
   if (!layouts.has(key))
-    layouts.set(key, createMushrooms(s.chapter, s.weather));
+    layouts.set(key, createMushrooms(s.chapter, s.weather, fieldDay(s)));
   const missing = Object.entries(ch.requirements)
     .filter(([id, n]) => s.inventory[id] < n)
     .map(([id]) => id);
@@ -130,9 +131,9 @@ export function missionTarget(s) {
   if (s.chapter === 2 && !s.defeated.includes("boss"))
     return target(0, -29, "击退青影", "观察突进预警，闪避后反击青影。");
   return target(
-    1,
+    8,
     29,
-    "向奶奶补充食材",
-    "本章所需菌子不足，可以回村向奶奶购买缺少的食材。",
+    "向大叔补充食材",
+    "本章所需菌子不足，可以回村向大叔购买，或等次日清晨的新菌子。",
   );
 }

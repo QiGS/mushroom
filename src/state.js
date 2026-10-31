@@ -1,4 +1,5 @@
 import { WORLD_BOUNDS, terrainHeight } from "./terrain.js";
+import { fieldDay, dayPeriod } from "./seasons.js";
 export { terrainHeight } from "./terrain.js";
 import {
   newCollection,
@@ -158,6 +159,12 @@ export function newGame() {
     stamina: 100,
     elapsed: 0,
     day: 1,
+    fireFuel: 2,
+    timeScale: 1,
+    bedOwned: false,
+    forecastOwned: false,
+    growthCycle: 0,
+    ambushes: [],
     weather: "rain",
     talked: false,
     uncle: false,
@@ -208,10 +215,11 @@ export function sanitizeSave(raw) {
     ["totalCollected", 99999],
     ["playSeconds", 999999],
     ["day", 9999],
-    ["elapsed", 99999],
+    ["elapsed", 99999999],
     ["hits", 999],
     ["boostTime", 8],
     ["timber", 9999],
+    ["fireFuel", 2],
   ])
     s[key] = finite(raw[key], s[key], 0, max);
   s.capacity = raw.capacity === 36 ? 36 : 24;
@@ -224,6 +232,8 @@ export function sanitizeSave(raw) {
     remaining -= s.inventory[p.id];
   }
   for (const key of [
+    "bedOwned",
+    "forecastOwned",
     "talked",
     "uncle",
     "basketReturned",
@@ -273,7 +283,33 @@ export function sanitizeSave(raw) {
     sensitivity: finite(raw.settings?.sensitivity, 1, 0.3, 2),
   };
   s.day = Math.max(1, Math.floor(s.day));
-  s.collection = sanitizeCollection(raw.collection, s.chapter, s.day);
+  s.timeScale = [1, 2, 4].includes(raw.timeScale) ? raw.timeScale : 1;
+  s.growthCycle = Math.floor(
+    s.elapsed / (CHAPTERS[s.chapter - 1].duration + 240),
+  );
+  s.ambushes = Array.isArray(raw.ambushes)
+    ? raw.ambushes
+        .filter(
+          (p) =>
+            p &&
+            typeof p.id === "string" &&
+            /^forage-[a-zA-Z0-9-]+$/.test(p.id) &&
+            Number.isFinite(p.x) &&
+            Number.isFinite(p.z) &&
+            p.x >= WORLD_BOUNDS.minX &&
+            p.x <= WORLD_BOUNDS.maxX &&
+            p.z >= WORLD_BOUNDS.minZ &&
+            p.z <= WORLD_BOUNDS.maxZ,
+        )
+        .slice(0, 6)
+        .map(({ id, x, z }) => ({ id, x, z }))
+    : [];
+  s.collection = sanitizeCollection(
+    raw.collection,
+    s.chapter,
+    fieldDay(s),
+    s.weather,
+  );
   s.tools = sanitizeTools(raw.tools, raw);
   for (const id of Object.keys(s.pantry))
     s.pantry[id] = Math.floor(finite(raw.pantry?.[id], s.pantry[id], 0, 99));
@@ -324,6 +360,10 @@ export function startChapter(old, chapter, weather) {
     "weapon",
     "timber",
     "surveyed",
+    "bedOwned",
+    "forecastOwned",
+    "fireFuel",
+    "timeScale",
     "selectedTool",
     "shielded",
     "settings",
@@ -331,7 +371,11 @@ export function startChapter(old, chapter, weather) {
   ])
     s[k] = structuredClone(old[k]);
   s.chapter = Math.max(1, Math.min(old.unlocked, chapter));
-  s.day = old.day + 1;
+  s.day = fieldDay(old) + 1;
+  s.fireFuel = Math.max(
+    0,
+    old.fireFuel - (1 - (old.elapsed % dayPeriod(old)) / dayPeriod(old)),
+  );
   s.collection = nextCollectionTrip(old.collection || newCollection());
   s.weather = weather || ["rain", "sun", "fog"][s.chapter - 1];
   return s;
@@ -454,7 +498,7 @@ export function quest(s) {
       title: s.completed ? "山野菌宴，开席啦" : "今天的收获上桌了",
       detail: s.completed
         ? "三道山野菜已集齐，可重游挑战探索成就"
-        : "回村与奶奶交谈，开启下一段旅程",
+        : "到村口公告牌选择下一段旅程",
       step: `第 ${s.chapter} 章 · 已完成`,
     };
   if (!s.talked)
@@ -475,10 +519,15 @@ export function quest(s) {
     step: `第 ${s.chapter} 章 · ${s.chapter === 3 ? `地标 ${s.landmarks.length}/3` : s.chapter === 2 ? "留心草丛里的动静" : `菌窝 ${Math.min(s.nests.length, 1)}/1`}`,
   };
 }
-export function createMushrooms(chapter, weather = "rain") {
-  const random = seededRandom(1234 + chapter * 55),
+export function createMushrooms(chapter, weather = "rain", day = 1) {
+  const random = seededRandom(1234 + chapter * 55 + day * 73),
     items = [];
   function group(species, x, z, n, nest = null, flags = {}) {
+    // Essential rare quest ingredients remain available in every season.
+    if (["wild", "bamboo", "cloud"].includes(species))
+      n = Math.ceil(
+        n * (weather === "sun" ? 0.8 : weather === "rain" ? 1.2 : 1),
+      );
     for (let i = 0; i < n; i++) {
       const a = i * 2.39996,
         r = 1 + Math.sqrt(i) * 0.65;

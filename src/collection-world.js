@@ -31,6 +31,7 @@ export function buildCollectionWorld(
   chapter,
   day,
   height,
+  weather = "rain",
 ) {
   let disposed = false;
   const boxes = new Map(),
@@ -53,7 +54,7 @@ export function buildCollectionWorld(
       radius: 2.9,
     });
   }
-  for (const item of collectionLayout(chapter, day)) {
+  for (const item of collectionLayout(chapter, day, weather)) {
     const group = place(item.x, item.z);
     const placeholder = new T.Group();
     group.add(placeholder);

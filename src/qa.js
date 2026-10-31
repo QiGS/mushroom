@@ -1,5 +1,12 @@
 // Local development only. This module is excluded from production builds.
-import { terrainHeight, CHAPTERS } from "./state.js";
+import { terrainHeight, CHAPTERS, newGame } from "./state.js";
+import {
+  advanceCalendar,
+  dayPeriod,
+  harvestSnakeChance,
+  fieldDay,
+  nextWeather,
+} from "./seasons.js";
 import {
   activeClues,
   collectSpecimen,
@@ -38,6 +45,106 @@ export function attachQA(game) {
     bar.append(b);
   };
   add("QA 开始", () => game.begin(true));
+  add("QA 日常开局", () => {
+    game.state = newGame();
+    game.state.coins = 250;
+    game.state.unlocked = 2;
+    game.rebuild();
+    move(1, 27);
+    game.yaw = 0;
+    game.pitch = 0.25;
+    game.distance = 7;
+    game.save();
+  });
+  add("QA 床边", () => {
+    move(-7.6, 33.1);
+    game.yaw = Math.PI * 0.45;
+    game.pitch = 0.12;
+    game.distance = 5;
+  });
+  add("QA 转镜头", () => {
+    game.yaw += Math.PI / 2;
+    game.pitch = 0.2;
+  });
+  add("QA 火塘", () => {
+    move(4, 31);
+    game.yaw = 0;
+    game.pitch = 0.3;
+    game.distance = 6;
+    game.ui.fire();
+  });
+  add("QA 灭火", () => {
+    game.state.fireFuel = 0;
+    game.state.timber = 3;
+    game.ui.fire();
+  });
+  add("QA 预报", () => {
+    move(7.8, 25.7);
+    game.yaw = 0;
+    game.pitch = 0.2;
+    game.ui.forecast();
+  });
+  add("QA 黎明前", () => {
+    game.ui.close();
+    game.state.elapsed =
+      Math.floor(game.state.elapsed / dayPeriod(game.state)) *
+        dayPeriod(game.state) +
+      dayPeriod(game.state) -
+      2;
+    game.state.timeScale = 1;
+  });
+  add("QA 下一天", () => {
+    game.ui.close();
+    const d = advanceCalendar(
+      game.state,
+      dayPeriod(game.state) - (game.state.elapsed % dayPeriod(game.state)),
+    );
+    if (d) game.refreshDay(d);
+  });
+  add("QA 旧木桥", () => {
+    move(Math.sin(14 * 0.08) * 6, 17.5);
+    game.yaw = 0;
+    game.pitch = 0.25;
+    game.distance = 8;
+  });
+  add("QA 走过木桥", () => {
+    move(Math.sin(14 * 0.08) * 6, 17.5);
+    game.yaw = 0;
+    game.keys.add("KeyW");
+    for (let i = 0; i < 240 && game.player.root.position.z > 10.5; i++)
+      game.updatePlayer(1 / 60);
+    game.keys.clear();
+    game.findInteraction();
+  });
+  add("QA 采菌遇蛇", () => {
+    const s = game.state;
+    s.collected = [];
+    s.ambushes = [];
+    s.health = 5;
+    s.nests = ["fallen-log", "lake-nest", "old-tree", "rain-nest", "mist-nest"];
+    const item = game.world.interactables.find(
+      (i) =>
+        i.type === "mushroom" &&
+        Math.hypot(i.x, i.z - 30) > 12 &&
+        harvestSnakeChance(s, `mushroom-${i.id}`),
+    );
+    game.world.sync(s);
+    if (item) {
+      move(item.x, item.z + 0.7);
+      game.nearest = item;
+      game.interact();
+    }
+  });
+  add("QA 交付准备", () => {
+    for (const [id, n] of Object.entries(
+      CHAPTERS[game.state.chapter - 1].requirements,
+    ))
+      game.state.inventory[id] = n;
+    game.state.nests = ["fallen-log"];
+    game.state.settled = false;
+    move(1, 27.5);
+    game.ui.grandma();
+  });
   for (let c = 1; c <= 3; c++)
     add(`QA 第${c}关`, () => {
       game.state.unlocked = 3;
@@ -192,10 +299,11 @@ export function attachQA(game) {
     game.state.inventory.wild = 16;
     game.state.nests = ["fallen-log"];
     game.state.talked = true;
-    for (const p of collectionLayout(game.state.chapter, game.state.day).slice(
-      0,
-      3,
-    ))
+    for (const p of collectionLayout(
+      game.state.chapter,
+      fieldDay(game.state),
+      game.state.weather,
+    ).slice(0, 3))
       collectSpecimen(game.state, p.id);
     game.state.pantry = { water: 3, rice: 2, salt: 2, herb: 1 };
     game.ui.cooking();
@@ -313,7 +421,12 @@ export function attachQA(game) {
   setInterval(() => {
     const p = game.player.root.position;
     status.textContent =
-      `${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} 高${p.y.toFixed(1)} HP${game.state.health} | 武器:${game.state.weapon} | 最近: ${game.nearest?.name || "无"} | ${game.world.mountains.loaded}/6 山体 ${game.world.mountains.sections} 片 | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
+      `第${fieldDay(game.state)}天 ${game.state.weather} 明天:${nextWeather(game.state)} 燃料:${game.state.fireFuel.toFixed(3)} 床:${game.state.bedOwned} 预报:${game.state.forecastOwned} 遇蛇:${game.state.ambushes.length} 菌:${game.world.items.length} 相机:${game.camera.position
+        .toArray()
+        .map((n) => n.toFixed(2))
+        .join(
+          ",",
+        )} | ${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} 高${p.y.toFixed(1)} HP${game.state.health} | 武器:${game.state.weapon} | 最近: ${game.nearest?.name || "无"} | ${game.world.mountains.loaded}/6 山体 ${game.world.mountains.sections} 片 | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
       (game.desktopControls
         ? ` | 夜行:${game.enemies.filter((e) => e.night && e.hp > 0).length} | 游泳:${game.swimming} | 水中:${game.waterTimer.toFixed(1)} | 时刻:${daylight(game.state).hour.toFixed(1)} | 鼠标:${game.look?.locked ? "已捕获" : "自由"} | 镜头:${game.yaw.toFixed(2)},${game.pitch.toFixed(2)} | 骨骼:${game.motion?.rig.skeleton.bones.length || 0} | 步速:${game.motion?.speed.toFixed(2) || 0}`
         : "");

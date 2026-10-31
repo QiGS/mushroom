@@ -8,7 +8,7 @@ export class DesktopLook {
     this.releasedAt = -Infinity;
     this.hint = document.querySelector(".mouse-hint");
     document.addEventListener("mousemove", (event) => {
-      if (!this.locked || game.ui.panel || !game.started || game.photoMode)
+      if (!this.locked || game.ui.blocking || !game.started || game.photoMode)
         return;
       this.rotate(event.movementX, event.movementY);
     });
@@ -20,7 +20,7 @@ export class DesktopLook {
       if (wasLocked && !this.locked) {
         this.releasedAt = performance.now();
         game.clearInput();
-        if (game.started && !game.ui.panel && !game.photoMode)
+        if (game.started && !game.ui.blocking && !game.photoMode)
           game.ui.settings();
       }
       this.syncHint();
@@ -36,7 +36,13 @@ export class DesktopLook {
   }
   capture() {
     const g = this.game;
-    if (this.locked || this.pending || !g.started || g.ui.panel || g.photoMode)
+    if (
+      this.locked ||
+      this.pending ||
+      !g.started ||
+      g.ui.blocking ||
+      g.photoMode
+    )
       return;
     if (!g.canvas.requestPointerLock) return this.failed();
     this.pending = true;

@@ -1,3 +1,4 @@
+import { fieldDay } from "./seasons.js";
 // Discovery history is permanent; held stock can be cooked or sold separately.
 import { grantTool } from "./tools.js";
 export const RARITIES = {
@@ -174,12 +175,18 @@ export function newCollection(
     lastReward: null,
   };
 }
-export function collectionLayout(chapter = 1, day = 1) {
+export function collectionLayout(chapter = 1, day = 1, weather = "rain") {
   const common = COLLECTION.filter((p) => p.rarity === "common");
   const rare = COLLECTION.filter((p) => p.rarity === "rare");
   const epic = COLLECTION.filter((p) => p.rarity === "epic");
   const offset = (Math.floor(day) + Math.floor(chapter) - 2) % 4;
   const result = COMMON_POINTS.map(([x, z], i) => ({ id: common[i].id, x, z }));
+  if (weather !== "rain")
+    result.splice(
+      0,
+      result.length,
+      ...result.filter((p, i) => (i + day) % 6 < (weather === "sun" ? 3 : 5)),
+    );
   for (let i = 0; i < 2; i++) {
     const index = (offset + i) % 4,
       [x, z] = RARE_POINTS[index];
@@ -193,7 +200,7 @@ export function collectionLayout(chapter = 1, day = 1) {
     radius: byId(p.id).rarity === "epic" ? 1.7 : 2,
   }));
 }
-export function sanitizeCollection(raw, chapter, day) {
+export function sanitizeCollection(raw, chapter, day, weather = "rain") {
   const c = newCollection();
   if (!raw || typeof raw !== "object") return c;
   const number = (n, fallback, max) =>
@@ -215,7 +222,7 @@ export function sanitizeCollection(raw, chapter, day) {
       };
   }
   const ids = COLLECTION.map((p) => p.id),
-    layout = collectionLayout(chapter, day).map((p) => p.id);
+    layout = collectionLayout(chapter, day, weather).map((p) => p.id);
   const list = (value, allowed) =>
     Array.isArray(value)
       ? [...new Set(value.filter((v) => allowed.includes(v)))]
@@ -263,7 +270,7 @@ function award(s, id, quantity, source) {
   c.counts[id] = Math.min(99999, c.counts[id] + quantity);
   c.stock[id] = Math.min(99999, (c.stock[id] || 0) + quantity);
   if (first) {
-    c.foundAt[id] = { day: s.day, chapter: s.chapter, source };
+    c.foundAt[id] = { day: fieldDay(s), chapter: s.chapter, source };
     c.unseen.push(id);
   }
   let bonus = 0;
@@ -291,13 +298,13 @@ function award(s, id, quantity, source) {
   };
 }
 export function activeClues(s) {
-  return collectionLayout(s.chapter, s.day).filter(
+  return collectionLayout(s.chapter, fieldDay(s), s.weather).filter(
     (p) =>
       s.collection.clues.includes(p.id) && !s.collection.picked.includes(p.id),
   );
 }
 export function revealClue(s, preferEpic = false) {
-  const candidates = collectionLayout(s.chapter, s.day).filter(
+  const candidates = collectionLayout(s.chapter, fieldDay(s), s.weather).filter(
     (p) =>
       p.species.rarity !== "common" &&
       !s.collection.clues.includes(p.id) &&
@@ -323,7 +330,7 @@ export function openTreasure(s, boxId) {
       ok: false,
       message: "这只宝箱本趟已经打开过了。重游山林会有新的礼物。",
     };
-  const rng = random(hash(`${c.seed}:${s.chapter}:${s.day}:${boxId}`));
+  const rng = random(hash(`${c.seed}:${s.chapter}:${fieldDay(s)}:${boxId}`));
   const roll = rng() * 100;
   let rarity = roll < 72 ? "common" : roll < 96 ? "rare" : "epic";
   const guaranteed = c.dryStreak >= 7 && rarity === "common";
@@ -340,7 +347,7 @@ export function openTreasure(s, boxId) {
   c.totalBoxes++;
   c.dryStreak = rarity === "common" ? c.dryStreak + 1 : 0;
   const reward = award(s, species.id, quantity, "box");
-  const candidates = collectionLayout(s.chapter, s.day).filter(
+  const candidates = collectionLayout(s.chapter, fieldDay(s), s.weather).filter(
     (p) =>
       p.species.rarity !== "common" &&
       !c.clues.includes(p.id) &&
@@ -365,7 +372,9 @@ export function openTreasure(s, boxId) {
   return { ok: true, ...c.lastReward };
 }
 export function collectSpecimen(s, id) {
-  const item = collectionLayout(s.chapter, s.day).find((p) => p.id === id);
+  const item = collectionLayout(s.chapter, fieldDay(s), s.weather).find(
+    (p) => p.id === id,
+  );
   if (!item || s.collection.picked.includes(id))
     return { ok: false, message: "这份收藏已经收好啦。" };
   s.collection.picked.push(id);

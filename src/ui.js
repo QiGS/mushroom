@@ -1,4 +1,12 @@
 import { toolArt } from "./tool-art.js";
+import { SceneDialog } from "./scene-dialog.js";
+import {
+  nextWeather,
+  WEATHER_NAMES,
+  addFirewood,
+  sleepUntilMorning,
+} from "./seasons.js";
+import { settle } from "./state.js";
 import { SceneNotice } from "./scene-notice.js";
 import { JourneyPanels } from "./journey-panels.js";
 import { daylight } from "./journey.js";
@@ -71,12 +79,16 @@ export class UI {
 
     this.mapTimer = 0;
     this.notice = new SceneNotice(game);
+    this.dialog = new SceneDialog(game);
     this.journey = new JourneyPanels(this);
     this.collection = new CollectionUI(this);
     this.toolbelt = new ToolbeltUI(this);
     this.adventure = new AdventureUI(game);
     this.bind();
     icons();
+  }
+  get blocking() {
+    return this.panel || this.dialog.active;
   }
   get waypoint() {
     return this.game.state.waypoint;
@@ -90,6 +102,12 @@ export class UI {
   }
   bind() {
     const on = (id, fn) => $(id).addEventListener("click", fn);
+    on("time-speed", () => {
+      const s = this.game.state;
+      s.timeScale = { 1: 2, 2: 4, 4: 1 }[s.timeScale];
+      this.game.save();
+      this.toast(`时间流逝 ${s.timeScale}× · 昼夜、天气与燃料同步加速`);
+    });
     on("route-status", () => this.game.toggleGuidance());
     on("begin", () => this.game.begin(false));
     on("continue", () => this.game.begin(true));
@@ -140,6 +158,7 @@ export class UI {
   }
   show(title, kicker, html, kind = "other") {
     this.notice.close();
+    this.dialog.close();
     if (!this.panel) this.lastFocus = document.activeElement;
     this.panel = kind;
     $("panel").dataset.kind = kind;
@@ -153,6 +172,7 @@ export class UI {
     $("close-panel").focus();
   }
   close() {
+    this.dialog.close();
     this.panel = null;
     $("modal-backdrop").classList.add("hidden");
     document.body.classList.remove("modal-open");
@@ -184,7 +204,7 @@ export class UI {
     this.show(
       "竹篮里的山野",
       "YOUR LITTLE HARVEST",
-      `<div class="collection-bag-link"><span>图鉴发现 ${stats.unique} / 12 种 · ${stats.total} 朵</span><button id="bag-collection">翻开收藏图鉴 →</button></div><p class="panel-subtitle">${basketCount(s)} / ${s.capacity} 朵 · 任务食材在出售时自动保留，收藏菌不占背篓容量；可在奶奶处出售，图鉴记录保留。</p><div class="species-grid">${SPECIES.map((p) => `<button class="species-card ${s.inventory[p.id] ? "" : "locked"}" data-species="${p.id}"><span class="species-count">× ${s.inventory[p.id]}</span>${mushroomSVG(p.color)}<h3>${p.name}</h3><small>${p.rarity} · ${p.area}</small></button>`).join("")}</div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><span>↑↓ 切换随身道具 · G 使用</span></div><div class="bag-tool-row">${
+      `<div class="collection-bag-link"><span>图鉴发现 ${stats.unique} / 12 种 · ${stats.total} 朵</span><button id="bag-collection">翻开收藏图鉴 →</button></div><p class="panel-subtitle">${basketCount(s)} / ${s.capacity} 朵 · 任务食材在出售时自动保留，收藏菌不占背篓容量；可在大叔的山货铺出售，图鉴记录保留。</p><div class="species-grid">${SPECIES.map((p) => `<button class="species-card ${s.inventory[p.id] ? "" : "locked"}" data-species="${p.id}"><span class="species-count">× ${s.inventory[p.id]}</span>${mushroomSVG(p.color)}<h3>${p.name}</h3><small>${p.rarity} · ${p.area}</small></button>`).join("")}</div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><span>↑↓ 切换随身道具 · G 使用</span></div><div class="bag-tool-row">${
         ownedTools(s)
           .map(
             (t) =>
@@ -317,58 +337,151 @@ export class UI {
     this.show(
       "今日山情",
       "WEATHER & WHISPERS",
-      `<div class="weather-illustration"><img src="./assets/ui/weather-board.webp" alt="木制山情公告牌"/><div class="weather-writing"><h3>今日山情</h3><p>${{ sun: "☀ 晴天 · 视野清晰，菌窝较分散。", rain: "☂ 雨后 · 菌子冒了头，西边蕨叶旁多了一窝。", fog: "☁ 薄雾 · 远方朦胧，东侧深处可能出现额外菌窝。" }[s.weather]}</p><p>${ch.hint}</p><small>${daylight(s).isNight ? "夜色已深，小心林间游蛇。" : `距离天黑 ${Math.max(0, Math.ceil((ch.duration - s.elapsed) / 60))} 分钟`}</small></div></div><div class="weather-actions"><button id="weather-close">记下了，出发 →</button></div>`,
+      `<div class="weather-illustration"><img src="./assets/ui/weather-board.webp" alt="木制山情公告牌"/><div class="weather-writing"><h3>今日山情</h3><p>${{ sun: "☀ 晴天 · 视野清晰，菌窝较分散。", rain: "☂ 雨后 · 菌子冒了头，西边蕨叶旁多了一窝。", fog: "☁ 薄雾 · 远方朦胧，东侧深处可能出现额外菌窝。" }[s.weather]}</p><p>${ch.hint}</p><small>${daylight(s).isNight ? "夜色已深，小心林间游蛇。" : `距离天黑 ${Math.max(0, Math.ceil((ch.duration - (s.elapsed % (ch.duration + 240))) / 60))} 分钟`}</small></div></div><div class="weather-actions"><button id="weather-chapters">选择旅程</button><button id="weather-close">记下了，出发 →</button></div>`,
       "weather",
     );
+    $("weather-chapters").onclick = () => this.chapters();
     $("weather-close").onclick = () => this.close();
   }
-  grandma() {
+  grandma(message = "") {
     const s = this.game.state,
       ch = CHAPTERS[s.chapter - 1];
+    this.close();
+    this.notice.close();
     if (!s.talked) {
       s.talked = true;
       this.game.save();
       this.game.audio.play("bell");
     }
-    this.show(
-      "村口的烟火气",
-      "HOME IS WHERE THE SOUP IS",
-      `<div class="grandma-dialog"><img src="./assets/ui/grandma-dialog.webp" alt="奶奶的手绘对话框"/><p>“${s.settled ? "哟，这一篮菌子，可有故事了。来，今晚这桌饭，有你一份功劳。" : ch.intro}”</p></div><p class="panel-subtitle">${ch.hint}</p><div class="camp-actions"><button id="submit-harvest"><strong>${s.settled ? "查看山野餐桌" : "交付食材 · 开饭啦"}</strong><small>${Object.entries(
-        ch.requirements,
+    const progress = Object.entries(ch.requirements)
+      .map(
+        ([id, n]) =>
+          `${SPECIES.find((p) => p.id === id).name} ${Math.min(s.inventory[id], n)}/${n}`,
       )
-        .map(
-          ([id, n]) =>
-            `${SPECIES.find((p) => p.id === id).name} ${Math.min(s.inventory[id], n)}/${n}`,
-        )
-        .join(
-          " · ",
-        )}</small></button><button id="free-cooking"><strong>自己动手煮一锅</strong><small>自由选择食材，尝试九宫格配方</small></button><button id="open-shop"><strong>逛逛山货铺</strong><small>购买斧子、猎枪、防水鞋与补给</small></button><button id="rest-village"><strong>坐下歇一会</strong><small>恢复全部体力，保留本次探索进度</small></button><button id="sell-harvest"><strong>卖出持有的菌子</strong><small>选择菌种按份出售，图鉴记录保留</small></button><button id="upgrade-basket"><strong>${s.capacity === 36 ? "大竹篮已备好" : "扩容竹篮 · 80 竹叶币"}</strong><small>${s.capacity === 36 ? "容量 36 朵" : "把容量从 24 朵增加到 36 朵"}</small></button></div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><button id="chapter-select">选择旅程</button></div>`,
-      "camp",
-    );
-    $("submit-harvest").onclick = () =>
-      s.settled ? this.feast() : this.cooking();
-    $("open-shop").onclick = () => this.shop();
-    $("free-cooking").onclick = () => this.cooking();
-    $("rest-village").onclick = () => {
-      s.health = 5;
-      s.stamina = 100;
-      this.game.save();
-      this.toast("休息好了，山风正等着你。");
-      this.close();
-    };
-    $("sell-harvest").onclick = () => {
-      this.journey.market("sell");
-    };
-    $("upgrade-basket").onclick = () => {
-      if (s.capacity === 36) return this.toast("已经是最宽敞的竹篮了。");
-      if (s.coins < 80) return this.toast("还需要攒够 80 竹叶币。", true);
-      s.coins -= 80;
-      s.capacity = 36;
-      this.game.save();
-      this.toast("扩容竹篮已装备 · 容量 36");
-      this.grandma();
-    };
-    $("chapter-select").onclick = () => this.chapters();
+      .join(" · ");
+    this.dialog.show({
+      speaker: "奶奶",
+      text:
+        message ||
+        (s.settled
+          ? "今晚这桌饭，有你一份功劳。再去山里走走吧，公告牌上也有下一段旅程的消息。"
+          : ch.intro + "\n" + progress),
+      actions: [
+        {
+          label: "聊聊 · 获取提示",
+          run: () => {
+            const next = missionTarget(s);
+            s.guideUsed = true;
+            s.collection.track = null;
+            this.waypoint = null;
+            s.guidance = true;
+            this.game.save();
+            this.dialog.show({
+              speaker: "奶奶",
+              text: next.hint + "\n已经替你记下方向，出发后按 V 可以沿虚线走。",
+              next: () => this.grandma(),
+            });
+          },
+        },
+        {
+          label: s.settled ? "本次食材已交付" : "交付食材",
+          disabled: s.settled,
+          run: () => {
+            const r = settle(s);
+            if (!r.ok)
+              return this.grandma(r.message + "\n" + missionTarget(s).hint);
+            this.game.world.sync(s);
+            this.game.save();
+            this.game.audio.play("win");
+            const reward = r.summary || r;
+            this.dialog.show({
+              speaker: "奶奶",
+              text: `这篮菌子来得正好！${ch.recipe}，今晚就端上桌。\n获得 ${reward.coins} 竹叶币。${s.unlocked >= 2 ? "小屋已解锁，缺什么就去大叔的铺子看看。" : ""}`,
+              next: () => this.grandma(),
+            });
+          },
+        },
+      ],
+    });
+  }
+  fire(message = "") {
+    const s = this.game.state;
+    this.close();
+    this.notice.close();
+    this.dialog.show({
+      speaker: "村口火塘",
+      text:
+        (message ? message + "\n" : "") +
+        (s.fireFuel > 0
+          ? `余下燃料约 ${s.fireFuel.toFixed(2)} 天。`
+          : "火已经熄了，添点竹子吧。") +
+        ` 竹材 ×${s.timber}\n一份竹材能续半天火，火塘最多储存两天燃料。`,
+      actions: [
+        {
+          label: "添竹材 ×1",
+          disabled: s.timber < 1 || s.fireFuel >= 1.999,
+          run: () => {
+            const r = addFirewood(s);
+            this.game.save();
+            this.fire(r.message);
+          },
+        },
+        {
+          label: "在火上烹饪",
+          disabled: s.fireFuel <= 0,
+          run: () => this.cooking(),
+        },
+      ],
+    });
+  }
+  bed() {
+    const s = this.game.state,
+      night =
+        s.elapsed % (CHAPTERS[s.chapter - 1].duration + 240) >=
+        CHAPTERS[s.chapter - 1].duration;
+    this.close();
+    this.notice.close();
+    this.dialog.show({
+      speaker: "一夜好眠",
+      text: night
+        ? "山里的夜凉了。睡一觉，醒来就是新的清晨。火塘会照常消耗这段时间的燃料。"
+        : "晨光还在窗外。等入夜，再来睡一觉吧。",
+      actions: [
+        {
+          label: "睡到天亮",
+          disabled: !night,
+          run: () => {
+            const r = sleepUntilMorning(s);
+            this.close();
+            if (r.ok) {
+              this.game.rebuild();
+              this.game.rescued = false;
+              this.game.twoMinuteWarning = false;
+              this.game.save();
+              this.game.audio.play("bell");
+            }
+            this.toast(r.message, !r.ok);
+          },
+        },
+      ],
+    });
+  }
+  forecast() {
+    const s = this.game.state;
+    if (!s.forecastOwned) return;
+    this.close();
+    this.notice.close();
+    const w = nextWeather(s);
+    this.dialog.show({
+      speaker: "风带来的明日信",
+      text:
+        `明天 · ${WEATHER_NAMES[w]}\n` +
+        {
+          rain: "夜里的雨会唤醒菌丝。新一天，林间会长出更多菌子。",
+          sun: "阳光会晒干落叶，菌子会少一些。可以把时间留给采竹、远行或料理。",
+          fog: "薄雾会留住湿气。明早沿着林间小径，留心那些新冒头的小伞。",
+        }[w],
+    });
   }
   shop() {
     this.journey.market("tools");
@@ -377,7 +490,7 @@ export class UI {
     this.show(
       "山间小屋",
       "A ROOM OF YOUR OWN",
-      '<p class="camp-intro">第一道山野料理，让村庄有了新的烟火气。小屋的门已经打开，走进去看看吧。</p><p class="panel-subtitle">屋内有床铺、书架和木桌。靠近亮起的补给按 E 收取，每三分钟游玩时间补充一次。房顶在进入时隐去，便于查看室内。</p><div class="panel-footer"><span>居所已永久解锁</span><button id="house-rest">歇脚 · 恢复生命与体力</button></div>',
+      '<p class="camp-intro">第一道山野料理，让村庄有了新的烟火气。小屋的门已经打开，走进去看看吧。</p><p class="panel-subtitle">屋内有书架和木桌。可在大叔处购买床，按 G 安置后，入夜在床边按 E 睡到清晨。靠近亮起的补给按 E 收取，每三分钟游玩时间补充一次。镜头会自动避让墙壁。</p><div class="panel-footer"><span>居所已永久解锁</span><button id="house-rest">歇脚 · 恢复生命与体力</button></div>',
       "house",
     );
     document.getElementById("house-rest").onclick = () => {
@@ -801,6 +914,12 @@ export class UI {
   update(dt) {
     this.adventure.update();
     this.notice.update();
+    $("time-speed").textContent =
+      `时间 ${this.game.state.timeScale}× · 点击切换`;
+    $("time-speed").setAttribute(
+      "aria-label",
+      `时间倍速，当前 ${this.game.state.timeScale} 倍`,
+    );
     const s = this.game.state,
       ch = CHAPTERS[s.chapter - 1],
       q = quest(s);

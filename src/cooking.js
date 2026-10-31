@@ -110,6 +110,8 @@ function reserve(s, key) {
     : 0;
 }
 export function cook(s, slots) {
+  if (s.fireFuel <= 0)
+    return { ok: false, message: "篝火已经熄灭，先添入竹材再开火。" };
   const recipe = recipeFor(s, slots),
     all = ingredients(s);
   if (!recipe)

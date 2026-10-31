@@ -42,6 +42,10 @@ function harness(t) {
     },
     ui: {
       panel: null,
+      dialog: { active: false },
+      get blocking() {
+        return this.panel || this.dialog.active;
+      },
       settings() {
         pauses++;
         this.panel = "settings";

@@ -36,6 +36,8 @@ test("legacy equipment migrates once and consumed tools cannot reappear on reloa
   });
   const a = sanitizeSave(s);
   assert.deepEqual(a.tools, {
+    bed: 0,
+    weatherVane: 0,
     grilled: 0,
     soup: 0,
     riceMeal: 0,

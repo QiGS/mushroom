@@ -1,86 +1,149 @@
-const http = require('node:http');
-const fs = require('node:fs');
-const path = require('node:path');
-const { spawn, spawnSync } = require('node:child_process');
+const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawn, spawnSync } = require("node:child_process");
 
-const project = path.resolve(__dirname, '..');
-const root = path.join(project, 'dist');
-const host = '127.0.0.1';
+const project = path.resolve(__dirname, "..");
+const root = path.join(project, "dist");
+const host = "127.0.0.1";
 const mime = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.glb': 'model/gltf-binary',
-  '.woff2': 'font/woff2',
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".webp": "image/webp",
+  ".glb": "model/gltf-binary",
+  ".mp3": "audio/mpeg",
+  ".woff2": "font/woff2",
 };
 
 function openBrowser(url) {
-  if (process.env.MUSHROOM_NO_OPEN === '1') return;
-  const [command, args] = process.platform === 'win32'
-    ? [process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `start "" "${url}"`]]
-    : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
-  const child = spawn(command, args, { windowsHide: true, stdio: 'ignore' });
-  child.on('error', () => console.log(`请在浏览器中打开：${url}`));
-  child.on('exit', code => { if (code) console.log(`请在浏览器中打开：${url}`); });
+  if (process.env.MUSHROOM_NO_OPEN === "1") return;
+  const [command, args] =
+    process.platform === "win32"
+      ? [
+          process.env.ComSpec || "cmd.exe",
+          ["/d", "/s", "/c", `start "" "${url}"`],
+        ]
+      : process.platform === "darwin"
+        ? ["open", [url]]
+        : ["xdg-open", [url]];
+  const child = spawn(command, args, { windowsHide: true, stdio: "ignore" });
+  child.on("error", () => console.log(`请在浏览器中打开：${url}`));
+  child.on("exit", (code) => {
+    if (code) console.log(`请在浏览器中打开：${url}`);
+  });
   child.unref();
 }
 
 function ensureBuild() {
-  if (fs.existsSync(path.join(root, 'index.html'))) return;
-  if (!fs.existsSync(path.join(project, 'package.json'))) {
-    throw new Error('找不到游戏文件。请先完整解压压缩包，再启动游戏。');
+  if (fs.existsSync(path.join(root, "index.html"))) return;
+  if (!fs.existsSync(path.join(project, "package.json"))) {
+    throw new Error("找不到游戏文件。请先完整解压压缩包，再启动游戏。");
   }
-  console.log('首次从源码启动：正在准备游戏，请保留此窗口。');
-  const env = { ...process.env, npm_config_cache: path.join(project, 'work', 'npm-cache') };
-  const commands = fs.existsSync(path.join(project, 'node_modules', 'vite'))
-    ? [['run', 'build']] : [['ci'], ['run', 'build']];
+  console.log("首次从源码启动：正在准备游戏，请保留此窗口。");
+  const env = {
+    ...process.env,
+    npm_config_cache: path.join(project, "work", "npm-cache"),
+  };
+  const commands = fs.existsSync(path.join(project, "node_modules", "vite"))
+    ? [["run", "build"]]
+    : [["ci"], ["run", "build"]];
   for (const args of commands) {
-    const command = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'npm';
-    const commandArgs = process.platform === 'win32' ? ['/d', '/s', '/c', `npm ${args.join(' ')}`] : args;
-    const result = spawnSync(command, commandArgs,
-      { cwd: project, env, stdio: 'inherit', windowsHide: true });
-    if (result.error || result.status !== 0) throw new Error('游戏准备失败，请检查网络并重试。');
+    const command =
+      process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : "npm";
+    const commandArgs =
+      process.platform === "win32"
+        ? ["/d", "/s", "/c", `npm ${args.join(" ")}`]
+        : args;
+    const result = spawnSync(command, commandArgs, {
+      cwd: project,
+      env,
+      stdio: "inherit",
+      windowsHide: true,
+    });
+    if (result.error || result.status !== 0)
+      throw new Error("游戏准备失败，请检查网络并重试。");
   }
 }
 
 function handler(req, res) {
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { Allow: 'GET, HEAD' });
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.writeHead(405, { Allow: "GET, HEAD" });
     return res.end();
   }
-  if (req.url === '/__mushroom_health') {
-    res.writeHead(200, { 'Content-Type': mime['.json'], 'Cache-Control': 'no-store' });
-    return res.end(JSON.stringify({ app: 'mushroom-local-game', version: 1 }));
+  if (req.url === "/__mushroom_health") {
+    res.writeHead(200, {
+      "Content-Type": mime[".json"],
+      "Cache-Control": "no-store",
+    });
+    return res.end(JSON.stringify({ app: "mushroom-local-game", version: 1 }));
   }
   let file;
   try {
-    const pathname = decodeURIComponent(new URL(req.url, `http://${host}`).pathname);
-    file = path.resolve(root, `.${pathname === '/' ? '/index.html' : pathname}`);
+    const pathname = decodeURIComponent(
+      new URL(req.url, `http://${host}`).pathname,
+    );
+    file = path.resolve(
+      root,
+      `.${pathname === "/" ? "/index.html" : pathname}`,
+    );
     const relative = path.relative(root, file);
-    if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('outside root');
+    if (relative.startsWith("..") || path.isAbsolute(relative))
+      throw new Error("outside root");
   } catch {
     res.writeHead(400);
-    return res.end('Bad request');
+    return res.end("Bad request");
   }
   fs.stat(file, (error, stat) => {
     if (error || !stat.isFile()) {
       res.writeHead(404);
-      return res.end('Not found');
+      return res.end("Not found");
     }
-    res.writeHead(200, {
-      'Content-Type': mime[path.extname(file)] || 'application/octet-stream',
-      'Content-Length': stat.size,
-      'Cache-Control': path.extname(file) === '.html' ? 'no-store' : 'public, max-age=3600',
-      'X-Content-Type-Options': 'nosniff',
-    });
-    if (req.method === 'HEAD') return res.end();
-    const stream = fs.createReadStream(file);
-    stream.on('error', () => res.destroy());
+    let start = 0,
+      end = stat.size - 1,
+      status = 200;
+    const headers = {
+      "Content-Type":
+        mime[path.extname(file).toLowerCase()] || "application/octet-stream",
+      "Content-Length": stat.size,
+      "Accept-Ranges": "bytes",
+      "Cache-Control":
+        path.extname(file) === ".html" ? "no-store" : "public, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
+    };
+    // Safari requests small byte ranges before it starts local MP3 playback.
+    if (req.headers.range) {
+      const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+      let valid = !!match && !!(match[1] || match[2]);
+      if (valid) {
+        if (!match[1]) start = Math.max(0, stat.size - Number(match[2]));
+        else {
+          start = Number(match[1]);
+          if (match[2]) end = Math.min(end, Number(match[2]));
+        }
+        valid =
+          Number.isSafeInteger(start) &&
+          Number.isSafeInteger(end) &&
+          start >= 0 &&
+          start <= end &&
+          start < stat.size;
+      }
+      if (!valid) {
+        res.writeHead(416, { "Content-Range": `bytes */${stat.size}` });
+        return res.end();
+      }
+      status = 206;
+      headers["Content-Range"] = `bytes ${start}-${end}/${stat.size}`;
+      headers["Content-Length"] = end - start + 1;
+    }
+    res.writeHead(status, headers);
+    if (req.method === "HEAD" || stat.size === 0) return res.end();
+    const stream = fs.createReadStream(file, { start, end });
+    stream.on("error", () => res.destroy());
     stream.pipe(res);
   });
 }
@@ -88,19 +151,29 @@ function handler(req, res) {
 async function existingGame(port) {
   if (!port) return false;
   try {
-    const r = await fetch(`http://${host}:${port}/__mushroom_health`, { signal: AbortSignal.timeout(600) });
-    return (await r.json()).app === 'mushroom-local-game';
-  } catch { return false; }
+    const r = await fetch(`http://${host}:${port}/__mushroom_health`, {
+      signal: AbortSignal.timeout(600),
+    });
+    return (await r.json()).app === "mushroom-local-game";
+  } catch {
+    return false;
+  }
 }
 
 async function main() {
-  const [major, minor] = process.versions.node.split('.').map(Number);
+  const [major, minor] = process.versions.node.split(".").map(Number);
   if (major < 22 || (major === 22 && minor < 12)) {
-    throw new Error('需要 Node.js 22.12 或更新版本；也可以使用内置运行环境的便携包。');
+    throw new Error(
+      "需要 Node.js 22.12 或更新版本；也可以使用内置运行环境的便携包。",
+    );
   }
   ensureBuild();
-  const start = process.env.MUSHROOM_PORT === undefined ? 5173 : Number(process.env.MUSHROOM_PORT);
-  if (!Number.isInteger(start) || start < 0 || start > 65535) throw new Error('无效的端口号。');
+  const start =
+    process.env.MUSHROOM_PORT === undefined
+      ? 5173
+      : Number(process.env.MUSHROOM_PORT);
+  if (!Number.isInteger(start) || start < 0 || start > 65535)
+    throw new Error("无效的端口号。");
   for (let attempt = 0; attempt < 12; attempt++) {
     const port = start === 0 ? 0 : start + attempt;
     if (port > 65535) break;
@@ -113,24 +186,26 @@ async function main() {
     const server = http.createServer(handler);
     try {
       await new Promise((resolve, reject) => {
-        server.once('error', reject);
+        server.once("error", reject);
         server.listen(port, host, resolve);
       });
     } catch (error) {
-      if (error.code === 'EADDRINUSE') continue;
+      if (error.code === "EADDRINUSE") continue;
       throw error;
     }
     const actualUrl = `http://${host}:${server.address().port}/`;
-    console.log(`\n菌野 · 美味菌子在哪里\n游戏已启动：${actualUrl}\n请保留此窗口；关闭窗口或按 Ctrl+C 可停止游戏。\n`);
+    console.log(
+      `\n菌野 · 美味菌子在哪里\n游戏已启动：${actualUrl}\n请保留此窗口；关闭窗口或按 Ctrl+C 可停止游戏。\n`,
+    );
     openBrowser(actualUrl);
-    process.once('SIGINT', () => server.close(() => process.exit(0)));
-    process.once('SIGTERM', () => server.close(() => process.exit(0)));
+    process.once("SIGINT", () => server.close(() => process.exit(0)));
+    process.once("SIGTERM", () => server.close(() => process.exit(0)));
     return;
   }
-  throw new Error('可用端口被占用，请关闭旧的游戏窗口后重试。');
+  throw new Error("可用端口被占用，请关闭旧的游戏窗口后重试。");
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error(`\n启动失败：${error.message}\n`);
   process.exitCode = 1;
 });

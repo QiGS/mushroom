@@ -1,0 +1,51 @@
+[
+  {
+    "id": "bridge",
+    "source": "桥.glb",
+    "sourceTriangles": 1947759,
+    "triangles": 21999,
+    "bytes": 1282088
+  },
+  {
+    "id": "rock",
+    "source": "岩石.glb",
+    "sourceTriangles": 1949754,
+    "triangles": 5246,
+    "bytes": 696256
+  },
+  {
+    "id": "noticeboard",
+    "source": "路边公告牌.glb",
+    "sourceTriangles": 1943402,
+    "triangles": 11996,
+    "bytes": 789284
+  },
+  {
+    "id": "stele",
+    "source": "石碑.glb",
+    "sourceTriangles": 1982950,
+    "triangles": 7998,
+    "bytes": 413804
+  },
+  {
+    "id": "campfire",
+    "source": "篝火.glb",
+    "sourceTriangles": 1920978,
+    "triangles": 12000,
+    "bytes": 801332
+  },
+  {
+    "id": "bed",
+    "source": "床.glb",
+    "sourceTriangles": 1943602,
+    "triangles": 16000,
+    "bytes": 811684
+  },
+  {
+    "id": "weather-vane",
+    "source": "天气指向器.glb",
+    "sourceTriangles": 1955228,
+    "triangles": 12000,
+    "bytes": 649268
+  }
+]

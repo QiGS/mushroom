@@ -30,10 +30,10 @@ export class SceneNotice {
     this.root.classList.add("reward-reveal");
     this.entries = entries;
     this.shown = 0;
-    this.revealTime = 0;
-    this.lastTick = performance.now();
+
     this.root.innerHTML =
-      '<div class="reward-list"></div><small class="reward-close">E 收好 · I 翻开图鉴</small>';
+      '<div class="reward-list"></div><button class="reward-close"></button>';
+    this.root.querySelector(".reward-close").onclick = () => this.advance();
     this.revealNext();
   }
   revealNext() {
@@ -41,8 +41,14 @@ export class SceneNotice {
     const row = document.createElement("div");
     row.className = "reward-drop";
     row.innerHTML = `${entry.art || '<span class="reward-symbol">✧</span>'}<div><strong>${entry.title}</strong><small>${entry.detail}</small></div>`;
-    this.root.querySelector(".reward-list").append(row);
+    this.root.querySelector(".reward-list").replaceChildren(row);
+    this.root.querySelector(".reward-close").textContent =
+      `E ${this.shown < this.entries.length ? "下一件" : "收好"} · ${this.shown} / ${this.entries.length}`;
     if (this.shown > 1) this.game.audio.play("collect");
+  }
+  advance() {
+    if (this.entries && this.shown < this.entries.length) this.revealNext();
+    else this.close();
   }
   close() {
     this.active = false;
@@ -50,16 +56,6 @@ export class SceneNotice {
   }
   update() {
     if (!this.active) return;
-    if (this.entries) {
-      const now = performance.now();
-      this.revealTime += Math.min(0.1, (now - this.lastTick) / 1000);
-      this.lastTick = now;
-      if (
-        this.shown < this.entries.length &&
-        this.revealTime >= this.shown * 0.75
-      )
-        this.revealNext();
-    }
     if (this.anchor.distanceTo(this.game.player.root.position) > 7) {
       this.close();
       return;

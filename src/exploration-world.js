@@ -1,4 +1,6 @@
 import * as T from "three";
+import { addProp } from "./prop-model.js";
+import { addVillager } from "./villagers.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   terrainHeight as height,
@@ -69,6 +71,7 @@ export function buildExplorationWorld(
     }
   };
 
+  const models = [];
   const house = group(-6, 33, height(-6, 33) + 0.16),
     base = house.position.y;
   box(house, 0, 0, 0, 7.2, 0.24, 6.2, 0x867458);
@@ -102,10 +105,34 @@ export function buildExplorationWorld(
     box(house, x, 2.2, 3.21, 0.05, 0.9, 0.03, 0x72573b);
     box(house, x, 2.2, 3.21, 0.85, 0.05, 0.03, 0x72573b);
   }
-  box(house, -2, 0.45, -1.4, 1.5, 0.75, 2.2, 0x776348);
-  box(house, -2, 0.86, -1.4, 1.45, 0.12, 2.1, 0xa6ac81);
-  box(house, -2, 0.98, -2.1, 1, 0.17, 0.5, 0xd9d0ae);
-  solid("house-bed", -8, 31.6, 0.75, 1.1, { house: true });
+  const bed = group(-8, 31.6, base + 0.12),
+    bedFallback = new T.Group();
+  bed.add(bedFallback);
+  box(bedFallback, 0, 0.45, 0, 1.5, 0.75, 2.2, 0x776348);
+  box(bedFallback, 0, 0.86, 0, 1.45, 0.12, 2.1, 0xa6ac81);
+  models.push(
+    addProp(bed, "bed", {
+      width: 1.5,
+      depth: 2.2,
+      height: 2.4,
+      fallback: bedFallback,
+    }),
+  );
+  const bedCollision = solid("house-bed", -8, 31.6, 0.75, 1.1, {
+    house: true,
+    active: false,
+    height: 2.4,
+  });
+  interactables.push({
+    id: "bed",
+    type: "bed",
+    x: -8,
+    z: 31.6,
+    object: bed,
+    radius: 2.1,
+    name: "在床上休息",
+    category: "夜晚睡到次日清晨",
+  });
   box(house, 2.4, 1.3, -1.8, 0.9, 2.6, 1, 0x725337);
   for (let j = 0; j < 3; j++)
     for (let i = 0; i < 4; i++)
@@ -205,23 +232,55 @@ export function buildExplorationWorld(
       1.02,
       0,
     );
+  const keeper = new T.Group(),
+    vendorFallback = new T.Group();
+  keeper.position.set(0, 0, 1.35);
+  keeper.rotation.y = Math.PI;
+  shop.add(keeper);
+  keeper.add(vendorFallback);
   const vendor = add(
-    shop,
+    vendorFallback,
     new T.ConeGeometry(0.35, 1.3, 8),
     0x78918a,
     0,
     0.65,
-    0.9,
+    0,
   );
-  add(shop, new T.SphereGeometry(0.23, 10, 6), 0xcfa678, 0, 1.5, 0.9);
-  add(shop, new T.ConeGeometry(0.47, 0.24, 10), 0xc6a773, 0, 1.74, 0.9);
+  add(vendorFallback, new T.SphereGeometry(0.23, 10, 6), 0xcfa678, 0, 1.5, 0);
+  add(vendorFallback, new T.ConeGeometry(0.47, 0.24, 10), 0xc6a773, 0, 1.74, 0);
+  const shopkeeper = addVillager(keeper, "uncle", vendorFallback);
+  const forecast = group(7.8, 24),
+    forecastFallback = new T.Group();
+  forecast.add(forecastFallback);
+  box(forecastFallback, 0, 1, 0, 0.12, 2, 0.12, 0xb4a178);
+  add(forecastFallback, new T.OctahedronGeometry(0.35), 0xc4d1a3, 0, 2.1, 0);
+  models.push(
+    addProp(forecast, "weather-vane", {
+      height: 2.5,
+      fallback: forecastFallback,
+    }),
+  );
+  const forecastCollision = solid("weather-vane", 7.8, 24, 0.35, 0.3, {
+    active: false,
+    height: 2.5,
+  });
+  interactables.push({
+    id: "weather-vane",
+    type: "forecast",
+    x: 7.8,
+    z: 24,
+    object: forecast,
+    radius: 2.3,
+    name: "查看明天天气",
+    category: "天气指向器",
+  });
   interactables.push({
     type: "shop",
     x: 8,
     z: 27.3,
     object: shop,
     radius: 2.8,
-    name: "山货铺 · 购买装备",
+    name: "大叔的山货铺",
     category: "斧子 / 猎枪 / 防水鞋 · 竹叶币交易",
   });
 
@@ -460,10 +519,19 @@ export function buildExplorationWorld(
     root.add(new T.Line(g, new T.LineBasicMaterial({ color: 0x68583d })));
   }
   for (const p of EXPLORATION_SPOTS) {
-    const g = group(p.x, p.z);
-    add(g, new T.CylinderGeometry(0.8, 1, 0.25, 8), 0x888e78, 0, 0.12);
-    add(g, new T.BoxGeometry(0.7, 1.7, 0.4), 0xb5b89a, 0, 1.05);
-    const diamond = add(g, new T.OctahedronGeometry(0.19), 0xe4cd84, 0, 2.25);
+    const g = group(p.x, p.z),
+      fallback = new T.Group();
+    g.add(fallback);
+    models.push(addProp(g, "stele", { height: 2.3, fallback }));
+    add(fallback, new T.CylinderGeometry(0.8, 1, 0.25, 8), 0x888e78, 0, 0.12);
+    add(fallback, new T.BoxGeometry(0.7, 1.7, 0.4), 0xb5b89a, 0, 1.05);
+    const diamond = add(
+      fallback,
+      new T.OctahedronGeometry(0.19),
+      0xe4cd84,
+      0,
+      2.25,
+    );
     interactables.push({
       ...p,
       type: "survey",
@@ -487,6 +555,15 @@ export function buildExplorationWorld(
       2 + (i % 4) * 0.5,
     );
     rock.rotation.y = i * 0.73;
+    models.push(
+      addProp(g, "rock", {
+        width: 2.7,
+        height: 4 + (i % 4),
+        depth: 2.6,
+        rotation: i * 0.73,
+        fallback: rock,
+      }),
+    );
     colliders.push({ x, z, r: 1.35 });
   }
   return {
@@ -500,7 +577,13 @@ export function buildExplorationWorld(
       p.hp -= damage;
       return p.hp <= 0;
     },
+    dispose() {
+      models.forEach((p) => p.dispose());
+      shopkeeper.dispose();
+    },
     sync(s) {
+      bed.visible = bedCollision.active = s.bedOwned;
+      forecast.visible = forecastCollision.active = s.forecastOwned;
       hinge.rotation.y = houseUnlocked(s) ? -Math.PI * 0.51 : 0;
       for (const [id, p] of props) {
         const broken = s.broken.includes(id);
@@ -511,14 +594,13 @@ export function buildExplorationWorld(
       }
     },
     update(t, s) {
+      shopkeeper.update(t);
       for (const { p, g } of supplies) {
         g.visible = supplyReady(s, p.id);
         g.children[0].position.y = 0.25 + Math.sin(t * 2) * 0.035;
       }
-      const inside = insideHouse(s.position.x, s.position.z);
-      roof.visible = lintel.visible = !inside;
-      for (const w of walls)
-        if (w.id.startsWith("front")) w.mesh.visible = !inside;
+      roof.visible = lintel.visible = true;
+      for (const w of walls) w.mesh.visible = true;
       for (const p of props.values())
         if (p.loot.visible) {
           p.loot.position.y =

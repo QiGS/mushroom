@@ -45,7 +45,7 @@ export class AdventureUI {
         .set(e.x, e.object.position.y + (e.boss ? 2.1 : 1.25), e.z)
         .project(g.camera);
       const visible =
-        !g.ui.panel &&
+        !g.ui.blocking &&
         e.hp > 0 &&
         e.object.visible &&
         !s.defeated.includes(e.id) &&
@@ -81,8 +81,8 @@ export class AdventureUI {
         .forEach((b) => (b.onclick = () => g.equipWeapon(b.dataset.weapon)));
     }
     const edge = boundaryIntensity(s.position.x, s.position.z);
-    this.edge.style.opacity = g.ui.panel ? "0" : String(edge * 0.85);
+    this.edge.style.opacity = g.ui.blocking ? "0" : String(edge * 0.85);
     this.edge.classList.toggle("near-edge", edge > 0.08);
-    this.aim.hidden = !!g.ui.panel || s.weapon !== "rifle";
+    this.aim.hidden = !!g.ui.blocking || s.weapon !== "rifle";
   }
 }

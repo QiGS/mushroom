@@ -5,6 +5,8 @@ const illustrated = new Set([
   "shoes",
   "bell",
   "compass",
+  "bed",
+  "weatherVane",
 ]);
 export function toolArt(tool) {
   return illustrated.has(tool.id)

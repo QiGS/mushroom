@@ -77,9 +77,14 @@ export function surfaceHeight(world, x, z) {
     if (Math.hypot(x - p.x, z - p.z) < p.r + 0.08) y = Math.max(y, p.y);
   for (const p of world.surfaces || [])
     if (Math.abs(x - p.x) < p.hx && Math.abs(z - p.z) < p.hz)
-      y = Math.max(y, p.y);
+      y = Math.max(y, p.heightAt ? p.heightAt(x, z) : p.y);
   // Existing timber bridge in the original forest.
-  if (z > 11 && z < 17 && Math.abs(x - Math.sin(14 * 0.08) * 6) < 1.7)
+  if (
+    !world.surfaces?.some((p) => p.heightAt) &&
+    z > 11 &&
+    z < 17 &&
+    Math.abs(x - Math.sin(14 * 0.08) * 6) < 1.7
+  )
     y = Math.max(y, terrainHeight(0, 14) + 0.45);
   return y;
 }

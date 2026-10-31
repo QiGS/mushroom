@@ -12,34 +12,30 @@ export class ForestAudio {
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.22;
       this.master.connect(this.ctx.destination);
-      const buffer = this.ctx.createBuffer(
-          1,
-          this.ctx.sampleRate * 4,
-          this.ctx.sampleRate,
-        ),
-        data = buffer.getChannelData(0);
-      let last = 0;
-      for (let i = 0; i < data.length; i++) {
-        last = (last + Math.random() * 0.04 - 0.02) * 0.998;
-        data[i] = last;
-      }
-      const noise = this.ctx.createBufferSource();
-      noise.buffer = buffer;
-      noise.loop = true;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.value = 450;
-      const gain = this.ctx.createGain();
-      gain.gain.value = 0.14;
-      noise.connect(filter).connect(gain).connect(this.master);
-      noise.start();
-      this.noise = noise;
+      this.tracks = [
+        ["jingmai-bgm.mp3", 0.28],
+        ["forest-stream.mp3", 0.11],
+      ].map(([file, volume]) => {
+        const audio = document.createElement("audio");
+        audio.src = `${import.meta.env.BASE_URL}assets/audio/${file}`;
+        audio.loop = true;
+        audio.preload = "auto";
+        audio.volume = volume;
+        audio.hidden = true;
+        document.body.append(audio);
+        return audio;
+      });
     }
-    await this.ctx.resume();
+    this.running = true;
     this.setEnabled(this.enabled);
+    await this.ctx.resume();
   }
   setEnabled(on) {
     this.enabled = on;
+    for (const track of this.tracks || []) {
+      if (on && this.running) track.play().catch(() => {});
+      else track.pause();
+    }
     if (this.master)
       this.master.gain.setTargetAtTime(
         on ? 0.22 : 0,
@@ -88,20 +84,10 @@ export class ForestAudio {
       );
     }
   }
-  update(dt) {
-    this.timer -= dt;
-    if (this.timer <= 0) {
-      this.timer = 8 + Math.random() * 8;
-      const f = [392, 440, 523, 587, 659][Math.floor(Math.random() * 5)];
-      this.note(f, 3, 0.055);
-      this.note(f * 1.5, 3, 0.035, 0.5);
-      if (Math.random() > 0.4) {
-        this.note(1800, 0.1, 0.035, 2);
-        this.note(2400, 0.12, 0.025, 2.15);
-      }
-    }
-  }
+  update() {}
   pause() {
+    this.running = false;
+    for (const track of this.tracks || []) track.pause();
     this.ctx?.suspend();
   }
 }

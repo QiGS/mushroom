@@ -1,3 +1,5 @@
+import { addProp } from "./prop-model.js";
+import { softenFoliage } from "./camera-collision.js";
 import { addMountainBackdrop } from "./mountains.js";
 import { buildExplorationWorld } from "./exploration-world.js";
 import { addVillager } from "./villagers.js";
@@ -81,6 +83,7 @@ transformed.z += cos(uTime*.9 + wp.z*.3) * ${(0.3 * strength).toFixed(3)} * max(
 }
 
 export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
+  const props = [];
   const root = new T.Group();
   scene.add(root);
   const random = seededRandom(957),
@@ -224,6 +227,9 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     pineCrowns = [],
     rocks = [],
     moss = [];
+  const foliageFocus = new T.Vector3(0, 2, 27),
+    foliageEye = new T.Vector3(0, 5, 34);
+  softenFoliage(canopyMat, foliageFocus, foliageEye);
   for (let i = 0; i < 360; i++) {
     const x = (random() - 0.5) * 145,
       z = (random() - 0.5) * 145;
@@ -580,6 +586,47 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       bridge,
     );
   }
+  const bridgeAnchor = new T.Group();
+  bridgeAnchor.position.set(bridge.position.x, height(0, 14) - 0.745, 14);
+  root.add(bridgeAnchor);
+  props.push(
+    addProp(bridgeAnchor, "bridge", {
+      width: 5.7,
+      depth: 3.8,
+      height: 2.1,
+      rotation: Math.PI / 2,
+      fallback: bridge,
+    }),
+  );
+  // The centerline deck follows the supplied bridge's slightly rising shape.
+  const deckY = [
+    0.1813, 0.1918, 0.2066, 0.2215, 0.2326, 0.2446, 0.2503, 0.2531, 0.2552,
+    0.2545, 0.2489,
+  ];
+  surfaces.push({
+    x: bridge.position.x,
+    z: 14,
+    hx: 1.55,
+    hz: 2.85,
+    y: height(0, 14) + 0.45,
+    heightAt(x, z) {
+      const t = T.MathUtils.clamp((14 - z) / 5.7 + 0.5, 0, 1) * 10,
+        i = Math.min(9, Math.floor(t));
+      return (
+        bridgeAnchor.position.y +
+        (T.MathUtils.lerp(deckY[i], deckY[i + 1], t - i) * 2.1) / 0.404068
+      );
+    },
+  });
+  for (const side of [-1, 1])
+    colliders.push({
+      id: `bridge-rail-${side}`,
+      x: bridge.position.x + side * 1.78,
+      z: 14,
+      hx: 0.13,
+      hz: 2.65,
+      height: 1.7,
+    });
   function at(x, z) {
     const g = new T.Group();
     g.position.set(x, height(x, z), z);
@@ -637,6 +684,9 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     0.55,
     -0.9,
   );
+  const fireAnchor = at(4, 29);
+  const fireArt = addProp(fireAnchor, "campfire", { width: 1.8, height: 1.4 });
+  props.push(fireArt);
   const fireLight = new T.PointLight(0xffa754, 5, 9, 2);
   fireLight.position.set(4, 1.5, -1);
   camp.add(fireLight);
@@ -746,7 +796,24 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     object: camp,
     radius: 2.6,
   });
-  const weatherBoard = sign(4, 25);
+  const weatherBoard = at(4, 25),
+    boardFallback = new T.Group();
+  weatherBoard.add(boardFallback);
+  mesh(new T.BoxGeometry(1.8, 1.2, 0.15), wood, boardFallback, 0, 1.5);
+  props.push(
+    addProp(weatherBoard, "noticeboard", {
+      height: 2.5,
+      fallback: boardFallback,
+    }),
+  );
+  colliders.push({
+    id: "weather-board",
+    x: 4,
+    z: 25,
+    hx: 0.8,
+    hz: 0.38,
+    height: 2.5,
+  });
   let boardTexture = null;
   if (typeof document !== "undefined") {
     boardTexture = new T.TextureLoader().load(
@@ -764,7 +831,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       }),
     );
     illustratedBoard.position.set(0, 1.38, 0.09);
-    weatherBoard.add(illustratedBoard);
+    boardFallback.add(illustratedBoard);
   }
   interactables.push({
     type: "weather",
@@ -810,7 +877,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     root,
   ).castShadow = false;
   const nestObjects = new Map();
-  const items = createMushrooms(chapter, weather);
+  const items = createMushrooms(chapter, weather, day);
   for (const n of NESTS) {
     if (!items.some((p) => p.nest === n.id)) continue;
     const g = at(n.x, n.z);
@@ -1278,6 +1345,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     chapter,
     day,
     height,
+    weather,
   );
   const exploration = buildExplorationWorld(
     root,
@@ -1298,6 +1366,10 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     collection.update(t, state);
     time.value = t;
     for (const fn of animated) fn(t);
+    const burning = state.fireFuel > 0;
+    fire.visible = flame.visible = burning && !fireArt.loaded;
+    fireArt.group.visible = burning;
+    if (!burning) fireLight.intensity = 0;
     const clock = daylight(state),
       night = clock.night;
     moon.visible = night > 0.15;
@@ -1363,6 +1435,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   }
   function dispose() {
     mountains.dispose();
+    props.forEach((p) => p.dispose());
+    exploration.dispose();
     boardTexture?.dispose();
     villagers.forEach((v) => v.dispose());
     collection.dispose();
@@ -1382,6 +1456,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   }
   return {
     mountains,
+    foliageFocus,
+    foliageEye,
     collection,
     exploration,
     surfaces,

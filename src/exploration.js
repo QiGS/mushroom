@@ -1,5 +1,20 @@
 import { grantTool } from "./tools.js";
+import { houseUnlocked } from "./terrain.js";
 export const SHOP = [
+  {
+    id: "bed",
+    name: "木制床铺",
+    icon: "☾",
+    price: 60,
+    detail: "永久家具 · 小屋解锁后可购买，G 安置，入夜后睡到清晨",
+  },
+  {
+    id: "weatherVane",
+    name: "天气指向器",
+    icon: "☀",
+    price: 45,
+    detail: "永久设施 · G 安置在公告牌旁，查看下一天的天气",
+  },
   {
     id: "note",
     price: 16,
@@ -189,6 +204,16 @@ export const WEAPONS = {
 export function purchase(s, id) {
   const item = SHOP.find((p) => p.id === id);
   if (!item) return { ok: false, message: "这件商品暂未上架。" };
+  if (id === "bed" && !houseUnlocked(s))
+    return {
+      ok: false,
+      message: "完成第一道菌宴、解锁小屋后，大叔就能送床来了。",
+    };
+  if (
+    (id === "bed" || id === "weatherVane") &&
+    (s.tools[id] > 0 || s[id === "bed" ? "bedOwned" : "forecastOwned"])
+  )
+    return { ok: false, message: "这件设施已经购入，无需重复购买。" };
   if (s.tools[id] >= 99) return { ok: false, message: "这件道具已经装满了。" };
   if (s.coins < item.price)
     return { ok: false, message: `还差 ${item.price - s.coins} 竹叶币。` };

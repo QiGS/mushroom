@@ -125,6 +125,52 @@ try {
     assert.ok(Number(r.headers.get("content-length")) > 1000);
   }
   assert.equal((await fetch(`${url}missing-file`, options)).status, 404);
+  for (const id of [
+    "bridge",
+    "rock",
+    "noticeboard",
+    "stele",
+    "campfire",
+    "bed",
+    "weather-vane",
+  ]) {
+    const r = await fetch(`${url}assets/props/${id}.glb`, {
+      ...options,
+      method: "HEAD",
+    });
+    assert.equal(r.status, 200, id);
+    assert.equal(r.headers.get("content-type"), "model/gltf-binary");
+  }
+  const music = `${url}assets/audio/jingmai-bgm.mp3`;
+  const audio = await fetch(music, { ...options, method: "HEAD" });
+  assert.equal(audio.status, 200);
+  assert.equal(audio.headers.get("content-type"), "audio/mpeg");
+  const size = Number(audio.headers.get("content-length"));
+  assert.ok(size > 1_000_000);
+  for (const [range, start, end] of [
+    ["bytes=0-1", 0, 1],
+    ["bytes=100-199", 100, 199],
+    ["bytes=-32", size - 32, size - 1],
+    [`bytes=${size - 20}-`, size - 20, size - 1],
+  ]) {
+    const r = await fetch(music, { ...options, headers: { Range: range } });
+    assert.equal(r.status, 206);
+    assert.equal(
+      r.headers.get("content-range"),
+      `bytes ${start}-${end}/${size}`,
+    );
+    assert.equal((await r.arrayBuffer()).byteLength, end - start + 1);
+  }
+  for (const range of [
+    "bytes=-0",
+    "bytes=9-1",
+    `bytes=${size}-`,
+    "bytes=0-1,4-5",
+  ])
+    assert.equal(
+      (await fetch(music, { ...options, headers: { Range: range } })).status,
+      416,
+    );
   assert.equal((await fetch(url, { ...options, method: "POST" })).status, 405);
   assert.equal(
     (await fetch(`${url}%2e%2e%2fpackage.json`, options)).status,

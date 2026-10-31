@@ -182,7 +182,10 @@ test("every treasure and specimen has a dry accessible interaction point in all 
       const targets = world.interactables.filter((p) =>
         ["treasure", "specimen"].includes(p.type),
       );
-      assert.equal(targets.length, TREASURES.length + 9);
+      assert.equal(
+        targets.length,
+        TREASURES.length + collectionLayout(chapter, day, "sun").length,
+      );
       for (const p of targets) {
         const dry = (x, z) => Math.hypot((x - 25) / 8.5, (z + 4) / 13) > 1.2;
         assert.ok(dry(p.x, p.z), `${chapter}/${p.id} in water`);

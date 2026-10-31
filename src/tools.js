@@ -1,4 +1,19 @@
+import { houseUnlocked } from "./terrain.js";
 export const TOOL_DEFS = [
+  {
+    id: "bed",
+    name: "木制床铺",
+    icon: "☾",
+    color: "#c3ad89",
+    description: "小屋解锁后按 G 安置，夜晚靠近床按 E 睡到次日清晨。",
+  },
+  {
+    id: "weatherVane",
+    name: "天气指向器",
+    icon: "☀",
+    color: "#b8c9aa",
+    description: "按 G 安置在公告牌旁，可查看下一天的天气。",
+  },
   {
     id: "grilled",
     name: "炭火菌串",
@@ -147,7 +162,22 @@ export function consumeTool(s, id) {
 }
 export function activateTool(s, id) {
   if (!s.tools[id])
-    return { ok: false, message: "道具已用完，可在奶奶处购买或自己烹饪。" };
+    return { ok: false, message: "道具已用完，可在大叔处购买或自己烹饪。" };
+  if (id === "bed" || id === "weatherVane") {
+    const key = id === "bed" ? "bedOwned" : "forecastOwned";
+    if (s[key]) return { ok: false, message: "已经安置好了，回村就能使用。" };
+    if (id === "bed" && !houseUnlocked(s))
+      return { ok: false, message: "完成第一道菌宴，解锁小屋后才能安置床铺。" };
+    consumeTool(s, id);
+    s[key] = true;
+    return {
+      ok: true,
+      message:
+        id === "bed"
+          ? "床铺已安置在小屋里 · 夜晚靠近按 E 睡到清晨"
+          : "天气指向器已安置在公告牌旁 · 靠近按 E 查看明天天气",
+    };
+  }
   if (["grilled", "soup", "riceMeal", "stew"].includes(id)) {
     if (
       s.health >= 5 &&

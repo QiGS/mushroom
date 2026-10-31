@@ -1,0 +1,132 @@
+#scene-dialog {
+  position: fixed;
+  z-index: 45;
+  left: 50%;
+  bottom: 132px;
+  transform: translateX(-50%);
+  width: min(650px, calc(100vw - 32px));
+  pointer-events: auto;
+  color: #f3ecd6;
+  filter: drop-shadow(0 8px 18px #10211ccb);
+}
+#scene-dialog[hidden] {
+  display: none;
+}
+.chat-paper {
+  position: relative;
+  padding: 23px 30px 17px;
+  background: linear-gradient(140deg, #263f36ed, #192e29f5);
+  border: 1px solid #aab49088;
+  border-radius: 3px 18px 4px 16px;
+}
+.chat-paper::before {
+  content: "";
+  position: absolute;
+  left: 36px;
+  top: -8px;
+  width: 14px;
+  height: 14px;
+  background: #31483c;
+  transform: rotate(45deg);
+  border-left: 1px solid #aab49088;
+  border-top: 1px solid #aab49088;
+}
+.chat-speaker {
+  letter-spacing: 0.12em;
+  font-size: 18px;
+  color: #e6ca8e;
+}
+.chat-text {
+  font-size: 17px;
+  line-height: 1.8;
+  margin: 12px 0 16px;
+  white-space: pre-line;
+  text-wrap: pretty;
+}
+.chat-close {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  font-size: 24px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: #d6ddc8;
+}
+.chat-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.chat-actions button {
+  padding: 9px 18px;
+  border: 1px solid #abb69983;
+  border-radius: 4px;
+  background: #52694b70;
+  color: #f6f0dc;
+  min-height: 40px;
+}
+.chat-actions button:hover {
+  background: #74865d90;
+}
+.chat-actions button:disabled {
+  opacity: 0.45;
+}
+.chat-key {
+  display: block;
+  text-align: right;
+  color: #bec8ae;
+  font-size: 11px;
+  margin-top: 10px;
+}
+#time-speed {
+  width: 100%;
+  padding: 6px 8px;
+  background: #293b31b8;
+  border: 0;
+  border-top: 1px solid #a6b19450;
+  border-radius: 0 0 7px 7px;
+  color: #ece6cf;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+#time-speed:hover {
+  background: #526744;
+}
+.reward-close {
+  display: block;
+  background: none;
+  border: 0;
+  color: #f3e8cb;
+  cursor: pointer;
+}
+@media (max-width: 700px) {
+  #scene-dialog {
+    bottom: 115px;
+  }
+  .chat-paper {
+    padding: 16px 20px 12px;
+  }
+  .chat-text {
+    font-size: 15px;
+    margin: 8px 0 12px;
+  }
+  .chat-speaker {
+    font-size: 16px;
+  }
+  .chat-actions button {
+    padding: 7px 12px;
+  }
+}
+@media (max-height: 600px) {
+  #scene-dialog {
+    bottom: 80px;
+    max-height: 65vh;
+    overflow: auto;
+  }
+  .chat-text {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
