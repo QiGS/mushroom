@@ -7,9 +7,9 @@ import * as T from "three";
 import {
   createTravelerRig,
   TravelerMotion,
-  windowsDesktop,
+  desktopExperience,
   angleDelta,
-} from "../src/windows-motion.js";
+} from "../src/character-motion.js";
 
 const document = await new NodeIO()
   .registerExtensions(ALL_EXTENSIONS)
@@ -44,14 +44,38 @@ const pose = {
   time: 0,
 };
 
-test("new character and camera behavior is restricted to Windows", () => {
-  assert.equal(windowsDesktop("Windows", ""), true);
+test("desktop controls support Windows and Mac while retaining mobile and Linux behavior", () => {
+  assert.equal(desktopExperience("Windows", ""), true);
   assert.equal(
-    windowsDesktop("", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"),
+    desktopExperience("", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"),
     true,
   );
-  for (const p of ["macOS", "MacIntel", "Linux", "iOS", "Android", ""])
-    assert.equal(windowsDesktop(p, ""), false);
+  for (const p of ["macOS", "MacIntel", "MacPPC"])
+    assert.equal(desktopExperience(p, ""), true);
+  assert.equal(
+    desktopExperience(
+      "",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15",
+    ),
+    true,
+  );
+  for (const p of ["Linux", "iOS", "Android", ""])
+    assert.equal(desktopExperience(p, ""), false);
+  assert.equal(
+    desktopExperience(
+      "MacIntel",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)",
+      5,
+    ),
+    false,
+  );
+  assert.equal(
+    desktopExperience(
+      "MacIntel",
+      "Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)",
+    ),
+    false,
+  );
 });
 
 test("all vertices of the supplied traveler retain their rest pose with normalized skin weights", () => {

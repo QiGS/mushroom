@@ -70,7 +70,7 @@ export function attachQA(game) {
     game.updatePlayer(0.25);
     game.keys.clear();
   });
-  if (game.windowsControls) {
+  if (game.desktopControls) {
     add("QA 角色近景", () => {
       move(1, 27.5);
       game.distance = 3.5;
@@ -97,7 +97,7 @@ export function attachQA(game) {
     const p = game.player.root.position;
     status.textContent =
       `${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} | 最近: ${game.nearest?.name || "无"} | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
-      (game.windowsControls
+      (game.desktopControls
         ? ` | 鼠标:${game.look?.locked ? "已捕获" : "自由"} | 镜头:${game.yaw.toFixed(2)},${game.pitch.toFixed(2)} | 骨骼:${game.motion?.rig.skeleton.bones.length || 0} | 步速:${game.motion?.speed.toFixed(2) || 0}`
         : "");
   }, 500);

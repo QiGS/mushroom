@@ -1,6 +1,6 @@
 import { MathUtils } from "three";
 
-export class WindowsLook {
+export class DesktopLook {
   constructor(game) {
     this.game = game;
     this.locked = false;

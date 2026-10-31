@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { WindowsLook } from "../src/windows-look.js";
+import { DesktopLook } from "../src/desktop-look.js";
 
 function harness(t) {
   const original = globalThis.document;
@@ -54,7 +54,7 @@ function harness(t) {
       resets++;
     },
   };
-  const look = new WindowsLook(game);
+  const look = new DesktopLook(game);
   const lock = () => {
     doc.pointerLockElement = game.canvas;
     doc.dispatchEvent(new Event("pointerlockchange"));
@@ -132,4 +132,27 @@ test("a denied pointer lock leaves drag fallback and permits a later user retry"
   };
   h.look.capture();
   assert.equal(h.look.locked, true);
+});
+
+test("event-only browsers can capture without returning a Promise", (t) => {
+  const h = harness(t);
+  h.game.canvas.requestPointerLock = () => undefined;
+  h.look.capture();
+  assert.equal(h.look.pending, true);
+  h.lock();
+  assert.equal(h.look.pending, false);
+  h.move(40, -20);
+  assert.equal(h.game.yaw, -0.1);
+  h.look.release();
+  assert.equal(h.look.locked, false);
+});
+
+test("browsers without pointer lock retain drag rotation without throwing", (t) => {
+  const h = harness(t);
+  delete h.game.canvas.requestPointerLock;
+  assert.doesNotThrow(() => h.look.capture());
+  assert.equal(h.look.pending, false);
+  h.look.rotate(40, 20);
+  assert.equal(h.game.yaw, -0.1);
+  assert.equal(h.game.pitch, 0.35);
 });

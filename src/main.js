@@ -5,12 +5,12 @@ import { buildWorld, makeTraveler, makeSnake } from "./world.js";
 import { UI } from "./ui.js";
 import { ForestAudio } from "./audio.js";
 import {
-  windowsDesktop,
+  desktopExperience,
   createTravelerRig,
   TravelerMotion,
   angleDelta,
-} from "./windows-motion.js";
-import { WindowsLook } from "./windows-look.js";
+} from "./character-motion.js";
+import { DesktopLook } from "./desktop-look.js";
 import {
   SAVE_KEY,
   SPECIES,
@@ -42,9 +42,10 @@ const v3 = new T.Vector3(),
 
 class Game {
   constructor() {
-    this.windowsControls = windowsDesktop(
+    this.desktopControls = desktopExperience(
       navigator.userAgentData?.platform,
       navigator.userAgent,
+      navigator.maxTouchPoints,
     );
     this.state = newGame();
     this.hasSave = false;
@@ -143,7 +144,7 @@ class Game {
         },
       );
       const model = gltf.scene;
-      if (this.windowsControls) {
+      if (this.desktopControls) {
         const rig = createTravelerRig(model);
         this.motion = new TravelerMotion(rig);
         this.player.body.visible = false;
@@ -292,7 +293,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     });
     window.addEventListener("pagehide", () => this.save());
     this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-    if (this.windowsControls) this.look = new WindowsLook(this);
+    if (this.desktopControls) this.look = new DesktopLook(this);
     this.pointer = null;
     this.canvas.addEventListener("pointerdown", (e) => {
       if (this.ui.panel) return;
@@ -337,7 +338,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const release = () => (this.pointer = null);
     this.canvas.addEventListener("pointerup", release);
     this.canvas.addEventListener("pointercancel", release);
-    if (this.windowsControls) window.addEventListener("pointerup", release);
+    if (this.desktopControls) window.addEventListener("pointerup", release);
     this.canvas.addEventListener(
       "wheel",
       (e) => {
@@ -397,7 +398,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.joystick = { x: 0, y: 0 };
     this.pointer = null;
     this.holdTime = 0;
-    if (this.windowsControls) this.velocity?.set(0, 0, 0);
+    if (this.desktopControls) this.velocity?.set(0, 0, 0);
     const knob = $("joystick")?.querySelector("i");
     if (knob) knob.style.transform = "";
   }
@@ -432,7 +433,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     await this.audio.start();
     this.save();
     this.ui.toast(
-      this.windowsControls
+      this.desktopControls
         ? "WASD 移动 · 移动鼠标环视 · Esc 释放鼠标 · E 互动"
         : "WASD 移动 · 拖动鼠标环视 · 靠近后按 E 互动",
     );
@@ -1026,8 +1027,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         ((this.keys.has("ArrowDown") ? 1 : 0) -
           (this.keys.has("ArrowUp") ? 1 : 0)) *
           dt,
-      this.windowsControls ? -0.35 : 0.08,
-      this.windowsControls ? 1.2 : 1.15,
+      this.desktopControls ? -0.35 : 0.08,
+      this.desktopControls ? 1.2 : 1.15,
     );
     const sprint =
       (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight")) &&
@@ -1043,7 +1044,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     );
     let dx = m.x * speed * dt,
       dz = m.y * speed * dt;
-    if (this.windowsControls) {
+    if (this.desktopControls) {
       const response = moving ? 10 : 15;
       this.velocity.x = T.MathUtils.damp(
         this.velocity.x,
@@ -1116,7 +1117,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           Math.sin(angle - this.player.root.rotation.y),
           Math.cos(angle - this.player.root.rotation.y),
         ) *
-        (this.windowsControls ? 1 - Math.exp(-dt * 13) : Math.min(1, dt * 12));
+        (this.desktopControls ? 1 - Math.exp(-dt * 13) : Math.min(1, dt * 12));
       this.stepTime += dt;
       if (this.stepTime > (sprint ? 0.25 : 0.4) && this.grounded) {
         this.audio.play("step");

@@ -1,8 +1,12 @@
 import * as T from "three";
 
 const { clamp, damp, lerp, smoothstep } = T.MathUtils;
-export const windowsDesktop = (platform = "", agent = "") =>
-  platform === "Windows" || /Windows NT/.test(agent);
+export function desktopExperience(platform = "", agent = "", touchPoints = 0) {
+  if (platform === "Windows" || /Windows NT/.test(agent)) return true;
+  // iPad can identify itself as a Mac when requesting desktop websites.
+  if (/iPad|iPhone|iPod/.test(agent) || touchPoints > 1) return false;
+  return /^(macOS|MacIntel|MacPPC)$/.test(platform) || /Macintosh/.test(agent);
+}
 export const angleDelta = (to, from) =>
   Math.atan2(Math.sin(to - from), Math.cos(to - from));
 
