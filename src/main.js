@@ -1,3 +1,4 @@
+import { isChest, mouseChest, reachableInteraction } from "./interaction.js";
 import {
   safeSpawn,
   stepBody,
@@ -80,6 +81,7 @@ import {
   requirementsMet,
 } from "./state.js";
 import "./journey.css";
+import "./scenery.css";
 const $ = (id) => document.getElementById(id),
   clamp = T.MathUtils.clamp;
 const QA =
@@ -114,7 +116,7 @@ class Game {
       52,
       innerWidth / innerHeight,
       0.1,
-      240,
+      750,
     );
     this.renderer = new T.WebGLRenderer({
       canvas: this.canvas,
@@ -376,10 +378,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         !this.photoMode
       ) {
         if (this.look.locked) {
-          if (e.button === 0) this.primaryAction();
+          if (e.button === 0) this.primaryAction(e);
           return;
         }
-        if (e.button === 0) this.primaryAction();
+        if (e.button === 0) this.primaryAction(e);
         if (this.ui.panel) return;
         this.look.capture();
       }
@@ -750,11 +752,49 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.save();
     this.ui.toast(`已切换${WEAPONS[id].name} · 左键使用`);
   }
-  primaryAction() {
+  primaryAction(event) {
     if (!this.started || this.ui.panel || this.photoMode) return;
     this.player.root.rotation.y = this.yaw + Math.PI;
     this.findInteraction();
     const p = this.player.root.position;
+    let aimed = null;
+    if (event && !this.look?.locked) {
+      const rect = this.canvas.getBoundingClientRect();
+      const ray = new T.Raycaster();
+      ray.setFromCamera(
+        new T.Vector2(
+          ((event.clientX - rect.left) / rect.width) * 2 - 1,
+          (-(event.clientY - rect.top) / rect.height) * 2 + 1,
+        ),
+        this.camera,
+      );
+      const hits = this.reachableItems.filter(isChest).flatMap((item) =>
+        ray
+          .intersectObject(item.object, true)
+          .filter((hit) => {
+            let o = hit.object;
+            while (o && o !== item.object) {
+              if (!o.visible) return false;
+              o = o.parent;
+            }
+            return true;
+          })
+          .map((hit) => ({ item, distance: hit.distance })),
+      );
+      aimed = hits.sort((a, b) => a.distance - b.distance)[0]?.item;
+    }
+    const chest = mouseChest(
+      this.world,
+      this.state,
+      p,
+      this.player.root.rotation.y,
+      this.reachableItems,
+      aimed,
+    );
+    if (chest) {
+      this.nearest = chest;
+      return this.interact();
+    }
     const threat = this.enemies.some(
       (e) =>
         e.hp > 0 &&
@@ -1245,22 +1285,15 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         return;
       }
       s.chests.push(item.id);
-      if (s.chapter === 1) {
-        grantTool(s, "compass", 2);
-        this.ui.toast("树洞的礼物 · 指南针 ×2 已放入道具栏，↑↓ 选择、G 使用");
-      }
-      if (s.chapter === 2) {
-        grantTool(s, "hat");
-        this.ui.toast("护身斗笠已放入道具栏 · 按 G 使用后抵挡一次伤害。");
-      }
-      if (s.chapter === 3) {
-        grantTool(s, "bell");
-        this.ui.toast("听风铃已放入道具栏 · ↑↓ 选择、G 使用，V 开关引导路线");
-      }
+      const extraTool = {
+        id: { 1: "compass", 2: "hat", 3: "bell" }[s.chapter],
+        quantity: s.chapter === 1 ? 2 : 1,
+      };
+      grantTool(s, extraTool.id, extraTool.quantity);
       this.audio.play("discover");
       this.world.sync(s);
       this.save();
-      this.ui.collection.offer("story-hidden");
+      this.ui.collection.offer("story-hidden", extraTool);
       return;
     }
     if (item.type === "uncle") {
@@ -1805,6 +1838,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const p = this.player.root.position;
     let best = null,
       bestDist = Infinity;
+    this.reachableItems = [];
     for (const item of this.world.interactables) {
       if (
         ["breakable", "field-loot"].includes(item.type) &&
@@ -1845,15 +1879,18 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       if (item.type === "badger" && this.state.basketReturned) continue;
       if (item.type === "mouse" && this.state.mouseRevealed) continue;
       if (item.type === "gate" && this.state.gateOpen) continue;
-      const d = Math.hypot(item.x - p.x, item.z - p.z);
-      if (d < item.radius && d < bestDist) {
+      if (!reachableInteraction(this.world, this.state, p, item)) continue;
+      this.reachableItems.push(item);
+      const d =
+        Math.hypot(item.x - p.x, item.z - p.z) - (isChest(item) ? 0.8 : 0);
+      if (d < bestDist) {
         best = item;
         bestDist = d;
       }
     }
     this.nearest = best;
     this.ui.prompt(best);
-    this.world.ring.visible = !!best;
+    this.world.ring.visible = !!best && !isChest(best);
     if (best) {
       this.world.ring.position.set(
         best.x,

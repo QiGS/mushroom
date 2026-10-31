@@ -11,6 +11,8 @@ export class SceneNotice {
     document.getElementById("hud").append(this.root);
   }
   show({ title, kicker, art = "", body = "", anchor }) {
+    this.root.classList.remove("reward-reveal");
+    this.entries = null;
     this.active = true;
     this.anchor = anchor
       ? new T.Vector3(
@@ -23,12 +25,41 @@ export class SceneNotice {
     this.root.querySelector("button").onclick = () => this.close();
     this.root.hidden = false;
   }
+  sequence(entries, anchor) {
+    this.show({ title: "", kicker: "", anchor });
+    this.root.classList.add("reward-reveal");
+    this.entries = entries;
+    this.shown = 0;
+    this.revealTime = 0;
+    this.lastTick = performance.now();
+    this.root.innerHTML =
+      '<div class="reward-list"></div><small class="reward-close">E 收好 · I 翻开图鉴</small>';
+    this.revealNext();
+  }
+  revealNext() {
+    const entry = this.entries[this.shown++];
+    const row = document.createElement("div");
+    row.className = "reward-drop";
+    row.innerHTML = `${entry.art || '<span class="reward-symbol">✧</span>'}<div><strong>${entry.title}</strong><small>${entry.detail}</small></div>`;
+    this.root.querySelector(".reward-list").append(row);
+    if (this.shown > 1) this.game.audio.play("collect");
+  }
   close() {
     this.active = false;
     this.root.hidden = true;
   }
   update() {
     if (!this.active) return;
+    if (this.entries) {
+      const now = performance.now();
+      this.revealTime += Math.min(0.1, (now - this.lastTick) / 1000);
+      this.lastTick = now;
+      if (
+        this.shown < this.entries.length &&
+        this.revealTime >= this.shown * 0.75
+      )
+        this.revealNext();
+    }
     if (this.anchor.distanceTo(this.game.player.root.position) > 7) {
       this.close();
       return;

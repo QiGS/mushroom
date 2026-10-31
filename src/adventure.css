@@ -65,7 +65,7 @@
 }
 .enemy-label b {
   display: block;
-  font: 9px sans-serif;
+  font: 9px var(--ui);
   margin-top: 4px;
 }
 #equipped-tools {
@@ -99,15 +99,15 @@
 }
 #equipped-tools kbd {
   margin-right: 4px;
-  font: 9px sans-serif;
+  font: 9px var(--ui);
   color: #d2b86f;
 }
 #equipped-tools b {
-  font: 9px sans-serif;
+  font: 9px var(--ui);
   color: #c9c1a0;
 }
 #equipped-tools small {
-  font: 9px sans-serif;
+  font: 9px var(--ui);
   color: #b9c9a6;
 }
 #aim-reticle {

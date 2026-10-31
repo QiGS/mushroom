@@ -108,13 +108,11 @@ export const collectionImage = (id) =>
 export const journalImage = (id, detail = false) =>
   `${import.meta.env?.BASE_URL || "./"}assets/journal/${id}-${detail ? "detail" : "card"}.webp`;
 export const TREASURES = [
-  { id: "trail", x: -5, z: 23, name: "村口的寻菌礼盒", area: "村口小径" },
-  { id: "bridge", x: -8, z: 11, name: "木桥旁的旧宝箱", area: "旧木桥" },
-  { id: "fern", x: -21, z: 7, name: "蕨叶里的宝箱", area: "蕨叶小径" },
-  { id: "shore", x: 14, z: -9, name: "湖畔的苔纹宝箱", area: "湖畔林缘" },
-  { id: "pine", x: 10, z: -24, name: "松影下的宝箱", area: "北方松林" },
-  { id: "ridge", x: -19, z: -26, name: "回声坡的宝箱", area: "回声坡" },
-  { id: "moon", x: 32, z: -24, name: "远径的寻菌礼盒", area: "远山小径" },
+  { id: "trail", x: -40, z: 17, name: "山脚古树的宝箱", area: "西麓林缘" },
+  { id: "shore", x: 66, z: 15, name: "谷底溪岸的宝箱", area: "峡谷南口" },
+  { id: "pine", x: 8, z: -65, name: "北境松影的宝箱", area: "北方松林" },
+  { id: "ridge", x: -68, z: -25.8, name: "风铃山巅的宝箱", area: "风铃山巅" },
+  { id: "moon", x: 82, z: -61, name: "东岭望月的宝箱", area: "峡谷东岸" },
 ];
 const COMMON_POINTS = [
   [-7, 20],

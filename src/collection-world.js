@@ -44,25 +44,13 @@ export function buildCollectionWorld(
   for (const box of TREASURES) {
     const group = place(box.x, box.z);
     const art = createChestVisual(group);
-    const glow = new T.Mesh(
-      new T.CircleGeometry(0.85, 32),
-      new T.MeshBasicMaterial({
-        color: 0xe9ce82,
-        transparent: true,
-        opacity: 0.14,
-        depthWrite: false,
-      }),
-    );
-    glow.rotation.x = -Math.PI / 2;
-    glow.position.y = 0.035;
-    group.add(glow);
-    boxes.set(box.id, { group, art, glow, opened: false });
+    boxes.set(box.id, { group, art, opened: false });
     interactables.push({
       ...box,
       type: "treasure",
       category: "林间宝箱 · 随机菌子与线索",
       object: group,
-      radius: 2.4,
+      radius: 2.9,
     });
   }
   for (const item of collectionLayout(chapter, day)) {
@@ -144,7 +132,6 @@ export function buildCollectionWorld(
     sync(state) {
       for (const [id, b] of boxes) {
         b.opened = state.collection.opened.includes(id);
-        b.glow.visible = !b.opened;
         b.art.setOpen(b.opened);
       }
       for (const [id, p] of specimens) {
@@ -153,9 +140,6 @@ export function buildCollectionWorld(
       }
     },
     update(t, state) {
-      for (const b of boxes.values()) {
-        b.glow.material.opacity = 0.11 + Math.sin(t * 2) * 0.035;
-      }
       for (const p of specimens.values())
         if (p.ring.visible)
           p.ring.scale.setScalar(1 + Math.sin(t * 2.5) * 0.08);

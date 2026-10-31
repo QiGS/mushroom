@@ -57,6 +57,25 @@ export function attachQA(game) {
     if (item) move(item.x, item.z + 1);
   });
   add("QA 交互", () => game.interact());
+  add("QA 左键", () => game.primaryAction());
+  add("QA 天气", () => {
+    move(4, 26);
+    game.ui.weather();
+  });
+  add("QA 奶奶", () => {
+    move(1, 28);
+    game.ui.grandma();
+  });
+  add("QA 谷底箱", () => {
+    move(66, 17);
+    game.yaw = 0;
+    game.pitch = 0.24;
+  });
+  add("QA 山顶箱", () => {
+    move(-68, -23.6);
+    game.yaw = 0;
+    game.pitch = 0.24;
+  });
   add("QA 盲盒", () => {
     const item = game.world.interactables.find(
       (i) =>
@@ -294,7 +313,7 @@ export function attachQA(game) {
   setInterval(() => {
     const p = game.player.root.position;
     status.textContent =
-      `${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} 高${p.y.toFixed(1)} HP${game.state.health} | 武器:${game.state.weapon} | 最近: ${game.nearest?.name || "无"} | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
+      `${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} 高${p.y.toFixed(1)} HP${game.state.health} | 武器:${game.state.weapon} | 最近: ${game.nearest?.name || "无"} | ${game.world.mountains.loaded}/6 山体 ${game.world.mountains.sections} 片 | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
       (game.desktopControls
         ? ` | 夜行:${game.enemies.filter((e) => e.night && e.hp > 0).length} | 游泳:${game.swimming} | 水中:${game.waterTimer.toFixed(1)} | 时刻:${daylight(game.state).hour.toFixed(1)} | 鼠标:${game.look?.locked ? "已捕获" : "自由"} | 镜头:${game.yaw.toFixed(2)},${game.pitch.toFixed(2)} | 骨骼:${game.motion?.rig.skeleton.bones.length || 0} | 步速:${game.motion?.speed.toFixed(2) || 0}`
         : "");

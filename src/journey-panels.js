@@ -1,3 +1,4 @@
+import { toolArt } from "./tool-art.js";
 import {
   ingredients,
   recipeFor,
@@ -97,7 +98,7 @@ export class JourneyPanels {
       mode === "tools"
         ? SHOP.map(
             (p) =>
-              `<article class="shop-item"><span>${p.icon}</span><h3>${p.name}</h3><p>${p.detail}</p><button data-tool-buy="${p.id}" ${s.coins < p.price ? "disabled" : ""}>购买 ${p.name} · ${p.price} 竹叶币</button></article>`,
+              `<article class="shop-item"><span>${toolArt(p)}</span><h3>${p.name}</h3><p>${p.detail}</p><button data-tool-buy="${p.id}" ${s.coins < p.price ? "disabled" : ""}>购买 ${p.name} · ${p.price} 竹叶币</button></article>`,
           ).join("")
         : mode === "ingredients"
           ? [

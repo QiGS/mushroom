@@ -68,7 +68,7 @@ npm run preview  # 预览生产构建
 
 ## 林间宝箱与菌子收藏
 
-村口小径就有第一只寻菌礼盒。每趟山林有 7 只探索宝箱，原有剧情宝箱还附送 1 份盲盒。靠近按 **E** 开箱，获得一种随机菌子与随机数量。奖励与新菌种以场景旁的小卡片呈现，不遮住整个画面；再次按 **E** 收起，走远也会自动收好。重复菌子累加到实际库存，可以烹饪或出售，图鉴的累计发现与首次记录永久保留；收藏菌不占任务食材背篓。
+每趟山林有 5 只分散的探索宝箱，原有剧情宝箱还附送 1 份盲盒。靠近按 **E** 或左键直接开箱，获得一种随机菌子与随机数量。奖励在场景中依次浮现，新菌种也会记入图鉴；再次按 **E** 收起，走远也会自动收好。重复菌子累加到实际库存，可以烹饪或出售，图鉴的累计发现与首次记录永久保留；收藏菌不占任务食材背篓。
 
 | 品质 | 菌种 | 盲盒基础概率 | 每盒数量 |
 | --- | --- | --- | --- |
@@ -82,7 +82,7 @@ npm run preview  # 预览生产构建
 
 每趟还会出现 6 种常见、2 种稀有和 1 种史诗菌的可采集实体。稀有种类轮换，史诗种类隔天交替。开箱便笺只指向本趟尚未采走的稀有或史诗菌，按 **M** 在地图查看搜索圈，并点击线索让指南针追踪。采走后线索消失，重游清空旧线索并刷新宝箱；收藏、星标和成就继续保留。旧版存档会自动补上收藏数据。
 
-宝箱使用新提供的关闭与开启两套 GLB，开启后保留开盖外观；每只探索宝箱还会发放一份随身道具。图鉴使用「菌子游戏资产」中的 12 张菌子卡片和 12 张详情插画。
+每趟有 **5 只分区探索宝箱**，分布在西麓、北林、山巅、峡谷南口谷底和东岭；另保留各章剧情宝箱。所有宝箱离出生点至少 25 米，彼此至少 24 米，出生地附近不再堆放。山顶与谷底均有可步行往返的路线。宝箱使用关闭与开启两套 GLB，靠近按 **E** 或左键直接打开；菌子、道具与线索依次浮现，没有背景框，再按 E 收好。奖励在开箱时一次性存档，提前收起不会丢失或重复领取。每只探索宝箱还会发放一份随身道具。图鉴使用「菌子游戏资产」中的 12 张菌子卡片和 12 张详情插画。
 
 ![夜间营火、奶奶与扁平道具栏](docs/journey-night-preview.png)
 
@@ -181,11 +181,12 @@ Windows 和 macOS 人物使用为原始模型新增的 16 关节程序化骨架�
 - `public/assets/traveler.glb` 来自项目所有者提供的 `主角_3d.glb`。原始约 195 万三角面 / 65 MB，经简化和贴图缩放后为 68,411 三角面 / 2.32 MB。素材权利归原权利方。
 - 12 种收藏菌与竹篮来自项目所有者在 `mushroom/` 中提供的 GLB。原始素材约 850 MB，这批运行模型共约 6 MB。新宝箱的两套 GLB 各简化至约 18,000 三角面，共约 2.5 MB；图鉴插画来自「菌子游戏资产」，24 张 WebP 共约 3.2 MB。优化统计见 `public/assets/collection/manifest.json`，素材权利归原权利方。
 - 奶奶与采菌大叔使用项目所有者新提供的 GLB，分别简化至约 30,000 三角面 / 1.38 MB。森林、竹林、村庄、其他角色、任务食材、水面、植物与粒子由 Three.js 程序化构建。没有使用任天堂模型、音乐或游戏资源。
+- 六种手绘道具图标来自 `道具二维/`，公告牌、奶奶对话框和 Logo 来自 `Jingmai_Mountains/`，经尺寸优化转为 WebP。六种山体 GLB 以 70 段实例组成近、中、远三层山景，按现有世界边界调整尺寸；山巅平台、峡谷岸线与通路由游戏地形提供。原始可选道具 GLB 不属于运行必需资产。
 - 主角源模型没有骨骼动画。Windows / macOS 运行时新增关节权重与程序化步态，其他平台保留原有形变动画；动作没有使用动作捕捉素材。
-- 环境音、提示音和轻柔旋律由 Web Audio 合成。标题使用项目提供的 Jingmai Handwriting UI Kit 中“寻菌景迈”透明手写字图。正文内置离线楷体，基于 [LXGW WenKai v1.522](https://github.com/lxgw/LxgwWenKai/releases/tag/v1.522) 子集化并改名为 Wildwood Wenkai UI，遵循 SIL OFL 1.1；完整许可证在 `public/assets/fonts/OFL.txt`，无需联网加载字体。
+- 环境音、提示音和轻柔旋律由 Web Audio 合成。标题使用项目提供的 Jingmai Handwriting UI Kit 中“寻菌景迈”透明手写字图。场景界面、地图与提示使用 Jingmai Rounded Font Kit 指定的源泉圆体：套件未附字体二进制，现基于官方 [GenSen Rounded v2.100](https://github.com/ButTaiwan/gensen-font/releases/tag/v2.100) 制作离线 WOFF2 子集，改名为 Jingmai Rounded UI。保留 SIL OFL 1.1 许可证在 `public/assets/fonts/GenSenRounded-OFL.txt`，无需联网加载字体。旧 Wenkai 文件与许可证保留供已有版本资源兼容。
 - 原始 GLB、参考图片、导出的 DOCX 和工作缓存不提交到仓库。可运行版本所需资源全部包含在 `public` 中。
 - 如需重新简化模型，把原始 `主角_3d.glb` 放在项目根目录，安装 Python 与 Pillow，然后执行 `npm run optimize`。
-- 重新处理收藏素材：将原始文件放入 `mushroom/`，安装 Python 的 Pillow、numpy，然后执行 `node scripts/optimize-collection.mjs`。图鉴插画放入 `菌子游戏资产/` 后执行 `python scripts/prepare-journal.py` 转为 WebP。日常运行无需这些原始文件或 Python。村民模型使用 `node scripts/prepare-villagers.mjs`；本地字体使用 `python scripts/prepare-font.py`（需要 fontTools 与 brotli，以及 `work/fonts/LXGWWenKai-Regular.ttf`）。
+- 重新处理收藏素材：将原始文件放入 `mushroom/`，安装 Python 的 Pillow、numpy，然后执行 `node scripts/optimize-collection.mjs`。图鉴插画放入 `菌子游戏资产/` 后执行 `python scripts/prepare-journal.py` 转为 WebP。日常运行无需这些原始文件或 Python。村民模型使用 `node scripts/prepare-villagers.mjs`；圆体字体使用 `python scripts/prepare-rounded-font.py`（需要 fontTools 与 brotli，以及官方 v2.100 的 `work/fonts/GenSenRounded2TC-R.otf`）；新山体及 UI 插画使用 `python scripts/prepare-scenery.py`，需要 Pillow 和用户提供的原始素材。以上脚本仅在重新制作素材时需要，克隆运行直接使用仓库内的优化结果。
 
 ## 项目结构
 

@@ -1,3 +1,4 @@
+import { toolArt } from "./tool-art.js";
 import { SceneNotice } from "./scene-notice.js";
 import { JourneyPanels } from "./journey-panels.js";
 import { daylight } from "./journey.js";
@@ -187,7 +188,7 @@ export class UI {
         ownedTools(s)
           .map(
             (t) =>
-              `<button data-bag-tool="${t.id}"><span>${t.icon}</span>${t.name} ×${s.tools[t.id]}<small>选入道具栏，返回后按 G 使用</small></button>`,
+              `<button data-bag-tool="${t.id}"><span>${toolArt(t)}</span>${t.name} ×${s.tools[t.id]}<small>选入道具栏，返回后按 G 使用</small></button>`,
           )
           .join("") || '<p class="map-note">道具已用完，探索宝箱可以补充。</p>'
       }</div>`,
@@ -316,7 +317,8 @@ export class UI {
     this.show(
       "今日山情",
       "WEATHER & WHISPERS",
-      `<div class="camp-intro">${{ sun: "☀ 晴天 · 视野清晰，菌窝较分散。", rain: "☂ 雨后 · 菌子冒了头，西边蕨叶旁多了一窝。", fog: "☁ 薄雾 · 远方朦胧，东侧深处可能出现额外菌窝。" }[s.weather]}</div><p class="panel-subtitle">${ch.hint}<br>天气与菌窝在出发时一同确定，线索始终对应本局实际位置。</p><div class="panel-footer"><span>距离天黑 ${Math.max(0, Math.ceil((ch.duration - s.elapsed) / 60))} 分钟</span><button id="weather-close">记下了，出发</button></div>`,
+      `<div class="weather-illustration"><img src="./assets/ui/weather-board.webp" alt="木制山情公告牌"/><div class="weather-writing"><h3>今日山情</h3><p>${{ sun: "☀ 晴天 · 视野清晰，菌窝较分散。", rain: "☂ 雨后 · 菌子冒了头，西边蕨叶旁多了一窝。", fog: "☁ 薄雾 · 远方朦胧，东侧深处可能出现额外菌窝。" }[s.weather]}</p><p>${ch.hint}</p><small>${daylight(s).isNight ? "夜色已深，小心林间游蛇。" : `距离天黑 ${Math.max(0, Math.ceil((ch.duration - s.elapsed) / 60))} 分钟`}</small></div></div><div class="weather-actions"><button id="weather-close">记下了，出发 →</button></div>`,
+      "weather",
     );
     $("weather-close").onclick = () => this.close();
   }
@@ -331,7 +333,7 @@ export class UI {
     this.show(
       "村口的烟火气",
       "HOME IS WHERE THE SOUP IS",
-      `<p class="camp-intro">“${s.settled ? "哟，这一篮菌子，可有故事了。来，今晚这桌饭，有你一份功劳。" : ch.intro}”</p><p class="panel-subtitle">${ch.hint}</p><div class="camp-actions"><button id="submit-harvest"><strong>${s.settled ? "查看山野餐桌" : "交付食材 · 开饭啦"}</strong><small>${Object.entries(
+      `<div class="grandma-dialog"><img src="./assets/ui/grandma-dialog.webp" alt="奶奶的手绘对话框"/><p>“${s.settled ? "哟，这一篮菌子，可有故事了。来，今晚这桌饭，有你一份功劳。" : ch.intro}”</p></div><p class="panel-subtitle">${ch.hint}</p><div class="camp-actions"><button id="submit-harvest"><strong>${s.settled ? "查看山野餐桌" : "交付食材 · 开饭啦"}</strong><small>${Object.entries(
         ch.requirements,
       )
         .map(
@@ -597,7 +599,7 @@ export class UI {
     );
     ctx.stroke();
     ctx.fillStyle = s.riverNoteFound ? "#819675" : "#ad8437";
-    ctx.font = `${large ? 19 : 12}px sans-serif`;
+    ctx.font = `${large ? 19 : 12}px JingmaiRounded, sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText(
       s.riverNoteFound ? "✓" : "▤",
@@ -605,7 +607,7 @@ export class UI {
       pz(RIVER_NOTE.z),
     );
     if (large) {
-      ctx.font = "11px sans-serif";
+      ctx.font = "11px JingmaiRounded, sans-serif";
       ctx.fillText("河心石台", px(RIVER_NOTE.x), pz(RIVER_NOTE.z) + 19);
     }
     ctx.lineWidth = large ? 7 : 3;
@@ -636,7 +638,7 @@ export class UI {
       ctx.fill();
     }
     ctx.fillStyle = "#496d4d";
-    ctx.font = `${large ? 19 : 13}px sans-serif`;
+    ctx.font = `${large ? 19 : 13}px JingmaiRounded, sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText("⌂", px(0), pz(30));
     for (const n of NESTS)
@@ -672,7 +674,7 @@ export class UI {
       )
         continue;
       ctx.fillStyle = opened ? "#9c9f7e" : "#a57936";
-      ctx.font = `${large ? 17 : 12}px sans-serif`;
+      ctx.font = `${large ? 17 : 12}px JingmaiRounded, sans-serif`;
       ctx.fillText(opened ? "▫" : "▣", px(box.x), pz(box.z));
     }
     for (const clue of activeClues(s)) {
@@ -693,14 +695,14 @@ export class UI {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = rarity.color;
-      ctx.font = `${large ? 18 : 12}px sans-serif`;
+      ctx.font = `${large ? 18 : 12}px JingmaiRounded, sans-serif`;
       ctx.fillText(
         rarity.icon,
         px(Math.round(clue.x / 3) * 3),
         pz(Math.round(clue.z / 3) * 3) + 4,
       );
       if (large) {
-        ctx.font = "11px sans-serif";
+        ctx.font = "11px JingmaiRounded, sans-serif";
         ctx.fillText(
           `${rarity.name}菌线索`,
           px(clue.x),
@@ -727,10 +729,10 @@ export class UI {
     ctx.stroke();
     for (const p of EXPLORATION_SPOTS) {
       ctx.fillStyle = s.surveyed.includes(p.id) ? "#697f56" : "#9c783e";
-      ctx.font = `${large ? 14 : 10}px sans-serif`;
+      ctx.font = `${large ? 14 : 10}px JingmaiRounded, sans-serif`;
       ctx.fillText("◇", px(p.x), pz(p.z));
       if (large) {
-        ctx.font = "11px sans-serif";
+        ctx.font = "11px JingmaiRounded, sans-serif";
         ctx.fillText(p.name, px(p.x), pz(p.z) - 12);
       }
     }
@@ -762,7 +764,7 @@ export class UI {
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = "#647551";
-      ctx.font = "10px sans-serif";
+      ctx.font = "10px JingmaiRounded, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("北", 0, -20);
       ctx.fillText("南", 0, 28);
@@ -873,10 +875,18 @@ export class UI {
       `${50 + Math.max(-45, Math.min(45, -diff * 25))}%`;
   }
   prompt(item) {
-    $("interaction").classList.toggle("hidden", !item);
+    $("interaction").classList.toggle("hidden", !item || this.notice.active);
+    $("interaction").classList.toggle(
+      "chest-prompt",
+      ["chest", "treasure"].includes(item?.type),
+    );
     if (item) {
       $("interact-label").textContent = item.name;
-      $("interact-category").textContent = item.category;
+      $("interact-category").textContent = ["chest", "treasure"].includes(
+        item.type,
+      )
+        ? "打开宝箱"
+        : item.category;
     }
   }
   saved() {

@@ -101,6 +101,19 @@ try {
     ["villagers/grandma.glb", "model/gltf-binary"],
     ["villagers/uncle.glb", "model/gltf-binary"],
     ["fonts/wildwood-wenkai.woff2", "font/woff2"],
+    ["fonts/jingmai-rounded.woff2", "font/woff2"],
+    ...["note", "fruit", "hat", "shoes", "bell", "compass"].map((id) => [
+      `tools/${id}.webp`,
+      "image/webp",
+    ]),
+    ...["weather-board", "grandma-dialog", "jingmai-logo"].map((id) => [
+      `ui/${id}.webp`,
+      "image/webp",
+    ]),
+    ...["near_A_v3", "near_B", "mid_A", "mid_B", "far_A", "far_B"].map((id) => [
+      `mountains/mountain_${id}.glb`,
+      "model/gltf-binary",
+    ]),
     ["ui/jingmai-title-white.png", "image/png"],
   ]) {
     const r = await fetch(`${url}assets/${file}`, {

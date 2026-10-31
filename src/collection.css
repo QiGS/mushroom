@@ -734,7 +734,7 @@
   font-weight: 600;
 }
 .map-clues h3 small {
-  font: 11px sans-serif;
+  font: 11px var(--ui);
   color: #8c9476;
   margin-left: 10px;
 }

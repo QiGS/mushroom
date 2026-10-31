@@ -1,12 +1,12 @@
 @font-face {
-  font-family: "Wildwood Wenkai";
-  src: url("/assets/fonts/wildwood-wenkai.woff2") format("woff2");
+  font-family: JingmaiRounded;
+  src: url("/assets/fonts/jingmai-rounded.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 html:root {
-  --ui: "Wildwood Wenkai", "Kaiti SC", STKaiti, KaiTi, serif;
+  --ui: JingmaiRounded, "Microsoft YaHei", sans-serif;
   --serif: var(--ui);
   font-family: var(--ui);
   font-synthesis: weight;

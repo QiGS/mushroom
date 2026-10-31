@@ -1,3 +1,4 @@
+import { addMountainBackdrop } from "./mountains.js";
 import { buildExplorationWorld } from "./exploration-world.js";
 import { addVillager } from "./villagers.js";
 import { daylight, NIGHT_SPAWNS } from "./journey.js";
@@ -185,6 +186,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   const ground = mesh(groundGeo, groundMat, root);
   ground.castShadow = false;
   const hillMat = material(0x748f78);
+  const hillFallback = new T.Group();
+  root.add(hillFallback);
   for (let i = 0; i < 20; i++) {
     const a = (i / 20) * Math.PI * 2,
       r = 130 + random() * 25;
@@ -192,13 +195,14 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     const mountain = mesh(
       new T.IcosahedronGeometry(1, 1),
       hillMat,
-      root,
+      hillFallback,
       Math.cos(a) * r,
       1,
       Math.sin(a) * r,
     );
     mountain.scale.set(21 + random() * 12, h, 20);
   }
+  const mountains = addMountainBackdrop(root, hillFallback);
   const safePoints = [
     ...NIGHT_SPAWNS.map(([x, z]) => ({ x, z, r: 3 })),
     ...EXPLORE_CLEARINGS,
@@ -743,6 +747,25 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     radius: 2.6,
   });
   const weatherBoard = sign(4, 25);
+  let boardTexture = null;
+  if (typeof document !== "undefined") {
+    boardTexture = new T.TextureLoader().load(
+      `${import.meta.env.BASE_URL}assets/ui/weather-board.webp`,
+    );
+    boardTexture.colorSpace = T.SRGBColorSpace;
+    const illustratedBoard = new T.Mesh(
+      new T.PlaneGeometry(2.6, 1.65),
+      new T.MeshStandardMaterial({
+        map: boardTexture,
+        transparent: true,
+        alphaTest: 0.12,
+        roughness: 1,
+        side: T.DoubleSide,
+      }),
+    );
+    illustratedBoard.position.set(0, 1.38, 0.09);
+    weatherBoard.add(illustratedBoard);
+  }
   interactables.push({
     type: "weather",
     name: "查看天气与线索",
@@ -1295,7 +1318,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         : state.weather === "fog"
           ? 0.025
           : 0.0125;
-    scene.fog.density = Math.abs(state.position.x) > 43 ? 0.007 : fogDensity;
+    scene.fog.density = Math.abs(state.position.x) > 43 ? 0.0045 : fogDensity;
     scene.fog.color
       .set(0xa5bca1)
       .lerp(new T.Color(0xc49e80), dusk * 0.35)
@@ -1339,6 +1362,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         obj.cloth.visible = state.markers.includes(obj.id);
   }
   function dispose() {
+    mountains.dispose();
+    boardTexture?.dispose();
     villagers.forEach((v) => v.dispose());
     collection.dispose();
     chestArt.dispose();
@@ -1356,6 +1381,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     ms.forEach((m) => m.dispose());
   }
   return {
+    mountains,
     collection,
     exploration,
     surfaces,

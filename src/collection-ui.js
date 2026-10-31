@@ -11,6 +11,7 @@ import {
 } from "./collection.js";
 import "./collection.css";
 import { TOOL_DEFS } from "./tools.js";
+import { toolArt } from "./tool-art.js";
 const $ = (id) => document.getElementById(id);
 const speciesById = (id) => COLLECTION.find((p) => p.id === id);
 const picture = (p, known = true, cls = "", detail = false) =>
@@ -149,7 +150,7 @@ export class CollectionUI {
     this.ui.map();
     this.ui.toast("线索已圈在地图上，沿指南针寻找搜索区域。");
   }
-  offer(boxId) {
+  offer(boxId, extraTool = null) {
     const s = this.game.state,
       result = openTreasure(s, boxId);
     if (!result.ok) return this.ui.toast(result.message, true);
@@ -159,12 +160,42 @@ export class CollectionUI {
     const anchor =
       this.game.nearest?.object.position || this.game.player.root.position;
     this.game.burst(anchor, 0xe6cc89, 20);
-    this.result(result, false, anchor);
+    this.result({ ...result, extraTool }, false, anchor);
   }
   result(reward, wild = false, anchor = this.game.nearest?.object.position) {
     const p = speciesById(reward.id),
       rarity = RARITIES[p.rarity],
       tool = TOOL_DEFS.find((t) => t.id === reward.tool?.id);
+    if (!wild) {
+      const entries = [
+        {
+          title: `${p.name} ×${reward.quantity}`,
+          detail: `${rarity.name} · ${reward.first ? "新菌种已记入图鉴" : "已收入行囊"}`,
+          art: `<img src="${collectionImage(p.id)}" alt=""/>`,
+        },
+      ];
+      for (const item of [reward.tool, reward.extraTool].filter(Boolean)) {
+        const definition = TOOL_DEFS.find((t) => t.id === item.id);
+        entries.push({
+          title: `${definition.name} ×${item.quantity}`,
+          detail: "已放入道具栏 · G 使用",
+          art: toolArt(definition),
+        });
+      }
+      if (reward.clue)
+        entries.push({
+          title: "采菌线索 ×1",
+          detail: "已记入地图 · M 查看",
+          art: toolArt(TOOL_DEFS.find((t) => t.id === "note")),
+        });
+      if (reward.bonus)
+        entries.push({
+          title: `竹叶币 +${reward.bonus}`,
+          detail: "收藏成就达成",
+        });
+      this.ui.notice.sequence(entries, anchor);
+      return;
+    }
     this.ui.notice.show({
       title: `${p.name} ×${reward.quantity}`,
       kicker: `${rarity.icon} ${rarity.name} · ${reward.first ? "初次相遇" : wild ? "林间采集" : "宝箱馈赠"}`,

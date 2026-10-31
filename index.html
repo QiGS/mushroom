@@ -12,13 +12,15 @@
       content="菌野：一场关于森林、菌子与慢时光的 3D 探索旅程。"
     />
     <title>菌野 · 寻菌景迈</title>
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" href="./favicon.png" />
   </head>
   <body>
     <canvas id="world" aria-label="菌野 3D 森林探索场景" tabindex="0"></canvas>
     <div id="vignette"></div>
     <div id="loading">
-      <div class="loading-mark">♧</div>
+      <div class="loading-mark">
+        <img src="./assets/ui/jingmai-logo.webp" alt="景迈菌子标志" />
+      </div>
       <span class="eyebrow">A LITTLE WILDER</span>
       <h1 class="loading-title">
         <img src="./assets/ui/jingmai-title-white.png" alt="寻菌景迈" />
@@ -28,6 +30,11 @@
     </div>
     <section id="welcome" class="hidden">
       <div class="title-wrap">
+        <img
+          class="welcome-logo"
+          src="./assets/ui/jingmai-logo.webp"
+          alt="景迈菌子标志"
+        />
         <div class="eyebrow">
           <span class="tiny-line"></span> A LITTLE WILDER
           <span class="tiny-line"></span>
@@ -56,7 +63,11 @@
     <main id="hud" class="hidden">
       <header class="top-bar">
         <div class="brand">
-          <span class="brand-symbol">♧</span>
+          <img
+            class="brand-logo"
+            src="./assets/ui/jingmai-logo.webp"
+            alt="景迈菌子标志"
+          />
           <div>
             <img
               class="hud-title"

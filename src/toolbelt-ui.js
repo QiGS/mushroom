@@ -1,3 +1,4 @@
+import { toolArt } from "./tool-art.js";
 import { TOOL_DEFS, ownedTools, normalizeToolSelection } from "./tools.js";
 import "./toolbelt.css";
 export class ToolbeltUI {
@@ -32,7 +33,7 @@ export class ToolbeltUI {
       ? list
           .map(
             (t) =>
-              `<button class="tool-slot ${s.selectedTool === t.id ? "selected" : ""}" data-tool="${t.id}" title="${t.name}：${t.description}" aria-label="选择${t.name}，剩余 ${s.tools[t.id]} 个" aria-pressed="${s.selectedTool === t.id}"><span style="color:${t.color}">${t.icon}</span><small>${t.name}</small><b>×${s.tools[t.id]}</b></button>`,
+              `<button class="tool-slot ${s.selectedTool === t.id ? "selected" : ""}" data-tool="${t.id}" title="${t.name}：${t.description}" aria-label="选择${t.name}，剩余 ${s.tools[t.id]} 个" aria-pressed="${s.selectedTool === t.id}"><span style="color:${t.color}">${toolArt(t)}</span><small>${t.name}</small><b>×${s.tools[t.id]}</b></button>`,
           )
           .join("")
       : '<p class="empty-tools">行囊空了 · 可向奶奶补给，或到灶台烹饪</p>';
@@ -44,6 +45,9 @@ export class ToolbeltUI {
           this.update();
         }),
     );
+    this.root
+      .querySelector(".tool-slot.selected")
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
     for (const id of ["tool-prev", "tool-next", "tool-use"])
       document.getElementById(id).disabled = !list.length;
     document.getElementById("tool-caption").textContent = selected

@@ -23,7 +23,7 @@
   letter-spacing: 2px;
 }
 .belt-heading small {
-  font: 10px sans-serif;
+  font: 10px var(--ui);
   letter-spacing: 1px;
   color: #c3bfa4;
 }
@@ -78,7 +78,7 @@
   display: block;
 }
 .tool-slot small {
-  font: 9px sans-serif;
+  font: 9px var(--ui);
   display: block;
   margin-top: 4px;
   white-space: nowrap;
@@ -87,7 +87,7 @@
   position: absolute;
   right: 3px;
   top: 1px;
-  font: 9px sans-serif;
+  font: 9px var(--ui);
   color: #f9e6b5;
 }
 #tool-use {

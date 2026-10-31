@@ -14,16 +14,31 @@ export function terrainHeight(x, z) {
     Math.cos(x * 0.18 - z * 0.1) * 0.22;
   const lake = Math.hypot((x - 25) / 8.5, (z + 4) / 13);
   const waterBlend = clamp((1.2 - lake) / 0.3, 0, 1);
-  const mountain =
+  const mountain = Math.min(
+    30.6,
     34 *
-    Math.max(0, 1 - Math.hypot((x + 68) / 32, (z + 29) / 45)) ** 1.2 *
-    (1 - smooth(-54, -50, x));
-  const length = smooth(-86, -72, z) * (1 - smooth(12, 28, z));
+      Math.max(0, 1 - Math.hypot((x + 68) / 32, (z + 29) / 45)) ** 1.2 *
+      (1 - smooth(-54, -50, x)),
+  );
+  const length = smooth(-86, -72, z) * (1 - smooth(10, 38, z));
   const plateau = 8 * smooth(40, 51, x) * length;
   const gorge =
     20 * (1 - smooth(5, 7.5, Math.abs(x - canyonCenter(z)))) * length;
+  // The southern dry approach rises through the water surface, so the river
+  // meets a shore instead of ending as a floating rectangular sheet.
+  const shore =
+    3 *
+    smooth(0, 12, z) *
+    (1 - smooth(26, 38, z)) *
+    length *
+    (1 - smooth(4.7, 7.5, Math.abs(x - canyonCenter(z))));
   return (
-    base * (1 - waterBlend) - 1.1 * waterBlend + mountain + plateau - gorge
+    base * (1 - waterBlend) -
+    1.1 * waterBlend +
+    mountain +
+    plateau -
+    gorge +
+    shore
   );
 }
 export function waterLevel(x, z) {
