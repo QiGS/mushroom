@@ -169,6 +169,9 @@ export function newGame() {
     completed: false,
     settled: false,
     tools: newTools(),
+    pantry: { water: 3, rice: 2, salt: 2, herb: 1 },
+    cooked: [],
+    houseLoot: {},
     gear: { axe: 0, rifle: 0, boots: 0 },
     weapon: "staff",
     timber: 0,
@@ -272,6 +275,13 @@ export function sanitizeSave(raw) {
   s.day = Math.max(1, Math.floor(s.day));
   s.collection = sanitizeCollection(raw.collection, s.chapter, s.day);
   s.tools = sanitizeTools(raw.tools, raw);
+  for (const id of Object.keys(s.pantry))
+    s.pantry[id] = Math.floor(finite(raw.pantry?.[id], s.pantry[id], 0, 99));
+  s.cooked = Array.isArray(raw.cooked)
+    ? [...new Set(raw.cooked.filter((v) => typeof v === "string"))].slice(0, 30)
+    : [];
+  for (const id of ["house-fruit", "house-note", "house-hat"])
+    s.houseLoot[id] = finite(raw.houseLoot?.[id], 0, 0, s.playSeconds + 180);
   for (const [id, limit] of Object.entries({ axe: 30, rifle: 12, boots: 5 }))
     s.gear[id] = Math.floor(finite(raw.gear?.[id], 0, 0, limit));
   s.weapon =
@@ -308,6 +318,8 @@ export function startChapter(old, chapter, weather) {
     "capacity",
     "totalCollected",
     "tools",
+    "pantry",
+    "cooked",
     "gear",
     "weapon",
     "timber",

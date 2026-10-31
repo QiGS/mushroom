@@ -16,6 +16,7 @@ const mime = {
   '.jpg': 'image/jpeg',
   '.webp': 'image/webp',
   '.glb': 'model/gltf-binary',
+  '.woff2': 'font/woff2',
 };
 
 function openBrowser(url) {

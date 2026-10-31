@@ -9,6 +9,7 @@ import {
 export { surfaceHeight } from "./terrain.js";
 import { CAMP, requirementsMet } from "./state.js";
 import { activeClues, TREASURES } from "./collection.js";
+import { missionTarget } from "./mission.js";
 
 export const RIVER_NOTE = {
   id: "river-note",
@@ -63,20 +64,22 @@ export function navigationTarget(s) {
       name: `${tracked.species.area} · ${tracked.species.rarity === "epic" ? "史诗" : "稀有"}菌线索`,
       kind: "clue",
     };
-  if (!s.riverNoteFound)
-    return { ...RIVER_NOTE, kind: "river", name: "河心线索" };
-  const clue = activeClues(s)[0];
-  if (clue)
-    return { ...clue, kind: "clue", name: `${clue.species.area} · 菌子线索` };
-  if (requirementsMet(s)) return { ...CAMP, kind: "camp", name: "山野村庄" };
-  const box = TREASURES.filter((b) => !s.collection.opened.includes(b.id)).sort(
-    (a, b) =>
-      Math.hypot(a.x - s.position.x, a.z - s.position.z) -
-      Math.hypot(b.x - s.position.x, b.z - s.position.z),
-  )[0];
-  return box
-    ? { ...box, kind: "treasure" }
-    : { ...CAMP, kind: "camp", name: "山野村庄" };
+  return missionTarget(s);
+}
+
+export function finishGuidance(s, position, world) {
+  if (!s.guidance && !s.waypoint && !s.collection.track) return null;
+  const destination = navigationTarget(s);
+  if (
+    Math.hypot(position.x - destination.x, position.z - destination.z) >= 2.2 ||
+    Math.abs(position.y - surfaceHeight(world, destination.x, destination.z)) >=
+      2
+  )
+    return null;
+  s.guidance = false;
+  s.waypoint = null;
+  s.collection.track = null;
+  return destination;
 }
 
 // A* over the same collision, water and gate rules used by the player.

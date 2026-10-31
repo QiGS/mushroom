@@ -7,6 +7,7 @@ import {
   canyonCenter,
 } from "./terrain.js";
 import { BREAKABLES, EXPLORATION_SPOTS } from "./exploration.js";
+import { HOUSE_SUPPLIES, supplyReady } from "./journey.js";
 
 export function buildExplorationWorld(
   root,
@@ -128,6 +129,36 @@ export function buildExplorationWorld(
   const lamp = new T.PointLight(0xffd699, 2.5, 9);
   lamp.position.set(0, 2.8, 0);
   house.add(lamp);
+  const supplies = HOUSE_SUPPLIES.map((p) => {
+    const g = group(p.x, p.z, base + 0.12);
+    add(
+      g,
+      new T.SphereGeometry(0.16, 10, 7),
+      p.tool === "fruit" ? 0xd9a468 : 0xc4cca3,
+      0,
+      0.22,
+    );
+    const aura = new T.Mesh(
+      new T.RingGeometry(0.2, 0.26, 24),
+      new T.MeshBasicMaterial({
+        color: 0xf2d99a,
+        transparent: true,
+        opacity: 0.7,
+        side: T.DoubleSide,
+      }),
+    );
+    aura.rotation.x = -Math.PI / 2;
+    aura.position.y = 0.04;
+    g.add(aura);
+    interactables.push({
+      ...p,
+      type: "house-supply",
+      object: g,
+      radius: 1.25,
+      category: "小屋补给 · 每三分钟刷新",
+    });
+    return { p, g };
+  });
   const doorMarker = group(-6, 37.4);
   add(
     doorMarker,
@@ -461,6 +492,7 @@ export function buildExplorationWorld(
   return {
     props,
     house,
+    cameraOccluders: [...walls.map((w) => w.mesh), roof, lintel, door],
     bridge,
     hit(id, damage) {
       const p = props.get(id);
@@ -479,6 +511,10 @@ export function buildExplorationWorld(
       }
     },
     update(t, s) {
+      for (const { p, g } of supplies) {
+        g.visible = supplyReady(s, p.id);
+        g.children[0].position.y = 0.25 + Math.sin(t * 2) * 0.035;
+      }
       const inside = insideHouse(s.position.x, s.position.z);
       roof.visible = lintel.visible = !inside;
       for (const w of walls)

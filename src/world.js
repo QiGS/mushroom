@@ -1,4 +1,6 @@
 import { buildExplorationWorld } from "./exploration-world.js";
+import { addVillager } from "./villagers.js";
+import { daylight, NIGHT_SPAWNS } from "./journey.js";
 import { EXPLORE_CLEARINGS } from "./exploration.js";
 import * as T from "three";
 import { createChestVisual } from "./chest-model.js";
@@ -111,6 +113,30 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   const fill = new T.DirectionalLight(0x9fd7db, 0.45);
   fill.position.set(30, 20, -30);
   root.add(fill);
+  const moon = new T.Mesh(
+    new T.SphereGeometry(2.1, 16, 12),
+    new T.MeshBasicMaterial({ color: 0xf4eacd, fog: false }),
+  );
+  root.add(moon);
+  const starsGeo = new T.BufferGeometry(),
+    stars = [];
+  for (let i = 0; i < 160; i++) {
+    const a = i * 2.39996,
+      r = 90 + (i % 7) * 8;
+    stars.push(Math.cos(a) * r, 55 + (i % 13) * 4, Math.sin(a) * r);
+  }
+  starsGeo.setAttribute("position", new T.Float32BufferAttribute(stars, 3));
+  const starfield = new T.Points(
+    starsGeo,
+    new T.PointsMaterial({
+      color: 0xc2d6eb,
+      size: 0.33,
+      transparent: true,
+      opacity: 0,
+      fog: false,
+    }),
+  );
+  root.add(starfield);
   const groundGeo = new T.PlaneGeometry(240, 240, 240, 240);
   groundGeo.rotateX(-Math.PI / 2);
   const positions = groundGeo.attributes.position,
@@ -174,6 +200,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     mountain.scale.set(21 + random() * 12, h, 20);
   }
   const safePoints = [
+    ...NIGHT_SPAWNS.map(([x, z]) => ({ x, z, r: 3 })),
     ...EXPLORE_CLEARINGS,
     { x: 0, z: 30, r: 10 },
     { x: 0, z: -38, r: 9 },
@@ -692,7 +719,11 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     });
     return g;
   }
-  const grandma = npc(1, 29, 0x75685a);
+  const grandma = at(1, 29),
+    grandmaFallback = npc(0, 0, 0x75685a);
+  grandmaFallback.position.set(0, 0, 0);
+  grandma.add(grandmaFallback);
+  const villagers = [addVillager(grandma, "grandma", grandmaFallback)];
   interactables.push({
     type: "grandma",
     name: "与奶奶交谈",
@@ -982,7 +1013,11 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     badger = null,
     mouse = null;
   if (chapter === 3) {
-    uncle = npc(-25, 5, 0x6a7a8c);
+    uncle = at(-25, 5);
+    const fallback = npc(0, 0, 0x6a7a8c);
+    fallback.position.set(0, 0, 0);
+    uncle.add(fallback);
+    villagers.push(addVillager(uncle, "uncle", fallback));
     interactables.push({
       type: "uncle",
       name: "询问采菌大叔",
@@ -1229,6 +1264,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     surfaces,
   );
   function update(t, state) {
+    villagers.forEach((v) => v.update(t));
     exploration.update(t, state);
     sun.position.set(
       state.position.x - 30,
@@ -1239,11 +1275,20 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     collection.update(t, state);
     time.value = t;
     for (const fn of animated) fn(t);
-    const phase = state.elapsed / (600 + state.chapter * 60);
-    const dusk = Math.max(0, Math.min(1, (phase - 0.68) / 0.35));
-    sun.color.set(0xffe6ae).lerp(new T.Color(0xffa166), dusk);
-    sun.intensity = 2.6 - dusk * 1.1;
-    hemi.intensity = 1.65 - dusk * 0.4;
+    const clock = daylight(state),
+      night = clock.night;
+    moon.visible = night > 0.15;
+    moon.position.set(state.position.x - 55, 68, state.position.z - 85);
+    starfield.material.opacity = night * 0.8;
+    const dusk = Math.sin(night * Math.PI);
+    sun.color
+      .set(0xffe6ae)
+      .lerp(new T.Color(0xffa166), dusk)
+      .lerp(new T.Color(0x9ab4df), night);
+    sun.intensity = 2.6 * (1 - night) + 0.11 * night;
+    hemi.intensity = 1.65 * (1 - night) + 0.2 * night;
+    hemi.color.set(0xd9eddf).lerp(new T.Color(0x91acd2), night);
+    fill.intensity = 0.45 * (1 - night) + 0.07 * night;
     const fogDensity =
       state.chapter === 3
         ? 0.021 + Math.sin(t * 0.16) * 0.008
@@ -1251,7 +1296,10 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
           ? 0.025
           : 0.0125;
     scene.fog.density = Math.abs(state.position.x) > 43 ? 0.007 : fogDensity;
-    scene.fog.color.set(0xa5bca1).lerp(new T.Color(0xc49e80), dusk * 0.35);
+    scene.fog.color
+      .set(0xa5bca1)
+      .lerp(new T.Color(0xc49e80), dusk * 0.35)
+      .lerp(new T.Color(0x0b172b), night);
     scene.background.copy(scene.fog.color);
     dishes.forEach((d, i) => (d.visible = state.recipes.length > i));
     if (badger && !state.basketReturned) {
@@ -1291,6 +1339,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         obj.cloth.visible = state.markers.includes(obj.id);
   }
   function dispose() {
+    villagers.forEach((v) => v.dispose());
     collection.dispose();
     chestArt.dispose();
     scene.remove(root);

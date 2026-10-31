@@ -97,6 +97,20 @@ try {
       assert.ok(Number(asset.headers.get("content-length")) > 1000);
     }),
   );
+  for (const [file, mime] of [
+    ["villagers/grandma.glb", "model/gltf-binary"],
+    ["villagers/uncle.glb", "model/gltf-binary"],
+    ["fonts/wildwood-wenkai.woff2", "font/woff2"],
+    ["ui/jingmai-title-white.png", "image/png"],
+  ]) {
+    const r = await fetch(`${url}assets/${file}`, {
+      ...options,
+      method: "HEAD",
+    });
+    assert.equal(r.status, 200, file);
+    assert.equal(r.headers.get("content-type"), mime);
+    assert.ok(Number(r.headers.get("content-length")) > 1000);
+  }
   assert.equal((await fetch(`${url}missing-file`, options)).status, 404);
   assert.equal((await fetch(url, { ...options, method: "POST" })).status, 405);
   assert.equal(
@@ -104,7 +118,7 @@ try {
     400,
   );
   console.log(
-    `Launcher passed on ${process.platform}/${process.arch}: page, traveler, 30 collection assets, 24 journal illustrations, HTTP boundaries.`,
+    `Launcher passed on ${process.platform}/${process.arch}: page, traveler, 30 collection assets, 24 journal illustrations, villagers, offline font, title artwork, HTTP boundaries.`,
   );
 } finally {
   if (!exited) child.kill("SIGTERM");

@@ -1,8 +1,13 @@
 // Local development only. This module is excluded from production builds.
 import { terrainHeight, CHAPTERS } from "./state.js";
-import { activeClues } from "./collection.js";
+import {
+  activeClues,
+  collectSpecimen,
+  collectionLayout,
+} from "./collection.js";
 import { RIVER_NOTE, surfaceHeight } from "./navigation.js";
 import { grantTool, TOOL_DEFS } from "./tools.js";
+import { daylight } from "./journey.js";
 export function attachQA(game) {
   const bar = document.createElement("div");
   bar.id = "qa-controls";
@@ -13,6 +18,11 @@ export function attachQA(game) {
     game.player.root.position.set(x, surfaceHeight(game.world, x, z), z);
     game.state.position = { x, z };
     game.vertical = 0;
+    game.collectTime = 0;
+    game.slowTime = 0;
+    game.dodgeTime = 0;
+    game.swimming = false;
+    game.waterTimer = 0;
     game.grounded = true;
     game.fallPeak = game.player.root.position.y;
     game.velocity.set(0, 0, 0);
@@ -52,7 +62,12 @@ export function attachQA(game) {
       (i) =>
         i.type === "treasure" && !game.state.collection.opened.includes(i.id),
     );
-    if (item) move(item.x, item.z + 0.8);
+    if (item) {
+      move(item.x, item.z + 0.8);
+      game.yaw = 0;
+      game.pitch = 0.3;
+      game.distance = 9;
+    }
   });
   add("QA 收藏", () => {
     const item = game.world.interactables.find(
@@ -130,10 +145,54 @@ export function attachQA(game) {
     game.keys.clear();
   });
   add("QA 落水", () => {
-    move(30, -4);
+    move(22, 0);
     game.state.health = 5;
-    game.safePosition = { x: 15, z: -4 };
-    game.updatePlayer(0.05);
+    game.state.gear.boots = 0;
+    for (let i = 0; i < 187; i++) game.updatePlayer(1 / 60);
+    game.ui.journal();
+  });
+  add("QA 游回岸", () => {
+    game.ui.close();
+    game.yaw = Math.PI / 2;
+    game.keys.add("KeyW");
+    for (let i = 0; i < 180 && game.player.root.position.x > 15; i++)
+      game.updatePlayer(1 / 60);
+    game.keys.clear();
+    game.ui.journal();
+  });
+  add("QA 白天", () => {
+    game.state.elapsed = 0;
+    game.updateNightPopulation();
+  });
+  add("QA 黑夜", () => {
+    game.state.elapsed = CHAPTERS[game.state.chapter - 1].duration + 80;
+    game.updateNightPopulation();
+  });
+  add("QA 灶台", () => {
+    move(4, 27.5);
+    game.state.inventory.wild = 16;
+    game.state.nests = ["fallen-log"];
+    game.state.talked = true;
+    for (const p of collectionLayout(game.state.chapter, game.state.day).slice(
+      0,
+      3,
+    ))
+      collectSpecimen(game.state, p.id);
+    game.state.pantry = { water: 3, rice: 2, salt: 2, herb: 1 };
+    game.ui.cooking();
+  });
+  add("QA 补给", () => {
+    game.state.unlocked = 3;
+    move(-8, 34);
+  });
+  add("QA 补给刷新", () => {
+    game.state.playSeconds += 181;
+    game.findInteraction();
+  });
+  add("QA 抵达", () => {
+    game.state.waypoint = { x: 25, z: -4, kind: "river" };
+    game.state.guidance = true;
+    move(25, -4);
   });
   add("QA 跌落", () => {
     move(-42, -29);
@@ -237,8 +296,16 @@ export function attachQA(game) {
     status.textContent =
       `${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} 高${p.y.toFixed(1)} HP${game.state.health} | 武器:${game.state.weapon} | 最近: ${game.nearest?.name || "无"} | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
       (game.desktopControls
-        ? ` | 鼠标:${game.look?.locked ? "已捕获" : "自由"} | 镜头:${game.yaw.toFixed(2)},${game.pitch.toFixed(2)} | 骨骼:${game.motion?.rig.skeleton.bones.length || 0} | 步速:${game.motion?.speed.toFixed(2) || 0}`
+        ? ` | 夜行:${game.enemies.filter((e) => e.night && e.hp > 0).length} | 游泳:${game.swimming} | 水中:${game.waterTimer.toFixed(1)} | 时刻:${daylight(game.state).hour.toFixed(1)} | 鼠标:${game.look?.locked ? "已捕获" : "自由"} | 镜头:${game.yaw.toFixed(2)},${game.pitch.toFixed(2)} | 骨骼:${game.motion?.rig.skeleton.bones.length || 0} | 步速:${game.motion?.speed.toFixed(2) || 0}`
         : "");
   }, 500);
-  document.body.append(bar);
+  const toggle = document.createElement("button");
+  toggle.textContent = "QA 面板";
+  toggle.style.cssText =
+    "position:fixed;right:8px;top:8px;z-index:91;font:11px sans-serif;padding:4px;background:#e9e4ce;color:#23382d";
+  toggle.onclick = () => {
+    bar.hidden = !bar.hidden;
+    bar.style.display = bar.hidden ? "none" : "flex";
+  };
+  document.body.append(bar, toggle);
 }

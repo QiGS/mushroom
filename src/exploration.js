@@ -1,6 +1,27 @@
 import { grantTool } from "./tools.js";
 export const SHOP = [
   {
+    id: "note",
+    price: 16,
+    name: "采菌便笺",
+    icon: "▤",
+    detail: "揭示未发现的稀有或史诗菌线索",
+  },
+  {
+    id: "bell",
+    price: 20,
+    name: "听风铃",
+    icon: "♧",
+    detail: "标记已发现的地标，雾山寻路的帮手",
+  },
+  {
+    id: "shoes",
+    price: 18,
+    name: "疾风草鞋",
+    icon: "➶",
+    detail: "G 使用，获得 8 秒加速",
+  },
+  {
     id: "fruit",
     price: 12,
     name: "回复果",
@@ -33,7 +54,7 @@ export const SHOP = [
     price: 30,
     name: "防水鞋",
     icon: "♧",
-    detail: "G 穿戴 · 5 次落水保护 · 落水扣血由 2 减至 1",
+    detail: "G 穿戴 · 5 次水中伤害减免 · 每次扣血由 2 减至 1",
   },
   {
     id: "hat",

@@ -22,6 +22,7 @@ shutil.copytree(project / 'dist', stage / 'dist')
 (stage / 'runtime').mkdir()
 (stage / 'scripts').mkdir()
 (stage / 'licenses').mkdir()
+shutil.copy2(project / 'public/assets/fonts/OFL.txt', stage / 'licenses/Wildwood-Wenkai-OFL.txt')
 shutil.copy2(runtime, stage / 'runtime' / 'node.exe')
 shutil.copy2(runtime.parent / 'LICENSE', stage / 'licenses' / 'Node.js-LICENSE.txt')
 shutil.copy2(project / 'scripts' / 'serve-game.cjs', stage / 'scripts' / 'serve-game.cjs')
@@ -64,11 +65,16 @@ B 背篓；I 图鉴；M 地图；L 手记；Esc 设置。
 左键击打高草、陶罐、木箱；斧子可砍竹，掉落物再按 E 或左键拾取。
 怪物头顶显示种类与血量。装备条显示斧子耐久、猎枪弹药和防水次数。
 第一章完成后可走入村庄小屋歇脚。地图可追踪山巅、断崖、峡谷和商店。
-高处跌落和落水会扣血；地图边缘逐渐泛红，提示尚未开放。
+高处跌落会扣血；水中每 3 秒持续扣血，WASD 游回岸边停止伤害。地图边缘逐渐泛红。
 村口小径有第一只寻菌礼盒。靠近按 E 开盲盒，随机获得不同数量的收藏菌。
 I 查看 12 种菌子图鉴、重复数量和星标；M 查看宝箱便笺并追踪稀有菌搜索圈。
 沿木浮桥走到月牙潭中央，按 E 获取便笺和指南针，选中后按 G 将线索记入地图。
-收藏永久保留，不占料理背篓；重游刷新宝箱与野生收藏菌。
+图鉴发现记录永久保留，持有菌子可在奶奶处卖出或自由烹饪；重游刷新宝箱与野生收藏菌。
+宝箱和新菌种使用场景小卡片，再按 E 收起；V 虚线抵达目标后自动消失。
+灶台九宫格选择食材，配方匹配后点击成品；普通料理进入底部扁平道具栏，G 食用。
+奶奶处可购买任务食材、烹饪调料与道具。已解锁的小屋内补给每 3 分钟实际游玩刷新。
+夜间光线变暗，月光和营火照明；夜行竹叶青等怪物增多，4 分钟后天亮。
+奶奶和大叔使用新模型，标题采用提供的手写字图，正文字体内置离线加载。
 游戏进度保存在当前浏览器。请使用相同浏览器和地址继续游玩。
 
 内容

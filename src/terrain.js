@@ -92,6 +92,8 @@ export function safeSpawn(world, s, position) {
 export function stepBody(world, s, body, dx, dz, dt) {
   const p = body.position,
     b = WORLD_BOUNDS;
+  const oldWater = waterLevel(p.x, p.z),
+    wasSwimming = body.swimming === true;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.15));
   const blocked = (x, z) =>
     world.colliders.some(
@@ -113,7 +115,11 @@ export function stepBody(world, s, body, dx, dz, dt) {
       const rise =
         surfaceHeight(world, x, z) -
         Math.max(p.y, surfaceHeight(world, p.x, p.z));
-      if (!blocked(x, z) && rise <= Math.max(0.24, Math.abs(amount) * 1.3))
+      const bankStep =
+        wasSwimming && surfaceHeight(world, x, z) <= oldWater + 0.8
+          ? 1.55
+          : 0.24;
+      if (!blocked(x, z) && rise <= Math.max(bankStep, Math.abs(amount) * 1.3))
         p[axis] = v;
     }
   }
@@ -135,8 +141,18 @@ export function stepBody(world, s, body, dx, dz, dt) {
     body.fallPeak = floor;
   } else body.grounded = false;
   const water = waterLevel(p.x, p.z);
+  const swimming =
+    Number.isFinite(water) && floor < water - 0.35 && p.y < water + 0.15;
+  if (swimming) {
+    p.y = water - 0.72;
+    body.vertical = 0;
+    body.grounded = false;
+    body.fallPeak = p.y;
+    landed = 0;
+  }
+  body.swimming = swimming;
   return {
     landed,
-    water: Number.isFinite(water) && floor < water - 0.35 && p.y < water + 0.15,
+    water: swimming,
   };
 }

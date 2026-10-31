@@ -11,7 +11,7 @@
       name="description"
       content="菌野：一场关于森林、菌子与慢时光的 3D 探索旅程。"
     />
-    <title>菌野 · 美味菌子在哪里</title>
+    <title>菌野 · 寻菌景迈</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   </head>
   <body>
@@ -20,7 +20,9 @@
     <div id="loading">
       <div class="loading-mark">♧</div>
       <span class="eyebrow">A LITTLE WILDER</span>
-      <h1>菌野</h1>
+      <h1 class="loading-title">
+        <img src="./assets/ui/jingmai-title-white.png" alt="寻菌景迈" />
+      </h1>
       <p id="loading-text">让风穿过树林…</p>
       <div class="loading-track"><i id="loading-progress"></i></div>
     </div>
@@ -30,7 +32,11 @@
           <span class="tiny-line"></span> A LITTLE WILDER
           <span class="tiny-line"></span>
         </div>
-        <h1>菌<span>野</span><small>风起的地方，万物生长。</small></h1>
+        <h1 class="jingmai-heading">
+          <img src="./assets/ui/jingmai-title-white.png" alt="寻菌景迈" /><small
+            >风起的地方，万物生长。</small
+          >
+        </h1>
         <p class="intro">
           背上行囊，走进一片会呼吸的森林。<br />寻找雨后的菌子，也找回久违的慢时光。
         </p>
@@ -51,7 +57,13 @@
       <header class="top-bar">
         <div class="brand">
           <span class="brand-symbol">♧</span>
-          <div><b>菌野</b><small>A LITTLE WILDER</small></div>
+          <div>
+            <img
+              class="hud-title"
+              src="./assets/ui/jingmai-title-white.png"
+              alt="寻菌景迈"
+            /><small>A LITTLE WILDER</small>
+          </div>
         </div>
         <div id="compass" aria-label="指南针">
           <span>W</span><i>·</i><span>N</span><i>·</i><span>E</span>
@@ -74,7 +86,7 @@
         </div>
       </section>
       <button id="route-status" aria-label="切换虚线引导">
-        <kbd>V</kbd><span id="route-label">河心线索</span
+        <kbd>V</kbd><span id="route-label">先与奶奶交谈</span
         ><small id="route-distance"></small>
       </button>
       <section id="toolbelt" aria-label="随身道具栏"></section>

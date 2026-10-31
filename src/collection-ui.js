@@ -73,7 +73,7 @@ export class CollectionUI {
       <div class="book-detail-heading"><div><span class="book-number">FIELD NOTE / ${String(COLLECTION.indexOf(p) + 1).padStart(2, "0")}</span><h3>${known ? p.name : "尚未发现"}</h3></div><button id="collection-favorite" class="favorite-button ${c.favorites.includes(p.id) ? "selected" : ""}" aria-label="${c.favorites.includes(p.id) ? "取消关注" : "标记关注"}">★</button></div>
       <div class="book-hero ${p.rarity} ${known ? "illustrated" : ""}">${picture(p, known, "", true)}<span class="rarity-seal ${p.rarity}">${RARITIES[p.rarity].icon} ${RARITIES[p.rarity].name}</span>${known ? `<span class="hero-count">累计收藏 <strong>×${c.counts[p.id]}</strong></span>` : ""}</div>
       <p class="book-description">${known ? p.note : "这页故事还在等待一场相遇。寻找林间宝箱，或亲手采集散落在山野中的菌子，便能点亮这一页。"}</p>
-      <div class="book-facts"><div><span>生长区域</span><b>${p.area}</b></div><div><span>首次发现</span><b>${found ? `第 ${found.day} 天 · ${found.source === "box" ? "宝箱惊喜" : "林间采集"}` : "尚未记录"}</b></div><div><span>收藏规则</span><b>重复累计 · 永久保留</b></div></div>
+      <div class="book-facts"><div><span>生长区域</span><b>${p.area}</b></div><div><span>首次发现</span><b>${found ? `第 ${found.day} 天 · ${found.source === "box" ? "宝箱惊喜" : "林间采集"}` : "尚未记录"}</b></div><div><span>当前持有</span><b>×${c.stock[p.id]} · 可烹饪或出售</b></div></div>
       <div class="book-clue"><span>⌖ 采集提示</span><p>${p.hint}</p>${hasClue ? `<button id="collection-track">${c.track === p.id ? "查看正在追踪的线索" : "在地图追踪线索"} ↗</button>` : `<small>${p.rarity === "common" ? "常见菌每趟都可找到，也会出现在盲盒中。" : "开启林间宝箱，可获得本趟稀有与史诗菌的便笺。"}</small>`}</div>
     </section>`
       : `<section class="book-detail empty-page"><span>✧</span><h3>留一页给下一次相遇</h3><p>${this.filter === "favorites" ? "点击详情页的星星，记下想寻找的菌子。" : "打开宝箱、走进林间，点亮你的第一份收藏。"}</p></section>`;
@@ -81,7 +81,7 @@ export class CollectionUI {
       "山野菌子图鉴",
       "THE WILDWOOD / COLLECTION",
       `<nav class="book-nav" aria-label="手记导航"><button data-book-nav="map">⌖ 地图</button><button data-book-nav="bag">♧ 背篓</button><button class="active" aria-current="page">菌子图鉴</button><button data-book-nav="journal">☷ 任务</button><button data-book-nav="achievements">☆ 成就</button><button data-book-nav="settings">⚙ 设置</button></nav>
-      <div class="collection-book"><aside class="book-filters" aria-label="图鉴分类">${filters.map(([id, icon, label, total]) => `<button class="book-filter ${this.filter === id ? "active" : ""}" data-collection-filter="${id}" aria-pressed="${this.filter === id}"><span>${icon}</span><b>${label}<small>${total}</small></b></button>`).join("")}<div class="book-note"><span>寻菌小记</span><p>重复的相遇，<br/>也是森林的馈赠。</p><b>${stats.total}</b><small>朵永久收藏</small></div></aside>
+      <div class="collection-book"><aside class="book-filters" aria-label="图鉴分类">${filters.map(([id, icon, label, total]) => `<button class="book-filter ${this.filter === id ? "active" : ""}" data-collection-filter="${id}" aria-pressed="${this.filter === id}"><span>${icon}</span><b>${label}<small>${total}</small></b></button>`).join("")}<div class="book-note"><span>寻菌小记</span><p>重复的相遇，<br/>也是森林的馈赠。</p><b>${stats.total}</b><small>朵累计发现</small></div></aside>
       <section class="book-cards-page" aria-label="菌子卡片"><div class="book-page-heading"><span>林间拾珍</span><small>已点亮 ${stats.unique} / 12</small></div><div class="collection-grid">${list
         .slice(this.page * 9, this.page * 9 + 9)
         .map(
@@ -150,55 +150,28 @@ export class CollectionUI {
     this.ui.toast("线索已圈在地图上，沿指南针寻找搜索区域。");
   }
   offer(boxId) {
-    const s = this.game.state;
-    if (s.collection.opened.includes(boxId))
-      return this.ui.toast("这个宝箱本趟已经打开过了。");
-    const name =
-      TREASURES.find((b) => b.id === boxId)?.name || "旧宝箱里的额外礼物";
-    this.ui.show(
-      name,
-      "A LITTLE SURPRISE",
-      `<div class="loot-stage sealed"><div class="loot-orbit"></div><img class="loot-basket" src="${collectionImage("chest-closed")}" alt="等待开启的神秘宝箱"/><span class="loot-ribbon">山野寻菌盲盒</span><h3>这次，森林会送来什么？</h3><p>一份菌子收藏，一点意料之外的惊喜。<br/>数量随机，重复的菌子也会累积进图鉴。</p><button id="open-mushroom-box" class="loot-open">揭开封签 · 打开盲盒</button><details class="loot-odds"><summary>看看盒子里的可能</summary><p>常见 72%（2–6 朵） · 稀有 24%（1–3 朵） · 史诗 4%（1–2 朵）。连续 7 盒未出稀有或史诗，第 8 盒至少稀有。宝箱仅通过探索获得。</p></details></div>`,
-      "treasure",
-    );
-    $("open-mushroom-box").onclick = () => {
-      const result = openTreasure(s, boxId);
-      if (!result.ok) return this.ui.toast(result.message, true);
-      this.game.world.sync(s);
-      this.game.save();
-      const button = $("open-mushroom-box"),
-        stage = button.closest(".loot-stage");
-      button.disabled = true;
-      button.textContent = "封签正在散开…";
-      stage.classList.add("opening");
-      this.game.audio.play("collect");
-      setTimeout(() => {
-        // A closed or replaced dialog must not interrupt the player's next action.
-        if (!stage.isConnected || this.ui.panel !== "treasure") return;
-        this.game.audio.play(
-          result.rarity === "common" ? "collect" : "discover",
-        );
-        this.result(result);
-      }, 650);
-    };
+    const s = this.game.state,
+      result = openTreasure(s, boxId);
+    if (!result.ok) return this.ui.toast(result.message, true);
+    this.game.world.sync(s);
+    this.game.save();
+    this.game.audio.play(result.rarity === "common" ? "collect" : "discover");
+    const anchor =
+      this.game.nearest?.object.position || this.game.player.root.position;
+    this.game.burst(anchor, 0xe6cc89, 20);
+    this.result(result, false, anchor);
   }
-  result(reward, wild = false) {
+  result(reward, wild = false, anchor = this.game.nearest?.object.position) {
     const p = speciesById(reward.id),
       rarity = RARITIES[p.rarity],
-      clue = speciesById(reward.clue),
       tool = TOOL_DEFS.find((t) => t.id === reward.tool?.id);
-    this.ui.show(
-      wild ? "林间的新收藏" : "森林送来了一份惊喜",
-      "A LITTLE WONDER",
-      `<div class="loot-stage revealed ${p.rarity}"><span class="loot-rarity">${rarity.icon} ${rarity.name}收藏</span><div class="loot-portrait">${picture(p)}<span class="loot-quantity">×${reward.quantity}</span></div><span class="loot-first">${reward.first ? "首次发现 · 图鉴已点亮" : "再次相遇 · 收藏数量已累加"}</span><h3>${p.name}</h3><p>累计收藏 <b>${reward.total}</b> 朵${reward.bonus ? ` · 收藏成就奖励 +${reward.bonus} 竹叶币` : ""}${reward.guaranteed ? " · 本次触发稀有保底" : ""}</p>${clue ? `<div class="loot-clue"><span>⌖ 还找到一张${RARITIES[clue.rarity].name}菌便笺</span><p>${clue.area}的搜索范围，已经记在地图上。</p><button id="loot-track">查看地图线索 ↗</button></div>` : ""}${tool ? `<div class="loot-tool"><b>${tool.icon} ${tool.name} ×${reward.tool.quantity}</b><span>已放入道具栏 · ↑↓ 选择，G 使用</span></div>` : ""}<div class="loot-actions"><button id="loot-continue">收好收藏，继续寻宝</button><button id="loot-guide">翻开图鉴 →</button></div></div>`,
-      "treasure",
-    );
-    $("loot-continue").onclick = () => {
-      this.ui.close();
-      this.game.look?.capture();
-    };
-    $("loot-guide").onclick = () => this.open(p.id);
-    if (clue) $("loot-track").onclick = () => this.track(clue.id);
+    this.ui.notice.show({
+      title: `${p.name} ×${reward.quantity}`,
+      kicker: `${rarity.icon} ${rarity.name} · ${reward.first ? "初次相遇" : wild ? "林间采集" : "宝箱馈赠"}`,
+      art: picture(p),
+      anchor,
+      body: `<p>${reward.first ? "新菌种已记入图鉴" : "累计发现 " + reward.total + " 朵"} · I 查看</p>${tool ? `<p>${tool.name} +${reward.tool.quantity} · 已放入行囊</p>` : ""}${reward.clue ? "<p>一张采菌便笺已记入地图 · M 查看</p>" : ""}${reward.bonus ? `<p>收藏成就 +${reward.bonus} 竹叶币</p>` : ""}`,
+    });
   }
   achievements() {
     const s = this.game.state,
@@ -217,7 +190,7 @@ export class CollectionUI {
         )
         .join(
           "",
-        )}</div><p class="panel-subtitle">累计打开 ${s.collection.totalBoxes} 个宝箱 · 永久收藏 ${stats.total} 朵菌子</p><div class="panel-footer"><span>成就奖励会在达成时自动领取</span><button id="achievement-guide">返回图鉴</button></div>`,
+        )}</div><p class="panel-subtitle">累计打开 ${s.collection.totalBoxes} 个宝箱 · 累计发现 ${stats.total} 朵菌子</p><div class="panel-footer"><span>成就奖励会在达成时自动领取</span><button id="achievement-guide">返回图鉴</button></div>`,
       "achievements",
     );
     $("achievement-guide").onclick = () => this.open();

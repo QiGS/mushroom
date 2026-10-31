@@ -1,3 +1,7 @@
+import { SceneNotice } from "./scene-notice.js";
+import { JourneyPanels } from "./journey-panels.js";
+import { daylight } from "./journey.js";
+import { missionTarget } from "./mission.js";
 import { AdventureUI } from "./adventure-ui.js";
 import { SHOP, purchase, EXPLORATION_SPOTS } from "./exploration.js";
 import {
@@ -65,6 +69,8 @@ export class UI {
     this.location = "";
 
     this.mapTimer = 0;
+    this.notice = new SceneNotice(game);
+    this.journey = new JourneyPanels(this);
     this.collection = new CollectionUI(this);
     this.toolbelt = new ToolbeltUI(this);
     this.adventure = new AdventureUI(game);
@@ -132,6 +138,7 @@ export class UI {
     );
   }
   show(title, kicker, html, kind = "other") {
+    this.notice.close();
     if (!this.panel) this.lastFocus = document.activeElement;
     this.panel = kind;
     $("panel").dataset.kind = kind;
@@ -162,13 +169,13 @@ export class UI {
     }, 4500);
   }
   discovery(species) {
-    $("discovery").classList.remove("hidden");
-    $("discovery").querySelector("p").textContent = species.name;
-    clearTimeout(this.discoveryTimer);
-    this.discoveryTimer = setTimeout(
-      () => $("discovery").classList.add("hidden"),
-      4000,
-    );
+    this.notice.show({
+      title: species.name,
+      kicker: "林间初遇 · 新菌种",
+      art: mushroomSVG(species.color),
+      body: `<p>${species.note}</p><p>已记入食材手记 · I 查看</p>`,
+      anchor: this.game.nearest?.object.position,
+    });
   }
   bag() {
     const s = this.game.state,
@@ -176,7 +183,7 @@ export class UI {
     this.show(
       "竹篮里的山野",
       "YOUR LITTLE HARVEST",
-      `<div class="collection-bag-link"><span>永久收藏 ${stats.unique} / 12 种 · ${stats.total} 朵</span><button id="bag-collection">翻开收藏图鉴 →</button></div><p class="panel-subtitle">${basketCount(s)} / ${s.capacity} 朵 · 任务食材在出售时自动保留，永久收藏不占容量。</p><div class="species-grid">${SPECIES.map((p) => `<button class="species-card ${s.inventory[p.id] ? "" : "locked"}" data-species="${p.id}"><span class="species-count">× ${s.inventory[p.id]}</span>${mushroomSVG(p.color)}<h3>${p.name}</h3><small>${p.rarity} · ${p.area}</small></button>`).join("")}</div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><span>↑↓ 切换随身道具 · G 使用</span></div><div class="bag-tool-row">${
+      `<div class="collection-bag-link"><span>图鉴发现 ${stats.unique} / 12 种 · ${stats.total} 朵</span><button id="bag-collection">翻开收藏图鉴 →</button></div><p class="panel-subtitle">${basketCount(s)} / ${s.capacity} 朵 · 任务食材在出售时自动保留，收藏菌不占背篓容量；可在奶奶处出售，图鉴记录保留。</p><div class="species-grid">${SPECIES.map((p) => `<button class="species-card ${s.inventory[p.id] ? "" : "locked"}" data-species="${p.id}"><span class="species-count">× ${s.inventory[p.id]}</span>${mushroomSVG(p.color)}<h3>${p.name}</h3><small>${p.rarity} · ${p.area}</small></button>`).join("")}</div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><span>↑↓ 切换随身道具 · G 使用</span></div><div class="bag-tool-row">${
         ownedTools(s)
           .map(
             (t) =>
@@ -242,7 +249,7 @@ export class UI {
             ],
             [
               "带着收获回家",
-              `山野菌 ${s.inventory.wild} / 12。天黑前返回村口有额外奖励，超时由向导接回且保留收获。`,
+              `山野菌 ${s.inventory.wild} / 12。天黑前返回村口有额外奖励，入夜光线变暗，怪物增多；可以继续探索或回村补给。`,
               s.settled,
             ],
           ]
@@ -295,8 +302,11 @@ export class UI {
     $("guide-hint").onclick = () => {
       s.guideUsed = true;
       this.close();
-      this.waypoint = { ...CAMP, kind: "camp" };
-      this.toast("向导提示：村庄在南方。指南针已标记归途。");
+      const next = missionTarget(s);
+      s.collection.track = null;
+      this.waypoint = null;
+      s.guidance = true;
+      this.toast(next.hint);
       this.game.save();
     };
   }
@@ -330,12 +340,13 @@ export class UI {
         )
         .join(
           " · ",
-        )}</small></button><button id="open-shop"><strong>逛逛山货铺</strong><small>购买斧子、猎枪、防水鞋与补给</small></button><button id="rest-village"><strong>坐下歇一会</strong><small>恢复全部体力，保留本次探索进度</small></button><button id="sell-harvest"><strong>兑换多余菌子</strong><small>保留任务食材，将余下收获换成竹叶币</small></button><button id="upgrade-basket"><strong>${s.capacity === 36 ? "大竹篮已备好" : "扩容竹篮 · 80 竹叶币"}</strong><small>${s.capacity === 36 ? "容量 36 朵" : "把容量从 24 朵增加到 36 朵"}</small></button></div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><button id="chapter-select">选择旅程</button></div>`,
+        )}</small></button><button id="free-cooking"><strong>自己动手煮一锅</strong><small>自由选择食材，尝试九宫格配方</small></button><button id="open-shop"><strong>逛逛山货铺</strong><small>购买斧子、猎枪、防水鞋与补给</small></button><button id="rest-village"><strong>坐下歇一会</strong><small>恢复全部体力，保留本次探索进度</small></button><button id="sell-harvest"><strong>卖出持有的菌子</strong><small>选择菌种按份出售，图鉴记录保留</small></button><button id="upgrade-basket"><strong>${s.capacity === 36 ? "大竹篮已备好" : "扩容竹篮 · 80 竹叶币"}</strong><small>${s.capacity === 36 ? "容量 36 朵" : "把容量从 24 朵增加到 36 朵"}</small></button></div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><button id="chapter-select">选择旅程</button></div>`,
       "camp",
     );
     $("submit-harvest").onclick = () =>
       s.settled ? this.feast() : this.cooking();
     $("open-shop").onclick = () => this.shop();
+    $("free-cooking").onclick = () => this.cooking();
     $("rest-village").onclick = () => {
       s.health = 5;
       s.stamina = 100;
@@ -344,8 +355,7 @@ export class UI {
       this.close();
     };
     $("sell-harvest").onclick = () => {
-      this.game.sell();
-      this.grandma();
+      this.journey.market("sell");
     };
     $("upgrade-basket").onclick = () => {
       if (s.capacity === 36) return this.toast("已经是最宽敞的竹篮了。");
@@ -359,35 +369,13 @@ export class UI {
     $("chapter-select").onclick = () => this.chapters();
   }
   shop() {
-    const s = this.game.state;
-    this.show(
-      "山货铺",
-      "TOOLS FOR THE TRAIL",
-      `<div class="shop-heading"><span>竹叶币 <strong>${s.coins}</strong></span><span>竹材 ${s.timber}</span></div><p class="panel-subtitle">购买后进入道具栏，↑↓ 选中、G 装备。左键使用武器，1 / 2 / 3 切换竹杖、斧子、猎枪。</p><div class="shop-grid">${SHOP.map((p) => `<article class="shop-item"><span>${p.icon}</span><h3>${p.name}</h3><p>${p.detail}</p><button data-buy="${p.id}" ${s.coins < p.price ? "disabled" : ""}>购买 ${p.name} · ${p.price} 竹叶币</button></article>`).join("")}</div><div class="shop-footer"><span>竹材每份可换 4 竹叶币</span><button class="shop-material" id="sell-timber" ${s.timber ? "" : "disabled"}>出售竹材 · +${s.timber * 4}</button></div>`,
-      "shop",
-    );
-    document.querySelectorAll("[data-buy]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          const result = purchase(this.game.state, b.dataset.buy);
-          this.game.result(result);
-          this.shop();
-        }),
-    );
-    document.getElementById("sell-timber").onclick = () => {
-      const s = this.game.state;
-      if (!s.timber) return;
-      s.coins += s.timber * 4;
-      s.timber = 0;
-      this.game.save();
-      this.shop();
-    };
+    this.journey.market("tools");
   }
   house() {
     this.show(
       "山间小屋",
       "A ROOM OF YOUR OWN",
-      '<p class="camp-intro">第一道山野料理，让村庄有了新的烟火气。小屋的门已经打开，走进去看看吧。</p><p class="panel-subtitle">屋内有床铺、书架和木桌。房顶在进入时隐去，便于查看室内。</p><div class="panel-footer"><span>居所已永久解锁</span><button id="house-rest">歇脚 · 恢复生命与体力</button></div>',
+      '<p class="camp-intro">第一道山野料理，让村庄有了新的烟火气。小屋的门已经打开，走进去看看吧。</p><p class="panel-subtitle">屋内有床铺、书架和木桌。靠近亮起的补给按 E 收取，每三分钟游玩时间补充一次。房顶在进入时隐去，便于查看室内。</p><div class="panel-footer"><span>居所已永久解锁</span><button id="house-rest">歇脚 · 恢复生命与体力</button></div>',
       "house",
     );
     document.getElementById("house-rest").onclick = () => {
@@ -399,41 +387,14 @@ export class UI {
     };
   }
   cooking() {
-    const s = this.game.state;
-    if (!requirementsMet(s)) {
-      this.toast("食材或探索目标尚未齐备，打开手记查看进度。", true);
-      return;
-    }
-    const ch = CHAPTERS[s.chapter - 1];
-    let step = 0;
-    const render = () => {
-      const text = [
-        "把刚采来的菌子放进锅里，山野的香气慢慢升起。",
-        "盖好锅盖，听一会儿咕嘟咕嘟的声音。",
-        "揭开锅盖，盛一碗热乎乎的山野风味。",
-      ];
-      this.show(
-        ch.recipe,
-        "A TASTE OF THE WILD",
-        `<div class="ending"><div class="ending-symbol">♨</div><p>${text[step]}</p><button id="cook-step" class="panel-action">${["加料", "盖盖", "开锅 · 大家开饭"][step]}</button><p class="map-note">${step + 1} / 3</p></div>`,
-        "cooking",
-      );
-      $("cook-step").onclick = () => {
-        this.game.audio.play("collect");
-        if (step < 2) {
-          step++;
-          render();
-        } else this.game.settle();
-      };
-    };
-    render();
+    this.journey.cooking();
   }
   settlement(summary) {
     const s = this.game.state;
     this.show(
       "这一篮，有故事",
       "A GOOD DAY IN THE WILD",
-      `<div class="ending"><div class="ending-symbol">♧</div><h3>${summary.recipe}</h3><p>“菌子挺客气，邻居不太好说话。”<br>新的山野风味，已经摆上村庄的餐桌。</p><div class="ending-stats"><div><strong>${summary.collected}</strong><span>采到菌子</span></div><div><strong>${summary.nests}</strong><span>发现菌窝</span></div><div><strong>${summary.chests}</strong><span>隐藏宝箱</span></div></div><p class="panel-subtitle">${summary.onTime ? "按时归来 ✓" : "向导平安接回 · 收获全部保留"} · +${summary.coins} 竹叶币<br>${s.completed ? "山野菌宴的三道菜齐了。谢谢你，把森林的味道带回家。" : `已解锁：${CHAPTERS[s.unlocked - 1].name}`}</p><button id="next-trip" class="panel-action">${s.completed ? "看看我们的菌宴" : "下一段山野旅程"} →</button></div>`,
+      `<div class="ending"><div class="ending-symbol">♧</div><h3>${summary.recipe}</h3><p>“菌子挺客气，邻居不太好说话。”<br>新的山野风味，已经摆上村庄的餐桌。</p><div class="ending-stats"><div><strong>${summary.collected}</strong><span>采到菌子</span></div><div><strong>${summary.nests}</strong><span>发现菌窝</span></div><div><strong>${summary.chests}</strong><span>隐藏宝箱</span></div></div><p class="panel-subtitle">${summary.onTime ? "按时归来 ✓" : "披星归来 · 收获全部保留"} · +${summary.coins} 竹叶币<br>${s.completed ? "山野菌宴的三道菜齐了。谢谢你，把森林的味道带回家。" : `已解锁：${CHAPTERS[s.unlocked - 1].name}`}</p><button id="next-trip" class="panel-action">${s.completed ? "看看我们的菌宴" : "下一段山野旅程"} →</button></div>`,
       "settlement",
     );
     $("next-trip").onclick = () =>
@@ -837,6 +798,7 @@ export class UI {
   }
   update(dt) {
     this.adventure.update();
+    this.notice.update();
     const s = this.game.state,
       ch = CHAPTERS[s.chapter - 1],
       q = quest(s);
@@ -846,16 +808,18 @@ export class UI {
     $("bag-count").textContent = `${basketCount(s)} / ${s.capacity}`;
     $("quest-step").textContent = q.step;
     $("quest-title").textContent = q.title;
-    $("quest-detail").textContent = q.detail;
-    $("day-label").textContent = `第 ${s.day} 天`;
-    const hours = 8 + Math.min(1, s.elapsed / ch.duration) * 11;
+    $("quest-detail").textContent = q.detail + " · " + missionTarget(s).hint;
+    const clock = daylight(s);
+    $("day-label").textContent = `第 ${clock.day} 天`;
+    const hours = clock.hour;
     $("time-label").textContent =
       `${String(Math.floor(hours)).padStart(2, "0")}:${String(Math.floor((hours % 1) * 60)).padStart(2, "0")}`;
-    $("weather-label").textContent = {
-      rain: "☂ 雨后",
-      sun: "☀ 晴朗",
-      fog: "☁ 薄雾",
-    }[s.weather];
+    $("weather-label").textContent =
+      {
+        rain: "☂ 雨后",
+        sun: "☀ 晴朗",
+        fog: "☁ 薄雾",
+      }[s.weather] + (clock.isNight ? " · 夜间" : "");
     this.updateToolbelt();
     const target = navigationTarget(s);
     $("route-label").textContent = target.name;

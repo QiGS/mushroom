@@ -1,0 +1,16 @@
+[
+  {
+    "id": "grandma",
+    "source": "奶奶.glb",
+    "sourceTriangles": 1924098,
+    "triangles": 30000,
+    "bytes": 1378016
+  },
+  {
+    "id": "uncle",
+    "source": "采菌大叔.glb",
+    "sourceTriangles": 1898245,
+    "triangles": 29999,
+    "bytes": 1372360
+  }
+]

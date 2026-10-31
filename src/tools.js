@@ -1,5 +1,33 @@
 export const TOOL_DEFS = [
   {
+    id: "grilled",
+    name: "炭火菌串",
+    icon: "♨",
+    color: "#d8ad75",
+    description: "食用后恢复 2 点生命。",
+  },
+  {
+    id: "soup",
+    name: "山泉菌汤",
+    icon: "♨",
+    color: "#d9c79c",
+    description: "食用后恢复 3 点生命。",
+  },
+  {
+    id: "riceMeal",
+    name: "菌香饭",
+    icon: "♧",
+    color: "#d6d29a",
+    description: "恢复全部生命与体力，获得 8 秒疾风效果。",
+  },
+  {
+    id: "stew",
+    name: "香草菌煲",
+    icon: "❧",
+    color: "#b9cc9c",
+    description: "恢复全部生命，并抵挡下一次怪物攻击。",
+  },
+  {
     id: "axe",
     name: "伐竹斧",
     icon: "⚒",
@@ -18,7 +46,7 @@ export const TOOL_DEFS = [
     name: "防水鞋",
     icon: "♧",
     color: "#8fc7c0",
-    description: "穿戴后 5 次落水伤害由 2 减至 1。",
+    description: "穿戴后抵减 5 次水中伤害，每次由 2 减至 1。",
   },
   {
     id: "fruit",
@@ -119,7 +147,29 @@ export function consumeTool(s, id) {
 }
 export function activateTool(s, id) {
   if (!s.tools[id])
-    return { ok: false, message: "道具已用完，探索宝箱可以补充。" };
+    return { ok: false, message: "道具已用完，可在奶奶处购买或自己烹饪。" };
+  if (["grilled", "soup", "riceMeal", "stew"].includes(id)) {
+    if (
+      s.health >= 5 &&
+      (id === "grilled" ||
+        id === "soup" ||
+        (id === "riceMeal" && s.boostTime > 0 && s.stamina >= 100) ||
+        (id === "stew" && s.shielded))
+    )
+      return { ok: false, message: "现在不需要这份料理，先留在行囊里。" };
+    consumeTool(s, id);
+    s.health = Math.min(
+      5,
+      s.health + { grilled: 2, soup: 3, riceMeal: 5, stew: 5 }[id],
+    );
+    s.stamina = 100;
+    if (id === "riceMeal") s.boostTime = 8;
+    if (id === "stew") s.shielded = true;
+    return {
+      ok: true,
+      message: `吃下${TOOL_DEFS.find((t) => t.id === id).name} · 暖意慢慢回来了`,
+    };
+  }
   if (id === "fruit" && s.health >= 5)
     return { ok: false, message: "现在生命充足，回复果先留着吧。" };
   if (id === "hat" && s.shielded)

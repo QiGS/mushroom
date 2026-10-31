@@ -1,4 +1,4 @@
-// Collection rewards are permanent keepsakes. Story ingredients stay in the basket.
+// Discovery history is permanent; held stock can be cooked or sold separately.
 import { grantTool } from "./tools.js";
 export const RARITIES = {
   common: { name: "常见", color: "#658551", icon: "✦", weight: 72 },
@@ -162,6 +162,7 @@ export function newCollection(
   return {
     seed,
     counts: Object.fromEntries(COLLECTION.map((p) => [p.id, 0])),
+    stock: Object.fromEntries(COLLECTION.map((p) => [p.id, 0])),
     foundAt: {},
     opened: [],
     picked: [],
@@ -202,6 +203,11 @@ export function sanitizeCollection(raw, chapter, day) {
   c.seed = number(raw.seed, c.seed, 4294967295) || 1;
   for (const p of COLLECTION) {
     c.counts[p.id] = number(raw.counts?.[p.id], 0, 99999);
+    c.stock[p.id] = number(
+      raw.stock?.[p.id],
+      raw.stock ? 0 : c.counts[p.id],
+      c.counts[p.id],
+    );
     const f = raw.foundAt?.[p.id];
     if (c.counts[p.id] && f && typeof f === "object")
       c.foundAt[p.id] = {
@@ -257,6 +263,7 @@ function award(s, id, quantity, source) {
   const c = s.collection,
     first = !c.counts[id];
   c.counts[id] = Math.min(99999, c.counts[id] + quantity);
+  c.stock[id] = Math.min(99999, (c.stock[id] || 0) + quantity);
   if (first) {
     c.foundAt[id] = { day: s.day, chapter: s.chapter, source };
     c.unseen.push(id);

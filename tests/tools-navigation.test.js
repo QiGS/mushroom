@@ -36,6 +36,10 @@ test("legacy equipment migrates once and consumed tools cannot reappear on reloa
   });
   const a = sanitizeSave(s);
   assert.deepEqual(a.tools, {
+    grilled: 0,
+    soup: 0,
+    riceMeal: 0,
+    stew: 0,
     axe: 0,
     rifle: 0,
     boots: 0,
@@ -130,6 +134,8 @@ test("the river clue is reachable along dry support in every chapter; blocked wa
     s.chapter = chapter;
     const world = buildWorld(new T.Scene(), chapter, "sun"),
       find = createPathfinder(world);
+    assert.equal(navigationTarget(s).kind, "task");
+    s.waypoint = { ...RIVER_NOTE, kind: "river" };
     assert.equal(navigationTarget(s).kind, "river");
     assert.ok(world.interactables.some((i) => i.type === "river-note"));
     assert.ok(

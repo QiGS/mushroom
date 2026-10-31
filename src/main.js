@@ -8,6 +8,14 @@ import {
   overlapsCollider,
 } from "./terrain.js";
 import {
+  daylight,
+  NIGHT_SPAWNS,
+  waterTick,
+  supplyReady,
+  takeHouseSupply,
+} from "./journey.js";
+import { missionTarget } from "./mission.js";
+import {
   BREAKABLES,
   WEAPONS,
   selectWeapon,
@@ -45,7 +53,11 @@ import {
   cycleTool,
   activateTool,
 } from "./tools.js";
-import { navigationTarget, surfaceHeight } from "./navigation.js";
+import {
+  navigationTarget,
+  surfaceHeight,
+  finishGuidance,
+} from "./navigation.js";
 import { RouteGuide } from "./route-guide.js";
 import {
   SAVE_KEY,
@@ -67,6 +79,7 @@ import {
   basketCount,
   requirementsMet,
 } from "./state.js";
+import "./journey.css";
 const $ = (id) => document.getElementById(id),
   clamp = T.MathUtils.clamp;
 const QA =
@@ -74,7 +87,8 @@ const QA =
 const storageKey = QA ? SAVE_KEY + "-qa" : SAVE_KEY;
 const v3 = new T.Vector3(),
   target = new T.Vector3(),
-  desired = new T.Vector3();
+  desired = new T.Vector3(),
+  cameraRay = new T.Raycaster();
 
 class Game {
   constructor() {
@@ -145,6 +159,11 @@ class Game {
     this.grounded = true;
     this.fallPeak = this.player.root.position.y;
     this.safePosition = { ...CAMP };
+    this.swimming = false;
+    this.waterTimer = 0;
+    this.trailLight = new T.PointLight(0xabcbe5, 0, 7, 2);
+    this.trailLight.position.set(0, 1.8, 0);
+    this.player.root.add(this.trailLight);
     this.nearest = null;
     this.attackTime = 0;
     this.attackCooldown = 0;
@@ -291,6 +310,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       )
         e.preventDefault();
       if (e.repeat) return;
+      if ((e.code === "KeyE" || e.code === "Escape") && this.ui.notice.active) {
+        e.preventDefault();
+        this.ui.notice.close();
+        return;
+      }
       if (e.code === "Escape") {
         if (this.look && performance.now() - this.look.releasedAt < 250) return;
         if (this.photoMode) this.photo(false);
@@ -493,7 +517,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.ui.toast("主角资源未能加载，已启用内置旅人。", true);
     if (!this.state.collection.totalBoxes)
       this.ui.toast(
-        "村口小径有寻菌礼盒 · E 开箱 · I 图鉴 · ↑↓ 选道具，G 使用 · V 路线",
+        "先与村口奶奶交谈 · V 指引当前任务 · ↑↓ 选道具，G 使用",
         false,
         6500,
       );
@@ -533,6 +557,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.fallPeak = this.player.root.position.y;
   }
   rebuild() {
+    this.ui.notice.close();
+    this.swimming = false;
+    this.waterTimer = 0;
     this.route.dispose();
     this.world.dispose();
     this.world = buildWorld(
@@ -580,7 +607,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       [-70, -18, "ridge-snake", "frost"],
       [79, -48, "gorge-snake", "rock"],
     );
-    for (const [x, z, id, kind] of positions) {
+    NIGHT_SPAWNS.forEach(([x, z, kind], i) =>
+      positions.push([x, z, `night-${i}`, kind, true]),
+    );
+    for (const [x, z, id, kind, night] of positions) {
       const type = MONSTER_TYPES[kind],
         enemy = makeSnake(this.world.root, x, z, kind === "boss");
       Object.assign(enemy, {
@@ -589,11 +619,15 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         kind: type.kind,
         hp: type.hp,
         maxHp: type.hp,
+        night: !!night,
+        nightIndex: night ? Number(id.split("-")[1]) : -1,
       });
       enemy.segments[0].material.color.setHex(type.color);
       enemy.object.visible = !this.state.defeated.includes(id);
       this.enemies.push(enemy);
     }
+    this.nightSignature = "";
+    this.updateNightPopulation();
     this.attackRing = new T.Mesh(
       new T.RingGeometry(0.7, 2, 28, 1, -0.7, 1.4),
       new T.MeshBasicMaterial({
@@ -607,6 +641,23 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.attackRing.rotation.x = -Math.PI / 2;
     this.attackRing.visible = false;
     this.world.root.add(this.attackRing);
+  }
+  updateNightPopulation() {
+    const clock = daylight(this.state),
+      key = `${clock.cycle}:${clock.isNight}`;
+    if (this.nightSignature === key) return;
+    this.nightSignature = key;
+    for (const e of this.enemies.filter((e) => e.night)) {
+      e.id = `night-${clock.cycle}-${e.nightIndex}`;
+      e.hp = clock.isNight && !this.state.defeated.includes(e.id) ? e.maxHp : 0;
+      e.object.visible = e.hp > 0;
+      e.telegraph.visible = e.sweep.visible = false;
+      e.x = e.home.x;
+      e.z = e.home.z;
+      e.state = "idle";
+      e.timer = 1;
+    }
+    this.enemies = [...this.enemies];
   }
   applyQuality() {
     this.renderer.setPixelRatio(
@@ -922,7 +973,20 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const s = this.state;
     if (!id || !s.tools[id])
       return this.ui.toast("道具栏为空，探索宝箱和河心石台可以获得道具。");
-    if (["fruit", "hat", "shoes", "axe", "rifle", "boots"].includes(id)) {
+    if (
+      [
+        "fruit",
+        "hat",
+        "shoes",
+        "axe",
+        "rifle",
+        "boots",
+        "grilled",
+        "soup",
+        "riceMeal",
+        "stew",
+      ].includes(id)
+    ) {
       const result = activateTool(s, id);
       this.result(result);
       if (result.ok) this.audio.play("bell");
@@ -1007,9 +1071,13 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.ui.toast("嘶声与抬头是突进预警。侧向闪避，等它停顿后挥杖。");
       return;
     }
-    this.ui.toast(CHAPTERS[this.state.chapter - 1].hint);
+    this.ui.toast(missionTarget(this.state).hint);
   }
   interact() {
+    if (this.ui.notice.active) {
+      this.ui.notice.close();
+      return;
+    }
     if (
       !this.started ||
       this.ui.panel ||
@@ -1037,6 +1105,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       const r = collectFieldLoot(s, item.id);
       this.result(r);
       if (r.ok) this.audio.play("collect");
+      return;
+    }
+    if (item.type === "house-supply") {
+      this.result(takeHouseSupply(s, item.id));
       return;
     }
     if (item.type === "survey") {
@@ -1126,7 +1198,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.save();
       return;
     }
-    if (item.type === "grandma" || item.type === "camp") {
+    if (item.type === "camp") {
+      this.ui.cooking();
+      return;
+    }
+    if (item.type === "grandma") {
       this.ui.grandma();
       return;
     }
@@ -1353,7 +1429,13 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight")) &&
       this.state.stamina > 3 &&
       moving;
-    let speed = this.state.boostTime > 0 ? 8.5 : sprint ? 6.5 : 3.6;
+    let speed = this.swimming
+      ? 2.6
+      : this.state.boostTime > 0
+        ? 8.5
+        : sprint
+          ? 6.5
+          : 3.6;
     if (this.slowTime > 0) speed *= 0.45;
     if (this.collectTime > 0) speed *= 0.1;
     this.state.stamina = clamp(
@@ -1390,27 +1472,24 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       vertical: this.vertical,
       grounded: this.grounded,
       fallPeak: this.fallPeak,
+      swimming: this.swimming,
     };
     const event = stepBody(this.world, this.state, body, dx, dz, dt);
     this.vertical = body.vertical;
     this.grounded = body.grounded;
     this.fallPeak = body.fallPeak;
-    if (event.water) {
-      const protectedByBoots = this.state.gear.boots > 0;
-      const waterDamage = waterImpact(this.state);
-      const safe = this.safePosition;
-      p.set(safe.x, surfaceHeight(this.world, safe.x, safe.z), safe.z);
-      this.vertical = 0;
-      this.grounded = true;
-      this.fallPeak = p.y;
-      this.velocity.set(0, 0, 0);
-      this.environmentHit(
-        waterDamage,
-        protectedByBoots
-          ? "防水鞋减轻了落水伤害 · 返回岸边"
-          : "落水了 · 失去 2 点生命，返回安全岸边",
-      );
-    } else if (event.landed)
+    const wasSwimming = this.swimming;
+    this.swimming = event.water;
+    const exposure = waterTick(this.state, this.waterTimer, dt, event.water);
+    this.waterTimer = exposure.elapsed;
+    document.body.classList.toggle("in-water", this.swimming);
+    if (event.water && !wasSwimming) {
+      this.ui.notice.close();
+      this.ui.toast("落水了！WASD 向岸边游动，水中每 3 秒持续扣血。");
+    }
+    if (exposure.damage)
+      this.environmentHit(exposure.damage, "还在水中，快向岸边游！");
+    else if (event.landed)
       this.environmentHit(
         event.landed,
         `跌落冲击 · 失去 ${event.landed} 点生命`,
@@ -1521,6 +1600,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.grounded = true;
       this.fallPeak = p.y;
       this.velocity.set(0, 0, 0);
+      this.swimming = false;
+      this.waterTimer = 0;
+      document.body.classList.remove("in-water");
       this.ui.toast("向导把你送回村庄 · 收获保留，先休息一下。");
     } else this.ui.toast(message + " · 选中回复果按 G 恢复");
     this.save();
@@ -1730,6 +1812,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       )
         continue;
       if (item.type === "house-rest" && !houseUnlocked(this.state)) continue;
+      if (item.type === "house-supply" && !supplyReady(this.state, item.id))
+        continue;
       if (item.type === "survey" && this.state.surveyed.includes(item.id))
         continue;
       if (Math.abs(item.object.position.y - p.y) > 3.2) continue;
@@ -1821,7 +1905,21 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         )
           limit = Math.max(2, along - 0.7);
       }
-      if (limit < length) desired.copy(target).addScaledVector(delta, limit);
+      if (Math.hypot(p.x + 6, p.z - 33) < 22) {
+        this.world.exploration.house.updateWorldMatrix(true, true);
+        cameraRay.set(target, delta);
+        cameraRay.far = limit;
+        const hit = cameraRay.intersectObjects(
+          this.world.exploration.cameraOccluders.filter((o) => o.visible),
+          false,
+        )[0];
+        if (hit) limit = Math.min(limit, Math.max(0.75, hit.distance - 0.25));
+      }
+      if (limit < length) {
+        desired.copy(target).addScaledVector(delta, limit);
+        if (this.camera.position.distanceTo(target) > limit)
+          this.camera.position.copy(desired);
+      }
     }
     this.camera.position.lerp(
       desired,
@@ -1891,6 +1989,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         "slowTime",
       ])
         this[key] = Math.max(0, this[key] - dt);
+      this.updateNightPopulation();
       this.updatePlayer(dt);
       this.updateEnemies(dt);
       this.findInteraction();
@@ -1909,20 +2008,23 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         !this.twoMinuteWarning
       ) {
         this.twoMinuteWarning = true;
-        this.ui.toast(
-          "距离天黑还有 2 分钟。收获足够就回村，更多惊喜也在前方。",
-        );
+        this.ui.toast("距离天黑还有 2 分钟。" + missionTarget(this.state).hint);
       }
       if (!this.rescued && this.state.elapsed >= ch.duration) {
         this.rescued = true;
-        this.player.root.position.set(0, terrainHeight(0, 28), 28);
-        this.vertical = 0;
-        this.grounded = true;
-        this.fallPeak = this.player.root.position.y;
-        this.velocity.set(0, 0, 0);
         this.ui.toast(
-          "夜色来了，向导把你平安接回村口。所有收获都保留，按时奖励未获得。",
+          "天黑了，更多竹叶青开始活动。可以继续探索，也可回奶奶身边补给。",
         );
+        this.save();
+      }
+      const arrived = finishGuidance(
+        this.state,
+        this.player.root.position,
+        this.world,
+      );
+      if (arrived) {
+        this.route.invalidate();
+        this.ui.toast(`已抵达${arrived.name} · 引导已收起，留意 E 交互提示`);
         this.save();
       }
       this.saveTime += dt;
@@ -1932,6 +2034,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       }
     }
     this.world.update(this.gameTime, this.state);
+    this.trailLight.intensity = daylight(this.state).night * 2.2;
     this.route.update(dt, this.state, this.player.root.position);
     this.route.group.visible =
       this.started && !this.photoMode && !this.ui.panel && this.state.guidance;

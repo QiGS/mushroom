@@ -1,0 +1,569 @@
+@font-face {
+  font-family: "Wildwood Wenkai";
+  src: url("/assets/fonts/wildwood-wenkai.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+html:root {
+  --ui: "Wildwood Wenkai", "Kaiti SC", STKaiti, KaiTi, serif;
+  --serif: var(--ui);
+  font-family: var(--ui);
+  font-synthesis: weight;
+}
+body,
+button,
+input,
+select {
+  font-family: var(--ui);
+}
+.jingmai-heading img {
+  display: block;
+  width: min(570px, 72vw);
+  height: auto;
+  margin: 0 auto 18px;
+  filter: drop-shadow(0 4px 10px #0d241b80);
+}
+#welcome h1.jingmai-heading {
+  margin: 20px 0 24px;
+  line-height: 1;
+}
+#welcome h1.jingmai-heading small {
+  letter-spacing: 5px;
+  font-size: 19px;
+}
+.loading-title img {
+  width: 280px;
+  height: auto;
+}
+.brand .hud-title {
+  width: 138px;
+  display: block;
+  margin-bottom: 5px;
+}
+#hud #toolbelt {
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  width: 760px;
+  max-width: calc(100vw - 44px);
+  padding: 7px 12px 5px;
+  border-radius: 6px;
+  background: linear-gradient(115deg, #203c31e0, #182e2bdc);
+  box-shadow: 0 6px 18px #061c1933;
+}
+#toolbelt .belt-heading {
+  display: none;
+}
+#hud #equipped-tools {
+  padding-bottom: 4px;
+  margin-bottom: 3px;
+  min-height: 20px;
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+#equipped-tools button {
+  padding: 2px 6px;
+  font-family: var(--ui);
+  font-size: 11px;
+}
+#equipped-tools small {
+  margin-left: auto;
+  font-family: var(--ui);
+  font-size: 10px;
+}
+#hud .belt-body {
+  gap: 8px;
+  height: 48px;
+}
+#hud #tool-slots {
+  padding: 2px;
+  gap: 5px;
+}
+.tool-slot {
+  min-width: 58px;
+  flex: 0 0 64px;
+  padding: 2px 4px;
+}
+.tool-slot > span {
+  font-size: 20px;
+}
+.tool-slot small {
+  font-family: var(--ui);
+  font-size: 10px;
+  margin-top: 0;
+}
+.tool-slot > b {
+  font: 10px var(--ui);
+}
+.belt-switch button {
+  height: 21px;
+  width: 22px;
+}
+#tool-use {
+  min-width: 44px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+#tool-use kbd {
+  font-size: 14px;
+  line-height: 22px;
+  margin: 0;
+}
+#tool-use > span {
+  font-size: 11px;
+}
+#toolbelt #tool-caption {
+  font: 11px var(--ui);
+  margin: 3px 0 0;
+  line-height: 17px;
+  min-height: 17px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 100px;
+}
+#tool-effects {
+  position: absolute;
+  right: 12px;
+  bottom: 5px;
+  font: 11px var(--ui);
+}
+#hud .bottom-bar {
+  bottom: 137px;
+  align-items: flex-end;
+}
+#hud .equipment button {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+#hud .control-hints {
+  font-size: 10px;
+  max-width: 370px;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+#hud #interaction {
+  bottom: 190px;
+}
+#hud .map-widget {
+  bottom: 197px;
+}
+#route-status {
+  font: 12px var(--ui);
+}
+#hud #scene-notice {
+  position: absolute;
+  z-index: 8;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: auto;
+  animation: notice-in 0.32s ease-out;
+}
+#scene-notice[hidden] {
+  display: none;
+}
+#scene-notice .notice-line {
+  position: absolute;
+  left: -43px;
+  top: 50%;
+  width: 42px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #d4dfac);
+}
+.notice-card {
+  padding: 17px 18px 12px;
+  background: linear-gradient(110deg, #1d352ce8, #274a3ddc);
+  border: 1px solid #c5d1a06b;
+  border-radius: 3px;
+  box-shadow: 0 6px 24px #0e291b38;
+  color: #f3ebce;
+  backdrop-filter: blur(5px);
+}
+.notice-card > small {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #d7c58f;
+}
+.notice-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+.notice-main img,
+.notice-main svg {
+  width: 80px;
+  height: 86px;
+  flex: 0 0 80px;
+  object-fit: contain;
+  background: transparent;
+  border: 0;
+}
+.notice-main h3 {
+  font-size: 23px;
+  margin: 0 0 6px;
+  font-weight: 400;
+}
+.notice-main p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 3px 0;
+  color: #d0d8bd;
+}
+.notice-card button {
+  margin: 10px 0 0;
+  padding: 6px 0;
+  width: 100%;
+  border-top: 1px solid #b5c59844;
+  text-align: right;
+  color: #daca9b;
+  font-size: 12px;
+}
+.notice-card kbd {
+  margin-right: 8px;
+}
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.in-water #vignette {
+  box-shadow: inset 0 -70px 110px #286a8a66;
+  transition: box-shadow 0.3s;
+}
+.in-water #hearts {
+  animation: water-heart 1.5s infinite;
+}
+@keyframes water-heart {
+  50% {
+    opacity: 0.65;
+  }
+}
+.cooking-bench {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin: 22px 0;
+}
+.cooking-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 86px);
+  grid-template-rows: repeat(3, 80px);
+  gap: 7px;
+  padding: 12px;
+  background: #7b765c;
+  border: 6px solid #aca17d;
+  box-shadow: inset 0 0 12px #3d483b55;
+}
+.cooking-grid button {
+  position: relative;
+  background: #d0c8a6;
+  border: 2px solid #eee1b5;
+  color: #44583e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 3px;
+}
+.cooking-grid button > span {
+  font-size: 25px;
+}
+.cooking-grid b {
+  font-size: 12px;
+  font-weight: 400;
+}
+.cooking-grid small {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  font-size: 11px;
+}
+.cook-arrow {
+  font-size: 35px;
+  color: #72825c;
+}
+.cook-output {
+  width: 148px;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-direction: column;
+  background: #5b7652;
+  color: #fff0c9;
+  border: 3px solid #a8ae78;
+  border-radius: 5px;
+}
+.cook-output > span {
+  font-size: 35px;
+}
+.cook-output strong {
+  font-size: 20px;
+}
+.cook-output small {
+  font-size: 12px;
+}
+.cooking-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.cooking-actions button {
+  background: #ddd7bb;
+  color: #526347;
+  padding: 9px 14px;
+  border: 1px solid #b0b794;
+  border-radius: 4px;
+}
+.craft-message {
+  min-height: 22px;
+  color: #6e794e;
+  line-height: 1.7;
+  font-size: 13px;
+}
+.ingredients-title {
+  color: #5c704a;
+  font-size: 18px;
+  font-weight: 400;
+}
+.ingredient-list {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+}
+.ingredient-list button {
+  background: #ede6cd;
+  border: 1px solid #b6bb95;
+  padding: 10px 5px;
+  color: #52664b;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+.ingredient-list b {
+  font-weight: 400;
+  font-size: 13px;
+}
+.ingredient-list span {
+  font-size: 25px;
+}
+.ingredient-list small {
+  color: #8c906e;
+  font-size: 11px;
+}
+.recipe-notes {
+  padding: 15px;
+  background: #e4dfc5;
+  margin-top: 20px;
+  color: #667752;
+  font-size: 13px;
+}
+.recipe-notes p {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  line-height: 1.8;
+}
+.recipe-notes b {
+  font-weight: 400;
+}
+.market-tabs {
+  display: flex;
+  gap: 7px;
+  margin: 12px 0;
+}
+.market-tabs button {
+  padding: 10px 12px;
+  background: #dce1c8;
+  color: #566c45;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.market-tabs button[aria-pressed="true"] {
+  background: #5e7750;
+  color: #f2e8c7;
+}
+.shop-item p {
+  font-size: 13px;
+}
+.shop-item button {
+  font-family: var(--ui);
+  font-size: 13px;
+}
+#quest-detail {
+  font-size: 13px;
+  line-height: 1.7;
+  max-width: 240px;
+}
+#toasts {
+  max-width: 440px;
+}
+.toast {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.7;
+}
+@media (max-width: 1100px) {
+  #hud #toolbelt {
+    width: 690px;
+  }
+  #hud .control-hints {
+    display: none;
+  }
+  #hud .bottom-bar {
+    justify-content: flex-end;
+    bottom: 133px;
+  }
+  .cooking-bench {
+    gap: 14px;
+  }
+}
+@media (max-width: 700px) {
+  #hud #toolbelt {
+    bottom: 8px;
+    left: 12px;
+    transform: none;
+    width: calc(100vw - 24px);
+    max-width: none;
+    padding: 6px 8px;
+  }
+  #hud #equipped-tools {
+    flex-wrap: wrap;
+    row-gap: 1px;
+    font-size: 9px;
+  }
+  #equipped-tools small {
+    width: auto;
+  }
+  #equipped-tools button {
+    font-size: 10px;
+  }
+  #toolbelt #tool-caption {
+    display: block;
+    font-size: 10px;
+    padding-right: 0;
+  }
+  #tool-effects {
+    display: none;
+  }
+  .tool-slot {
+    min-width: 49px;
+    flex-basis: 51px;
+  }
+  #hud .bottom-bar {
+    bottom: 137px;
+    left: 12px;
+    right: 12px;
+  }
+  #hud .equipment {
+    gap: 5px;
+  }
+  #hud .equipment button {
+    font-size: 10px;
+    padding: 7px 8px;
+  }
+  #hud .equipment kbd {
+    display: none;
+  }
+  #hud #interaction {
+    bottom: 193px;
+    max-width: calc(100vw - 150px);
+  }
+  #hud .map-widget {
+    bottom: 195px;
+  }
+  #hud #mobile-controls {
+    bottom: 185px;
+  }
+  #scene-notice .notice-line {
+    display: none;
+  }
+  .notice-card {
+    padding: 12px;
+  }
+  .notice-main h3 {
+    font-size: 20px;
+  }
+  .notice-main img,
+  .notice-main svg {
+    width: 65px;
+    flex-basis: 65px;
+  }
+  .cooking-bench {
+    gap: 8px;
+  }
+  .cooking-grid {
+    grid-template-columns: repeat(3, 55px);
+    grid-template-rows: repeat(3, 62px);
+    padding: 5px;
+    border-width: 3px;
+    gap: 4px;
+  }
+  .cooking-grid b {
+    font-size: 10px;
+  }
+  .cook-arrow {
+    font-size: 20px;
+  }
+  .cook-output {
+    width: 100px;
+    min-height: 120px;
+  }
+  .cook-output strong {
+    font-size: 16px;
+  }
+  .cook-output small {
+    font-size: 10px;
+  }
+  .ingredient-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .recipe-notes p {
+    flex-direction: column;
+    gap: 0;
+  }
+  .market-tabs button {
+    padding: 8px;
+    font-size: 11px;
+  }
+  .brand .hud-title {
+    width: 108px;
+  }
+  .jingmai-heading img {
+    width: 80vw;
+  }
+  #welcome h1.jingmai-heading small {
+    font-size: 15px;
+    letter-spacing: 2px;
+  }
+  #quest-detail {
+    font-size: 12px;
+  }
+}
+
+.ingredient-art {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ingredient-art img,
+.ingredient-art svg {
+  width: 36px;
+  height: 32px;
+  object-fit: contain;
+}
+.cooking-grid .ingredient-art img,
+.cooking-grid .ingredient-art svg {
+  width: 28px;
+  height: 24px;
+}
