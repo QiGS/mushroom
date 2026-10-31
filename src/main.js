@@ -5,6 +5,13 @@ import { buildWorld, makeTraveler, makeSnake } from "./world.js";
 import { UI } from "./ui.js";
 import { ForestAudio } from "./audio.js";
 import {
+  windowsDesktop,
+  createTravelerRig,
+  TravelerMotion,
+  angleDelta,
+} from "./windows-motion.js";
+import { WindowsLook } from "./windows-look.js";
+import {
   SAVE_KEY,
   SPECIES,
   CHAPTERS,
@@ -35,6 +42,10 @@ const v3 = new T.Vector3(),
 
 class Game {
   constructor() {
+    this.windowsControls = windowsDesktop(
+      navigator.userAgentData?.platform,
+      navigator.userAgent,
+    );
     this.state = newGame();
     this.hasSave = false;
     try {
@@ -132,54 +143,73 @@ class Game {
         },
       );
       const model = gltf.scene;
-      const bounds = new T.Box3().setFromObject(model),
-        size = bounds.getSize(new T.Vector3()),
-        center = bounds.getCenter(new T.Vector3());
-      model.position.set(-center.x, -bounds.min.y, -center.z);
-      const carrier = new T.Group();
-      carrier.add(model);
-      carrier.scale.setScalar(1.9 / size.y);
-      this.player.body.visible = false;
-      this.player.root.add(carrier);
-      this.player.model = carrier;
-      this.player.root.add(this.player.basket, this.player.staff);
-      this.player.basket.position.y = 1.15;
-      this.player.basket.position.z = -0.25;
-      const strawHat = new T.Mesh(
-        new T.ConeGeometry(0.49, 0.17, 24),
-        new T.MeshStandardMaterial({ color: 0xbfac79, roughness: 1 }),
-      );
-      strawHat.position.y = 1.84;
-      this.player.root.add(strawHat);
-      this.walkUniform = { value: 0 };
-      this.walkAmount = { value: 0 };
-      model.traverse((o) => {
-        if (o.isMesh) {
-          o.castShadow = true;
-          o.receiveShadow = true;
-          o.material.roughness = 0.85;
-          o.material.metalness = 0;
-          o.material.envMapIntensity = 0.2;
-          const m = o.material;
-          m.onBeforeCompile = (shader) => {
-            shader.uniforms.uWalk = this.walkUniform;
-            shader.uniforms.uWalkAmount = this.walkAmount;
-            shader.vertexShader =
-              "uniform float uWalk;uniform float uWalkAmount;\n" +
-              shader.vertexShader;
-            shader.vertexShader = shader.vertexShader.replace(
-              "#include <begin_vertex>",
-              `#include <begin_vertex>
+      if (this.windowsControls) {
+        const rig = createTravelerRig(model);
+        this.motion = new TravelerMotion(rig);
+        this.player.body.visible = false;
+        this.player.root.add(rig.root);
+        this.player.model = rig.root;
+        rig.bones.spine.add(this.player.basket);
+        this.player.basket.position.set(0, 0.03, -0.25);
+        rig.bones.rightHand.add(this.player.staff);
+        this.player.staff.position.set(0.015, -0.02, 0.09);
+        const hat = new T.Mesh(
+          new T.ConeGeometry(0.49, 0.17, 24),
+          new T.MeshStandardMaterial({ color: 0xbfac79, roughness: 1 }),
+        );
+        hat.position.y = 0.25;
+        hat.castShadow = true;
+        rig.bones.head.add(hat);
+      } else {
+        const bounds = new T.Box3().setFromObject(model),
+          size = bounds.getSize(new T.Vector3()),
+          center = bounds.getCenter(new T.Vector3());
+        model.position.set(-center.x, -bounds.min.y, -center.z);
+        const carrier = new T.Group();
+        carrier.add(model);
+        carrier.scale.setScalar(1.9 / size.y);
+        this.player.body.visible = false;
+        this.player.root.add(carrier);
+        this.player.model = carrier;
+        this.player.root.add(this.player.basket, this.player.staff);
+        this.player.basket.position.y = 1.15;
+        this.player.basket.position.z = -0.25;
+        const strawHat = new T.Mesh(
+          new T.ConeGeometry(0.49, 0.17, 24),
+          new T.MeshStandardMaterial({ color: 0xbfac79, roughness: 1 }),
+        );
+        strawHat.position.y = 1.84;
+        this.player.root.add(strawHat);
+        this.walkUniform = { value: 0 };
+        this.walkAmount = { value: 0 };
+        model.traverse((o) => {
+          if (o.isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = true;
+            o.material.roughness = 0.85;
+            o.material.metalness = 0;
+            o.material.envMapIntensity = 0.2;
+            const m = o.material;
+            m.onBeforeCompile = (shader) => {
+              shader.uniforms.uWalk = this.walkUniform;
+              shader.uniforms.uWalkAmount = this.walkAmount;
+              shader.vertexShader =
+                "uniform float uWalk;uniform float uWalkAmount;\n" +
+                shader.vertexShader;
+              shader.vertexShader = shader.vertexShader.replace(
+                "#include <begin_vertex>",
+                `#include <begin_vertex>
 float legWeight=1.0-smoothstep(0.25,0.48,position.y);
 float side=position.x>0.0?1.0:-1.0;
 transformed.z+=sin(uWalk)*side*uWalkAmount*legWeight*0.10;
 transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
 `,
-            );
-          };
-          m.customProgramCacheKey = () => "traveler-walk-v1";
-        }
-      });
+              );
+            };
+            m.customProgramCacheKey = () => "traveler-walk-v1";
+          }
+        });
+      }
     } catch (error) {
       console.warn(
         "Traveler asset unavailable; using built-in traveler.",
@@ -216,6 +246,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         e.preventDefault();
       if (e.repeat) return;
       if (e.code === "Escape") {
+        if (this.look && performance.now() - this.look.releasedAt < 250) return;
         if (this.photoMode) this.photo(false);
         else if (this.ui.panel) this.ui.close();
         else if (this.started) this.ui.settings();
@@ -261,14 +292,38 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     });
     window.addEventListener("pagehide", () => this.save());
     this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    if (this.windowsControls) this.look = new WindowsLook(this);
     this.pointer = null;
     this.canvas.addEventListener("pointerdown", (e) => {
       if (this.ui.panel) return;
+      if (
+        this.look &&
+        e.pointerType === "mouse" &&
+        this.started &&
+        !this.photoMode
+      ) {
+        if (this.look.locked) {
+          if (e.button === 0) this.attack();
+          return;
+        }
+        this.look.capture();
+      }
       this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
-      this.canvas.setPointerCapture(e.pointerId);
+      if (!this.look || e.pointerType !== "mouse" || this.photoMode)
+        this.canvas.setPointerCapture(e.pointerId);
     });
     this.canvas.addEventListener("pointermove", (e) => {
+      if (this.look?.locked) return;
       if (!this.pointer || this.pointer.id !== e.pointerId) return;
+      if (this.look) {
+        this.look.rotate(
+          e.clientX - this.pointer.x,
+          e.clientY - this.pointer.y,
+        );
+        this.pointer.x = e.clientX;
+        this.pointer.y = e.clientY;
+        return;
+      }
       this.yaw -=
         (e.clientX - this.pointer.x) * 0.005 * this.state.settings.sensitivity;
       this.pitch = clamp(
@@ -282,6 +337,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const release = () => (this.pointer = null);
     this.canvas.addEventListener("pointerup", release);
     this.canvas.addEventListener("pointercancel", release);
+    if (this.windowsControls) window.addEventListener("pointerup", release);
     this.canvas.addEventListener(
       "wheel",
       (e) => {
@@ -341,6 +397,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.joystick = { x: 0, y: 0 };
     this.pointer = null;
     this.holdTime = 0;
+    if (this.windowsControls) this.velocity?.set(0, 0, 0);
     const knob = $("joystick")?.querySelector("i");
     if (knob) knob.style.transform = "";
   }
@@ -370,10 +427,15 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.clearInput();
     this.yaw = 0.05;
     this.pitch = 0.27;
+    this.look?.capture();
     this.audio.enabled = this.state.settings.sound;
     await this.audio.start();
     this.save();
-    this.ui.toast("WASD 移动 · 拖动鼠标环视 · 靠近后按 E 互动");
+    this.ui.toast(
+      this.windowsControls
+        ? "WASD 移动 · 移动鼠标环视 · Esc 释放鼠标 · E 互动"
+        : "WASD 移动 · 拖动鼠标环视 · 靠近后按 E 互动",
+    );
     if (this.storageWarning)
       this.ui.toast("浏览器存储不可用，本次进度可能无法保存。", true);
     if (this.modelFallback)
@@ -382,6 +444,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   returnTitle() {
     this.save();
     this.started = false;
+    this.look?.release();
     $("hud").classList.add("hidden");
     $("welcome").classList.remove("hidden");
     $("continue").classList.remove("hidden");
@@ -413,6 +476,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     );
     this.vertical = 0;
     this.grounded = true;
+    this.velocity.set(0, 0, 0);
     this.attackTime = 0;
     this.dodgeTime = 0;
     this.invincible = 0;
@@ -962,8 +1026,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         ((this.keys.has("ArrowDown") ? 1 : 0) -
           (this.keys.has("ArrowUp") ? 1 : 0)) *
           dt,
-      0.08,
-      1.15,
+      this.windowsControls ? -0.35 : 0.08,
+      this.windowsControls ? 1.2 : 1.15,
     );
     const sprint =
       (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight")) &&
@@ -979,6 +1043,23 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     );
     let dx = m.x * speed * dt,
       dz = m.y * speed * dt;
+    if (this.windowsControls) {
+      const response = moving ? 10 : 15;
+      this.velocity.x = T.MathUtils.damp(
+        this.velocity.x,
+        m.x * speed,
+        response,
+        dt,
+      );
+      this.velocity.z = T.MathUtils.damp(
+        this.velocity.z,
+        m.y * speed,
+        response,
+        dt,
+      );
+      dx = this.velocity.x * dt;
+      dz = this.velocity.z * dt;
+    }
     if (this.dodgeTime > 0) {
       dx = this.dodgeDir.x * 10 * dt;
       dz = this.dodgeDir.y * 10 * dt;
@@ -1027,62 +1108,85 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.ui.toast("脚下一滑，回到安全岸边。收获还好好的。");
       this.state.elapsed += 8;
     }
+    const facingBefore = this.player.root.rotation.y;
     if (moving) {
       const angle = Math.atan2(m.x, m.y);
       this.player.root.rotation.y +=
         Math.atan2(
           Math.sin(angle - this.player.root.rotation.y),
           Math.cos(angle - this.player.root.rotation.y),
-        ) * Math.min(1, dt * 12);
+        ) *
+        (this.windowsControls ? 1 - Math.exp(-dt * 13) : Math.min(1, dt * 12));
       this.stepTime += dt;
       if (this.stepTime > (sprint ? 0.25 : 0.4) && this.grounded) {
         this.audio.play("step");
         this.stepTime = 0;
       }
     }
-    const gait = this.gameTime * (sprint ? 14 : 10),
-      bob =
-        moving && this.grounded
-          ? Math.abs(Math.sin(gait)) * 0.035
-          : Math.sin(this.gameTime * 2) * 0.008;
-    this.player.body.position.y = bob;
-    this.player.body.rotation.x =
-      this.collectTime > 0
-        ? Math.sin((this.collectTime / 0.55) * Math.PI) * 0.5
-        : 0;
-    this.player.legs.forEach(
-      (leg, i) =>
-        (leg.rotation.x = moving ? Math.sin(gait + i * Math.PI) * 0.5 : 0),
-    );
-    this.player.arms.forEach(
-      (arm, i) =>
-        (arm.rotation.x =
-          this.attackTime > 0
-            ? i === 1
-              ? -1.5
-              : 0
-            : moving
-              ? -Math.sin(gait + i * Math.PI) * 0.4
-              : 0),
-    );
-    this.player.staff.rotation.x = this.attackTime > 0 ? -1.2 : 0;
-    if (this.player.model) {
-      this.player.model.position.y = bob;
-      this.player.model.rotation.x =
-        this.collectTime > 0
-          ? Math.sin((this.collectTime / 0.55) * Math.PI) * 0.4
-          : this.dodgeTime > 0
-            ? 0.25
-            : 0;
-      this.walkUniform.value = gait;
-      this.walkAmount.value = T.MathUtils.damp(
-        this.walkAmount.value,
-        moving ? 1 : 0,
+    if (this.motion) {
+      const actualSpeed = Math.min(
         10,
-        dt,
+        Math.hypot(p.x - old.x, p.z - old.z) / Math.max(dt, 0.001),
       );
+      this.motion.update(dt, {
+        speed: actualSpeed,
+        grounded: this.grounded,
+        vertical: this.vertical,
+        turn:
+          angleDelta(this.player.root.rotation.y, facingBefore) /
+          Math.max(dt, 0.001),
+        attack: this.attackTime,
+        collect: this.collectTime,
+        dodge: this.dodgeTime,
+        time: this.gameTime,
+      });
       this.player.model.visible =
         this.invincible <= 0 || Math.floor(this.gameTime * 12) % 2 === 0;
+    } else {
+      const gait = this.gameTime * (sprint ? 14 : 10),
+        bob =
+          moving && this.grounded
+            ? Math.abs(Math.sin(gait)) * 0.035
+            : Math.sin(this.gameTime * 2) * 0.008;
+      this.player.body.position.y = bob;
+      this.player.body.rotation.x =
+        this.collectTime > 0
+          ? Math.sin((this.collectTime / 0.55) * Math.PI) * 0.5
+          : 0;
+      this.player.legs.forEach(
+        (leg, i) =>
+          (leg.rotation.x = moving ? Math.sin(gait + i * Math.PI) * 0.5 : 0),
+      );
+      this.player.arms.forEach(
+        (arm, i) =>
+          (arm.rotation.x =
+            this.attackTime > 0
+              ? i === 1
+                ? -1.5
+                : 0
+              : moving
+                ? -Math.sin(gait + i * Math.PI) * 0.4
+                : 0),
+      );
+      this.player.staff.rotation.x = this.attackTime > 0 ? -1.2 : 0;
+      if (this.player.model) {
+        this.player.model.position.y = bob;
+        this.player.model.rotation.x =
+          this.collectTime > 0
+            ? Math.sin((this.collectTime / 0.55) * Math.PI) * 0.4
+            : this.dodgeTime > 0
+              ? 0.25
+              : 0;
+        this.walkUniform.value = gait;
+        this.walkAmount.value = T.MathUtils.damp(
+          this.walkAmount.value,
+          moving ? 1 : 0,
+          10,
+          dt,
+        );
+        this.player.model.visible =
+          this.invincible <= 0 || Math.floor(this.gameTime * 12) % 2 === 0;
+      }
     }
     this.player.basket.scale.setScalar(1 + basketCount(this.state) / 100);
     this.attackRing.visible = this.attackTime > 0;
@@ -1358,7 +1462,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       }
       if (limit < length) desired.copy(target).addScaledVector(delta, limit);
     }
-    this.camera.position.lerp(desired, 1 - Math.exp(-dt * 6));
+    this.camera.position.lerp(
+      desired,
+      1 - Math.exp(-dt * (this.look?.locked ? 18 : 6)),
+    );
     this.camera.lookAt(target);
   }
   burst(pos, color, count) {
@@ -1384,6 +1491,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   }
   photo(on) {
     this.photoMode = on;
+    if (on) this.look?.release();
     this.clearInput();
     $("hud").classList.toggle("hidden", on);
     $("photo-ui").classList.toggle("hidden", !on);

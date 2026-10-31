@@ -100,6 +100,7 @@ export class UI {
   show(title, kicker, html, kind = "other") {
     if (!this.panel) this.lastFocus = document.activeElement;
     this.panel = kind;
+    this.game.look?.release();
     this.game.clearInput();
     $("panel-title").textContent = title;
     $("panel-kicker").textContent = kicker;
@@ -397,10 +398,13 @@ export class UI {
   }
   settings() {
     const s = this.game.state;
+    const cameraHelp = this.game.windowsControls
+      ? "移动鼠标 / 方向键"
+      : "拖动鼠标 / 方向键";
     this.show(
       "让旅程更合心意",
       "SETTINGS",
-      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>拖动鼠标 / 方向键</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>J</kbd>竹杖攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>R</kbd>投石诱导</span><span><kbd>H</kbd>回复果</span><span><kbd>C</kbd>寻菌指南针</span><span><kbd>X</kbd>疾风草鞋</span><span><kbd>V</kbd>听风铃</span><span><kbd>L</kbd>旅途手记</span><span><kbd>M / B / G</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span><button id="save-exit">保存并返回标题</button></div>`,
+      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>J</kbd>竹杖攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>R</kbd>投石诱导</span><span><kbd>H</kbd>回复果</span><span><kbd>C</kbd>寻菌指南针</span><span><kbd>X</kbd>疾风草鞋</span><span><kbd>V</kbd>听风铃</span><span><kbd>L</kbd>旅途手记</span><span><kbd>M / B / G</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.windowsControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
       "settings",
     );
     $("set-sound").onclick = () => {
@@ -420,6 +424,11 @@ export class UI {
       s.settings.sensitivity = Number(e.target.value);
       this.game.save();
     };
+    if ($("resume-play"))
+      $("resume-play").onclick = () => {
+        this.close();
+        this.game.look.capture();
+      };
     $("save-exit").onclick = () => {
       this.close();
       this.game.returnTitle();

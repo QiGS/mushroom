@@ -70,13 +70,36 @@ export function attachQA(game) {
     game.updatePlayer(0.25);
     game.keys.clear();
   });
+  if (game.windowsControls) {
+    add("QA 角色近景", () => {
+      move(1, 27.5);
+      game.distance = 3.5;
+      game.pitch = 0.1;
+      game.yaw = game.player.root.rotation.y;
+    });
+    add("QA 步态预览", () => {
+      game.ui.close();
+      game.qaMotionPreview = !game.qaMotionPreview;
+      if (game.qaMotionPreview) {
+        game.keys.add("KeyW");
+        setTimeout(() => {
+          game.keys.clear();
+          game.qaMotionPreview = false;
+        }, 2500);
+      } else game.clearInput();
+    });
+  }
   const status = document.createElement("output");
   status.id = "qa-status";
   status.style.cssText = "width:100%;font:11px monospace;";
   bar.append(status);
   setInterval(() => {
     const p = game.player.root.position;
-    status.textContent = `${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} | 最近: ${game.nearest?.name || "无"} | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris`;
+    status.textContent =
+      `${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} | 最近: ${game.nearest?.name || "无"} | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
+      (game.windowsControls
+        ? ` | 鼠标:${game.look?.locked ? "已捕获" : "自由"} | 镜头:${game.yaw.toFixed(2)},${game.pitch.toFixed(2)} | 骨骼:${game.motion?.rig.skeleton.bones.length || 0} | 步速:${game.motion?.speed.toFixed(2) || 0}`
+        : "");
   }, 500);
   document.body.append(bar);
 }
