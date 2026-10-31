@@ -1,6 +1,7 @@
 import * as T from "three";
 import { boundaryIntensity } from "./terrain.js";
 import { WEAPONS } from "./exploration.js";
+import { rifleAmmo } from './combat.js';
 import "./adventure.css";
 export class AdventureUI {
   constructor(game) {
@@ -22,6 +23,7 @@ export class AdventureUI {
     this.aim.id = "aim-reticle";
     this.aim.textContent = "+";
     document.getElementById("hud").append(this.aim);
+    this.ammo=document.createElement('div');this.ammo.className='rifle-status';this.ammo.hidden=true;document.getElementById('hud').append(this.ammo);
   }
   update() {
     const g = this.game,
@@ -84,5 +86,7 @@ export class AdventureUI {
     this.edge.style.opacity = g.ui.blocking ? "0" : String(edge * 0.85);
     this.edge.classList.toggle("near-edge", edge > 0.08);
     this.aim.hidden = !!g.ui.blocking || s.weapon !== "rifle";
+    this.ammo.hidden=this.aim.hidden;
+    if(!this.ammo.hidden)this.ammo.textContent=g.reloadTime>0?`装填中 ${g.reloadTime.toFixed(1)}s`:`${rifleAmmo(s)} / ${s.gear.rifle} 发 · R 装填`;
   }
 }

@@ -7,6 +7,7 @@ const illustrated = new Set([
   "compass",
   "bed",
   "weatherVane",
+  "axe", "rifle", "boots", "rice", "water", "salt", "herb",
 ]);
 export function toolArt(tool) {
   return illustrated.has(tool.id)

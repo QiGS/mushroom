@@ -62,7 +62,7 @@ export const SHOP = [
     price: 100,
     name: "猎枪",
     icon: "⌁",
-    detail: "G 装备 · 12 发 · 伤害 4 · 射程 22 米",
+    detail: "G 装备 · 12 发 · 4 发弹匣，R 装填 · 伤害 4 · 射程 22 米",
   },
   {
     id: "boots",

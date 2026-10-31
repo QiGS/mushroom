@@ -1,0 +1,133 @@
+#narrator {
+  position: absolute;
+  left: 50%;
+  bottom: 160px;
+  transform: translateX(-50%);
+  width: min(520px, 85vw);
+  text-align: center;
+  pointer-events: none;
+  color: #fff6d6;
+  text-shadow:
+    0 2px 4px #14241a,
+    0 0 15px #172d20;
+  background: linear-gradient(90deg, transparent, #152b2099, transparent);
+  padding: 12px 22px;
+  border: 0;
+}
+#narrator small {
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: #dce3aa;
+}
+#narrator p {
+  margin: 5px 0;
+  font-family: JingmaiRounded, sans-serif;
+  font-size: 20px;
+  line-height: 1.5;
+}
+#hud #boss-bar {
+  top: 20px !important;
+  bottom: auto !important;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(460px, 46vw);
+  z-index: 5;
+  background: linear-gradient(90deg, transparent, #17271fdd, transparent);
+  padding: 10px 24px;
+  border: 0;
+}
+#boss-bar span {
+  font-size: 20px;
+}
+#boss-bar.ant-boss i {
+  background: linear-gradient(90deg, #718347, #d6cd71);
+}
+#boss-bar small {
+  line-height: 1.5;
+}
+#hud:has(#boss-bar:not(.hidden)) #compass {
+  visibility: hidden;
+}
+.jingmai-heading img {
+  width: min(340px, 70vw);
+  max-height: 220px;
+  object-fit: contain;
+}
+.loading-title img {
+  width: 220px;
+  max-height: 145px;
+  object-fit: contain;
+}
+.brand .hud-title {
+  width: 85px;
+  height: 52px;
+  object-fit: contain;
+}
+.travel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.travel-card {
+  padding: 18px;
+  border: 1px solid #9aa782;
+  border-radius: 16px;
+  background: #e8ead5;
+}
+.travel-card h3 {
+  margin: 6px 0;
+}
+.travel-card p {
+  font-size: 13px;
+  line-height: 1.7;
+  min-height: 70px;
+}
+.travel-card button {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+}
+.rifle-status {
+  display: block;
+  font:
+    12px JingmaiRounded,
+    sans-serif;
+  color: #f4e2a5;
+  text-shadow: 0 1px 3px #12251b;
+  position: absolute;
+  top: calc(50% + 22px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+@media (max-width: 700px) {
+  .jingmai-heading img {
+    width: 65vw;
+    max-height: 170px;
+  }
+  #hud:has(#boss-bar:not(.hidden)) #route-status {
+    top: 205px;
+  }
+  #hud:has(#boss-bar:not(.hidden)) .quest {
+    top: 250px;
+  }
+  #hud #boss-bar {
+    top: 109px !important;
+    width: 70vw;
+    padding: 6px 12px;
+  }
+  #boss-bar span {
+    font-size: 16px;
+  }
+  #narrator {
+    bottom: 190px;
+  }
+  #narrator p {
+    font-size: 16px;
+  }
+  .travel-grid {
+    grid-template-columns: 1fr;
+  }
+  .travel-card p {
+    min-height: 0;
+  }
+}

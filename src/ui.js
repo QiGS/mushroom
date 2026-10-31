@@ -1,4 +1,6 @@
 import { toolArt } from "./tool-art.js";
+import { grandmaPlace, BOSS_DESTINATIONS } from "./story.js";
+import { cycleTimeScale } from "./seasons.js";
 import { SceneDialog } from "./scene-dialog.js";
 import {
   nextWeather,
@@ -20,6 +22,7 @@ import {
   houseUnlocked,
   insideHouse,
   canyonCenter,
+  canyonAt,
 } from "./terrain.js";
 import {
   createIcons,
@@ -104,7 +107,7 @@ export class UI {
     const on = (id, fn) => $(id).addEventListener("click", fn);
     on("time-speed", () => {
       const s = this.game.state;
-      s.timeScale = { 1: 2, 2: 4, 4: 1 }[s.timeScale];
+      s.timeScale = cycleTimeScale(s.timeScale);
       this.game.save();
       this.toast(`时间流逝 ${s.timeScale}× · 昼夜、天气与燃料同步加速`);
     });
@@ -309,8 +312,13 @@ export class UI {
                 s.gateOpen,
               ],
               [
+                "守住最后的菌谷",
+                "击退毒蚁母巢：躲开酸液圈，先清小蚁；首领撞上岩石时攻击毒囊。",
+                s.defeated.includes("ant-queen"),
+              ],
+              [
                 "凭记忆回家",
-                `云团菌 ${s.inventory.cloud}/10 · 月牙菌 ${s.inventory.crescent}/6。返回村口，解锁云雾菌煲。`,
+                `云团菌 ${s.inventory.cloud}/10 · 月牙菌 ${s.inventory.crescent}/6。到石门旁找奶奶交付，解锁云雾菌煲。`,
                 s.settled,
               ],
             ];
@@ -331,6 +339,28 @@ export class UI {
       this.game.save();
     };
   }
+  travel() {
+    this.show(
+      "山野驿路",
+      "CHAPTERS & BOSS ENCOUNTERS",
+      `<p class="panel-subtitle">L 随时打开 · 可直接进入任意章节，或传送到首领战入口。保留行囊、金币、图鉴与已有成就；跳关不会自动领取通关奖励。</p><div class="travel-grid">${CHAPTERS.map((ch) => `<article class="travel-card"><small>第 ${ch.id} 章</small><h3>${ch.name}</h3><p>${ch.intro}</p><button data-travel="${ch.id}">前往本章</button>${BOSS_DESTINATIONS[ch.id] ? `<button data-boss-travel="${ch.id}">直达 ${BOSS_DESTINATIONS[ch.id].name}</button>` : ""}</article>`).join("")}</div><div class="panel-footer"><span>V 只引导主线 · K 查看旅途手记</span><button id="travel-journal">旅途手记</button></div>`,
+      "travel",
+    );
+    document
+      .querySelectorAll("[data-travel]")
+      .forEach(
+        (b) =>
+          (b.onclick = () => this.game.travelChapter(Number(b.dataset.travel))),
+      );
+    document
+      .querySelectorAll("[data-boss-travel]")
+      .forEach(
+        (b) =>
+          (b.onclick = () =>
+            this.game.travelChapter(Number(b.dataset.bossTravel), true)),
+      );
+    $("travel-journal").onclick = () => this.journal();
+  }
   weather() {
     const s = this.game.state,
       ch = CHAPTERS[s.chapter - 1];
@@ -345,7 +375,8 @@ export class UI {
   }
   grandma(message = "") {
     const s = this.game.state,
-      ch = CHAPTERS[s.chapter - 1];
+      ch = CHAPTERS[s.chapter - 1],
+      firstMeeting = !s.talked;
     this.close();
     this.notice.close();
     if (!s.talked) {
@@ -360,12 +391,14 @@ export class UI {
       )
       .join(" · ");
     this.dialog.show({
-      speaker: "奶奶",
+      speaker: `奶奶 · ${grandmaPlace(s).area}`,
       text:
         message ||
         (s.settled
           ? "今晚这桌饭，有你一份功劳。再去山里走走吧，公告牌上也有下一段旅程的消息。"
-          : ch.intro + "\n" + progress),
+          : (firstMeeting ? ch.intro : missionTarget(s).hint) +
+            "\n" +
+            progress),
       actions: [
         {
           label: "聊聊 · 获取提示",
@@ -373,7 +406,7 @@ export class UI {
             const next = missionTarget(s);
             s.guideUsed = true;
             s.collection.track = null;
-            this.waypoint = null;
+            s.waypoint = null;
             s.guidance = true;
             this.game.save();
             this.dialog.show({
@@ -391,6 +424,7 @@ export class UI {
             if (!r.ok)
               return this.grandma(r.message + "\n" + missionTarget(s).hint);
             this.game.world.sync(s);
+            if (s.chapter === 3) this.game.narrator.say("ending");
             this.game.save();
             this.game.audio.play("win");
             const reward = r.summary || r;
@@ -556,7 +590,7 @@ export class UI {
     this.show(
       "让旅程更合心意",
       "SETTINGS",
-      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>左键 / J</kbd>武器攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>R</kbd>投石诱导</span><span><kbd>1 / 2 / 3</kbd>切换武器</span><span><kbd>↑ / ↓</kbd>切换道具</span><span><kbd>G</kbd>使用当前道具</span><span><kbd>V</kbd>虚线引导开关</span><span><kbd>L</kbd>旅途手记</span><span><kbd>M / B / I</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
+      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>左键 / J</kbd>武器攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>R</kbd>猎枪装填 / 投石诱导</span><span><kbd>1 / 2 / 3</kbd>切换武器</span><span><kbd>↑ / ↓</kbd>切换道具</span><span><kbd>G</kbd>使用当前道具</span><span><kbd>V</kbd>主线虚线引导</span><span><kbd>L</kbd>跳关 / 首领战</span><span><kbd>K</kbd>旅途手记</span><span><kbd>M / B / I</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
       "settings",
     );
     $("set-sound").onclick = () => {
@@ -592,13 +626,13 @@ export class UI {
     this.show(
       "山野行路图",
       "THE WILDWOOD / MAP",
-      `<div class="map-large-wrap"><canvas id="large-map" width="600" height="600" aria-label="森林地图，点击标记方向"></canvas></div><div class="map-legend"><span>▲ 你的位置</span><span>⌂ 村庄</span><span>◇ 已发现菌窝</span><span>⚑ 红布路标</span></div><p class="map-note">点击地图标记方向 · 不会自动移动 · 未发现的菌窝不会直接显示</p>`,
+      `<div class="map-large-wrap"><canvas id="large-map" width="600" height="600" aria-label="森林地图，点击标记方向"></canvas></div><div class="map-legend"><span>▲ 你的位置</span><span>⌂ 村庄</span><span>◇ 已发现菌窝</span><span>⚑ 红布路标</span></div><p class="map-note">V 虚线只跟随主线剧情；地图上的支线标记由指南针指示。</p>`,
       "map",
     );
     this.drawMap($("large-map").getContext("2d"), 600, true);
     $("panel-body").insertAdjacentHTML(
       "beforeend",
-      `<div class="map-route-summary"><div><strong>⌖ ${target.name}</strong><small>距离 ${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · 道具栏指南针 ×${s.tools.compass}</small></div><button id="map-guide-toggle">V · ${s.guidance ? "关闭" : "显示"}虚线引导</button></div><p class="map-compass-hint">右上罗盘指示目标方向 · 金色标记为当前目标 · 河心石台可沿浮桥抵达</p>${!s.riverNoteFound ? '<div class="map-clues"><button class="river-note" id="map-river"><span>▤</span><div><b>河心石台 · 未拾取的便笺</b><small>点击追踪，再按 V 查看通路</small></div></button></div>' : ""}${this.collection.cluesMarkup()}<div class="explore-map-links">${EXPLORATION_SPOTS.map((p) => `<button data-explore="${p.id}">◇ ${p.name}</button>`).join("")}<button data-explore="shop">山货铺</button></div>`,
+      `<div class="map-route-summary"><div><strong>⌖ ${target.name}</strong><small>距离 ${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · 道具栏指南针 ×${s.tools.compass}</small></div><button id="map-guide-toggle">V · ${s.guidance ? "关闭" : "显示"}虚线引导</button></div><p class="map-compass-hint">右上罗盘指示目标方向 · 金色标记为当前目标 · 河心石台可沿浮桥抵达</p>${!s.riverNoteFound ? '<div class="map-clues"><button class="river-note" id="map-river"><span>▤</span><div><b>河心石台 · 未拾取的便笺</b><small>点击后由罗盘指向便笺 · V 始终引导主线</small></div></button></div>' : ""}${this.collection.cluesMarkup()}<div class="explore-map-links">${EXPLORATION_SPOTS.map((p) => `<button data-explore="${p.id}">◇ ${p.name}</button>`).join("")}<button data-explore="shop">山货铺</button></div>`,
     );
     $("map-guide-toggle").onclick = () => {
       this.game.toggleGuidance();
@@ -859,6 +893,18 @@ export class UI {
       );
     }
     const navTarget = navigationTarget(s);
+    const granny = grandmaPlace(s);
+    ctx.fillStyle = "#f5e5b8";
+    ctx.beginPath();
+    ctx.arc(px(granny.x), pz(granny.z), large ? 5 : 3, 0, Math.PI * 2);
+    ctx.fill();
+    if (large) {
+      ctx.fillStyle = "#485d42";
+      ctx.font = "12px JingmaiRounded, sans-serif";
+      ctx.fillText("奶奶 · " + granny.area, px(granny.x), pz(granny.z) - 12);
+      ctx.fillText("赤岩峡谷", px(-25), pz(-67));
+      ctx.fillText("苔溪深峡", px(65), pz(-66));
+    }
     if (navTarget) {
       ctx.strokeStyle = "#d39435";
       ctx.lineWidth = 1.5;
@@ -948,27 +994,32 @@ export class UI {
       `${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · ${s.guidance ? (this.game.route.points.length ? "引导中" : "暂无安全路线") : "显示路线"}`;
     $("route-status").classList.toggle("active", s.guidance);
     const p = s.position;
-    const region = insideHouse(p.x, p.z)
-      ? "山间小屋"
-      : p.x < -43
-        ? "风铃山岭"
-        : p.x > 43 && p.z < 24
-          ? "赤石峡谷"
-          : p.z > 22
-            ? "山野村庄"
-            : p.z < -32
-              ? s.chapter === 2
-                ? "双石菌窝"
-                : "深山菌谷"
-              : p.x > 17
-                ? "月牙潭畔"
-                : p.x < -17 && p.z < -5
-                  ? "回声坡"
-                  : s.chapter === 2
-                    ? "青影竹林"
-                    : s.chapter === 3
-                      ? "岔路林"
-                      : "晨光林地";
+    const canyon = canyonAt(p.x, p.z);
+    const region = canyon
+      ? canyon.id === "canyon-one"
+        ? "苔溪深峡"
+        : "赤岩峡谷"
+      : insideHouse(p.x, p.z)
+        ? "山间小屋"
+        : p.x < -43
+          ? "风铃山岭"
+          : p.x > 43 && p.z < 24
+            ? "赤石峡谷"
+            : p.z > 22
+              ? "山野村庄"
+              : p.z < -32
+                ? s.chapter === 2
+                  ? "双石菌窝"
+                  : "深山菌谷"
+                : p.x > 17
+                  ? "月牙潭畔"
+                  : p.x < -17 && p.z < -5
+                    ? "回声坡"
+                    : s.chapter === 2
+                      ? "青影竹林"
+                      : s.chapter === 3
+                        ? "岔路林"
+                        : "晨光林地";
     $("region-label").textContent = region;
     if (region !== this.location) {
       this.location = region;

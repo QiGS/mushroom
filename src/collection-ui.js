@@ -151,9 +151,11 @@ export class CollectionUI {
     this.ui.toast("线索已圈在地图上，沿指南针寻找搜索区域。");
   }
   offer(boxId, extraTool = null) {
+    this.ui.notice.close();
     const s = this.game.state,
       result = openTreasure(s, boxId);
     if (!result.ok) return this.ui.toast(result.message, true);
+    this.game.world.collection.rewardBox = boxId;
     this.game.world.sync(s);
     this.game.save();
     this.game.audio.play(result.rarity === "common" ? "collect" : "discover");
@@ -161,8 +163,16 @@ export class CollectionUI {
       this.game.nearest?.object.position || this.game.player.root.position;
     this.game.burst(anchor, 0xe6cc89, 20);
     this.result({ ...result, extraTool }, false, anchor);
+    this.ui.notice.onClosed = () => {
+      this.game.world.collection.rewardBox = null;
+      this.game.world.sync(this.game.state);
+    };
   }
   result(reward, wild = false, anchor = this.game.nearest?.object.position) {
+    this.game.narrator.reward({ rarity: reward.rarity });
+    if (reward.rarity === "rare" || reward.rarity === "epic")
+      this.game.narrator.say("rare");
+    this.game.save();
     const p = speciesById(reward.id),
       rarity = RARITIES[p.rarity],
       tool = TOOL_DEFS.find((t) => t.id === reward.tool?.id);

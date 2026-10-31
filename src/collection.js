@@ -113,7 +113,7 @@ export const TREASURES = [
   { id: "shore", x: 66, z: 15, name: "谷底溪岸的宝箱", area: "峡谷南口" },
   { id: "pine", x: 8, z: -65, name: "北境松影的宝箱", area: "北方松林" },
   { id: "ridge", x: -68, z: -25.8, name: "风铃山巅的宝箱", area: "风铃山巅" },
-  { id: "moon", x: 82, z: -61, name: "东岭望月的宝箱", area: "峡谷东岸" },
+  { id: "moon", x: 81, z: -43, name: "东岭望月的宝箱", area: "峡谷东岸" },
 ];
 const COMMON_POINTS = [
   [-7, 20],

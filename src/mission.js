@@ -7,15 +7,17 @@ import {
   requirementsMet,
 } from "./state.js";
 import { fieldDay } from "./seasons.js";
+import { grandmaPlace } from "./story.js";
 const layouts = new Map();
 export function missionTarget(s) {
   const target = (x, z, name, hint) => ({ x, z, name, hint, kind: "task" });
+  const granny = grandmaPlace(s);
   if (!s.talked)
     return target(
-      1,
-      29,
+      granny.x,
+      granny.z,
       "先与奶奶交谈",
-      "先到村口奶奶身边按 E，领取这趟采菌任务。",
+      `先到${granny.area}奶奶身边按 E，领取这趟采菌任务。`,
     );
   if (s.settled)
     return target(
@@ -26,10 +28,10 @@ export function missionTarget(s) {
     );
   if (requirementsMet(s))
     return target(
-      1,
-      29,
-      "回村向奶奶交付",
-      "食材和探索目标已齐，回村与奶奶交谈，选择交付食材。",
+      granny.x,
+      granny.z,
+      "向奶奶交付",
+      `食材和探索目标已齐，到${granny.area}找奶奶交付食材。`,
     );
   if (s.chapter === 3) {
     if (!s.uncle)
@@ -48,11 +50,15 @@ export function missionTarget(s) {
       );
     if (s.landmarks.length < 3) {
       const p = LANDMARKS.find((p) => !s.landmarks.includes(p.id));
-      if (p.id === "trees" && !s.defeated.includes("boss"))
+      if (
+        p.id === "trees" &&
+        !s.defeated.includes("tree-guard") &&
+        !s.defeated.includes("boss")
+      )
         return target(
           -10,
           -24,
-          "击退抱抱树守卫",
+          "击退抱抱树的岩纹蛇",
           "守卫停顿时反击，再记录抱抱树的路牌。",
         );
       return target(
@@ -69,6 +75,13 @@ export function missionTarget(s) {
         "解开菌谷石门",
         "三处地标齐了。按“石纹、月纹、双树”排列石牌。",
       );
+    if (!s.defeated.includes("ant-queen"))
+      return target(
+        0,
+        -36,
+        "击退毒蚁母巢",
+        "进入石门后的菌谷，避开酸液、先清蚁群；首领冲刺撞石后会露出破绽。",
+      );
   }
   if (s.chapter === 1 && !s.nests.length)
     return target(
@@ -79,6 +92,7 @@ export function missionTarget(s) {
     );
   const ch = CHAPTERS[s.chapter - 1],
     key = s.chapter + ":" + s.weather + ":" + fieldDay(s);
+  if (layouts.size > 8) layouts.clear();
   if (!layouts.has(key))
     layouts.set(key, createMushrooms(s.chapter, s.weather, fieldDay(s)));
   const missing = Object.entries(ch.requirements)

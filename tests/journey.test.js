@@ -176,7 +176,7 @@ test("default guidance follows chapter tasks and an arrived manual clue clears i
   s.talked = true;
   assert.match(navigationTarget(s).name, /菌窝/);
   s.waypoint = { x: 25, z: -4, kind: "river" };
-  s.guidance = true;
+  s.guidance = false;
   const p = { x: 25, z: -4, y: surfaceHeight(world, 25, -4) };
   assert.equal(finishGuidance(s, { ...p, y: 20 }, world), null);
   assert.equal(finishGuidance(s, p, world).kind, "river");

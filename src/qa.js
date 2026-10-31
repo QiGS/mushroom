@@ -15,6 +15,7 @@ import {
 import { RIVER_NOTE, surfaceHeight } from "./navigation.js";
 import { grantTool, TOOL_DEFS } from "./tools.js";
 import { daylight } from "./journey.js";
+import { missionTarget } from "./mission.js";
 export function attachQA(game) {
   const bar = document.createElement("div");
   bar.id = "qa-controls";
@@ -45,6 +46,102 @@ export function attachQA(game) {
     bar.append(b);
   };
   add("QA 开始", () => game.begin(true));
+  add("QA 推进战斗", () => {
+    game.ui.close();
+    for (let i = 0; i < 360; i++) {
+      game.gameTime += 1 / 60;
+      game.attackCooldown = Math.max(0, game.attackCooldown - 1 / 60);
+      game.updateReload(1 / 60);
+      game.updateEnemies(1 / 60);
+    }
+    game.ui.update(0.1);
+  });
+  add("QA 第三章主线", () => {
+    game.travelChapter(3);
+    game.state.coins = 250;
+    game.save();
+  });
+  add("QA 主线脚下", () => {
+    const target = missionTarget(game.state),
+      path = game.route.find(game.state, game.player.root.position, target);
+    const p = path.at(-1);
+    if (p) move(p.x, p.z);
+    game.yaw = 0;
+    game.pitch = 0.2;
+  });
+  add("QA 毒蚁战", () => {
+    game.travelChapter(3, true);
+    game.invincible = 300;
+    game.yaw = 0;
+    game.pitch = 0.12;
+    game.distance = 6;
+  });
+  add("QA 战斗补给", () => {
+    game.state.gear.rifle = 12;
+    game.state.rifleLoaded = 4;
+    game.state.gear.axe = 30;
+    game.equipWeapon("rifle");
+    game.save();
+  });
+  add("QA 毒蚁二阶段", () => {
+    const boss = game.enemies.find((e) => e.species === "antQueen");
+    if (boss) boss.hp = 40;
+  });
+  add("QA 毒蚁三阶段", () => {
+    const boss = game.enemies.find((e) => e.species === "antQueen");
+    if (boss) boss.hp = 20;
+  });
+  add("QA 毒蚁收尾", () => {
+    const boss = game.enemies.find((e) => e.species === "antQueen");
+    if (boss) boss.hp = 1;
+  });
+  add("QA 定点瞄准", () => {
+    const boss = game.enemies.find((e) => e.boss && e.hp > 0);
+    if (!boss) return;
+    move(boss.x, boss.z + 7);
+    boss.state = "stunned";
+    boss.timer = 30;
+    game.invincible = 300;
+    game.yaw = 0;
+    game.pitch = -0.03;
+    game.distance = 4;
+  });
+  add("QA 12 次换日", () => {
+    let count = 0;
+    const tick = () => {
+      game.ui.close();
+      const dawn = advanceCalendar(game.state, dayPeriod(game.state));
+      game.refreshDay(dawn);
+      if (++count < 12) setTimeout(tick, 180);
+      else game.ui.toast("QA 连续换日完成");
+    };
+    tick();
+  });
+  add("QA 峡谷一", () => {
+    move(40, -49);
+    game.yaw = 0.58;
+    game.pitch = 0.4;
+    game.distance = 10;
+  });
+  add("QA 峡谷二", () => {
+    move(-22, -48);
+    game.yaw = 0;
+    game.pitch = 0.4;
+    game.distance = 9;
+  });
+  add("QA 走入峡谷", () => {
+    game.keys.add("KeyW");
+    game.yaw = 0;
+    for (let i = 0; i < 180; i++) game.updatePlayer(1 / 60);
+    game.keys.clear();
+  });
+  add("QA 旁白成就", () => {
+    game.state.totalCollected = 50;
+    game.state.nests = ["fallen-log", "lake-nest"];
+    game.narrator.say("colony");
+    game.narrator.reward({ nest: true, rarity: "epic" });
+    game.save();
+  });
   add("QA 日常开局", () => {
     game.state = newGame();
     game.state.coins = 250;
@@ -421,6 +518,7 @@ export function attachQA(game) {
   setInterval(() => {
     const p = game.player.root.position;
     status.textContent =
+      `GL几何:${game.renderer.info.memory.geometries} 纹理:${game.renderer.info.memory.textures} 像素比:${game.renderer.getPixelRatio().toFixed(2)} 帧均值:${game.frameAverage.toFixed(1)} 怪:${game.enemies.filter((e) => e.hp > 0).length} 弹:${game.state.rifleLoaded}/${game.state.gear.rifle} 路径:${game.route.points.length} | ` +
       `第${fieldDay(game.state)}天 ${game.state.weather} 明天:${nextWeather(game.state)} 燃料:${game.state.fireFuel.toFixed(3)} 床:${game.state.bedOwned} 预报:${game.state.forecastOwned} 遇蛇:${game.state.ambushes.length} 菌:${game.world.items.length} 相机:${game.camera.position
         .toArray()
         .map((n) => n.toFixed(2))

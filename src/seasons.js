@@ -1,6 +1,9 @@
 import { CHAPTERS } from "./state.js";
 import { houseUnlocked } from "./terrain.js";
 export const WEATHER_NAMES = { sun: "晴天", rain: "雨后", fog: "薄雾" };
+export const TIME_SCALES = [1, 2, 4, 8, 16, 32, 64];
+export const cycleTimeScale = (n) =>
+  TIME_SCALES[(TIME_SCALES.indexOf(n) + 1) % TIME_SCALES.length];
 export const dayPeriod = (s) => CHAPTERS[s.chapter - 1].duration + 240;
 export const fieldDay = (s) => s.day + Math.floor(s.elapsed / dayPeriod(s));
 export function nextWeather(s, day = fieldDay(s) + 1) {

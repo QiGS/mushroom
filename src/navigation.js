@@ -10,6 +10,7 @@ export { surfaceHeight } from "./terrain.js";
 import { CAMP, requirementsMet } from "./state.js";
 import { activeClues, TREASURES } from "./collection.js";
 import { missionTarget } from "./mission.js";
+import { collidersNear } from "./spatial.js";
 
 export const RIVER_NOTE = {
   id: "river-note",
@@ -35,7 +36,7 @@ export function canWalk(world, s, x, z) {
   )
     return false;
   if (
-    world.colliders.some(
+    collidersNear(world, x, z).some(
       (c) => colliderActive(c, s) && overlapsCollider(c, x, z, 0.4),
     )
   )
@@ -44,6 +45,7 @@ export function canWalk(world, s, x, z) {
   return !Number.isFinite(water) || surfaceHeight(world, x, z) > water + 0.08;
 }
 export function navigationTarget(s) {
+  if (s.guidance) return missionTarget(s);
   if (s.waypoint)
     return {
       ...s.waypoint,
@@ -109,14 +111,23 @@ export function createPathfinder(world) {
     }
     return true;
   };
-  const nearest = (s, p) => {
+  const nearest = (s, p, arrival = false) => {
     let best = null,
       distance = Infinity;
-    for (let dx = -2; dx <= 2; dx++)
-      for (let dz = -2; dz <= 2; dz++) {
+    for (let dx = -3; dx <= 3; dx++)
+      for (let dz = -3; dz <= 3; dz++) {
         const q = { x: Math.round(p.x) + dx, z: Math.round(p.z) + dz };
         const d = Math.hypot(q.x - p.x, q.z - p.z);
-        if (d < distance && valid(s, q.x, q.z) && clear(s, p, q)) {
+        if (
+          d < distance &&
+          valid(s, q.x, q.z) &&
+          (arrival
+            ? d <= 2.5 &&
+              Math.abs(
+                surfaceHeight(world, p.x, p.z) - surfaceHeight(world, q.x, q.z),
+              ) < 2
+            : clear(s, p, q))
+        ) {
           best = q;
           distance = d;
         }
@@ -125,7 +136,7 @@ export function createPathfinder(world) {
   };
   return (s, start, target) => {
     const from = nearest(s, start),
-      to = nearest(s, target);
+      to = nearest(s, target, true);
     if (!from || !to) return [];
     const key = (p) => `${p.x},${p.z}`,
       goal = key(to);
@@ -162,15 +173,12 @@ export function createPathfinder(world) {
       return top;
     };
     push({ ...from, f: Math.hypot(from.x - to.x, from.z - to.z) });
-    while (heap.length && closed.size < 27000) {
+    while (heap.length && closed.size < 12000) {
       const p = pop(),
         pk = key(p);
       if (closed.has(pk)) continue;
       if (pk === goal) {
-        const path = [
-          { x: target.x, z: target.z },
-          { x: p.x, z: p.z },
-        ];
+        const path = [{ x: p.x, z: p.z }];
         let k = pk;
         while (parents.has(k)) {
           const previous = parents.get(k);

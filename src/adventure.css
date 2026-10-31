@@ -196,9 +196,6 @@
 #hud #interaction {
   bottom: 295px;
 }
-#hud #boss-bar {
-  display: none;
-}
 @media (max-width: 700px) {
   #hud #interaction {
     bottom: 270px;

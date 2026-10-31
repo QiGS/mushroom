@@ -58,7 +58,9 @@ export class ForestAudio {
     o.stop(t + duration + 0.03);
   }
   play(kind) {
-    if (kind === "collect") {
+    if(kind==='shot') {
+      this.note(72,.17,.7,0,'sawtooth');this.note(170,.08,.25,0,'square');this.note(48,.25,.3,.04,'triangle');
+    } else if (kind === "collect") {
       this.note(660, 0.35, 0.35);
       this.note(880, 0.6, 0.25, 0.07);
     } else if (kind === "discover") {

@@ -1,4 +1,5 @@
 import * as T from "three";
+import { missionTarget } from './mission.js';
 import {
   createPathfinder,
   navigationTarget,
@@ -61,12 +62,12 @@ export class RouteGuide {
       this.key = "";
       return;
     }
-    const target = navigationTarget(s),
+    const target = missionTarget(s),
       key = `${target.x}:${target.z}:${s.gateOpen}`;
     const moved =
       !this.origin ||
       Math.hypot(position.x - this.origin.x, position.z - this.origin.z) > 0.75;
-    if (this.key !== key || (this.elapsed > 1 && moved)) {
+    if (this.key !== key || (this.elapsed > 2.5 && moved)) {
       this.key = key;
       this.elapsed = 0;
       this.target = target;
@@ -136,7 +137,7 @@ export class RouteGuide {
         surfaceHeight(this.world, target.x, target.z) + 0.21,
         target.z,
       );
-      this.tip.visible = points.length > 1;
+      this.tip.visible = true;
     }
     this.tip.scale.setScalar(1 + Math.sin(s.playSeconds * 3) * 0.12);
   }

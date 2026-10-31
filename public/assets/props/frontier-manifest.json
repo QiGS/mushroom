@@ -1,0 +1,44 @@
+[
+  {
+    "id": "canyon-one",
+    "source": "道具二维/峡谷1.glb",
+    "sourceTriangles": 1972102,
+    "triangles": 12992,
+    "bytes": 1098328
+  },
+  {
+    "id": "canyon-two",
+    "source": "道具二维/峡谷2.glb",
+    "sourceTriangles": 1952275,
+    "triangles": 11000,
+    "bytes": 599468
+  },
+  {
+    "id": "poison-ant",
+    "source": "new/毒蚂蚁.glb",
+    "sourceTriangles": 500000,
+    "triangles": 25442,
+    "bytes": 3211908
+  },
+  {
+    "id": "fallen-log",
+    "source": "new/枯木.glb",
+    "sourceTriangles": 1988932,
+    "triangles": 6498,
+    "bytes": 789960
+  },
+  {
+    "id": "rock-two",
+    "source": "new/岩石2.glb",
+    "sourceTriangles": 1915817,
+    "triangles": 9397,
+    "bytes": 786832
+  },
+  {
+    "id": "rock-three",
+    "source": "new/岩石3.glb",
+    "sourceTriangles": 1909932,
+    "triangles": 8661,
+    "bytes": 784332
+  }
+]

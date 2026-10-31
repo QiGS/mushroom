@@ -11,6 +11,11 @@ export class SceneNotice {
     document.getElementById("hud").append(this.root);
   }
   show({ title, kicker, art = "", body = "", anchor }) {
+    if (this.onClosed) {
+      const fn = this.onClosed;
+      this.onClosed = null;
+      fn();
+    }
     this.root.classList.remove("reward-reveal");
     this.entries = null;
     this.active = true;
@@ -53,6 +58,11 @@ export class SceneNotice {
   close() {
     this.active = false;
     this.root.hidden = true;
+    if (this.onClosed) {
+      const fn = this.onClosed;
+      this.onClosed = null;
+      fn();
+    }
   }
   update() {
     if (!this.active) return;

@@ -1,3 +1,8 @@
+import { Narrator } from "./narrator.js";
+import { BOSS_DESTINATIONS, prepareBossTrip } from "./story.js";
+import { makeAnt, updateAnt } from "./ant-enemy.js";
+import { disposeObject } from "./resources.js";
+import { collidersNear } from "./spatial.js";
 import {
   fieldDay,
   advanceCalendar,
@@ -34,7 +39,14 @@ import {
   collectFieldLoot,
   surveySpot,
 } from "./exploration.js";
-import { clearShot, inAttackArc, MONSTER_TYPES } from "./combat.js";
+import {
+  clearShot,
+  inAttackArc,
+  MONSTER_TYPES,
+  rifleTarget,
+  rifleAmmo,
+  loadRifle,
+} from "./combat.js";
 import { equipmentVisual } from "./equipment-visual.js";
 import "./style.css";
 import * as T from "three";
@@ -130,10 +142,12 @@ class Game {
       antialias: true,
       alpha: false,
       powerPreference: "high-performance",
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: false,
     });
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.autoUpdate = false;
+    this.shadowTime = 1;
     this.renderer.shadowMap.type = T.PCFShadowMap;
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -156,6 +170,13 @@ class Game {
     this.audio = new ForestAudio();
     this.audio.enabled = this.state.settings.sound;
     this.ui = new UI(this);
+    this.narrator = new Narrator(this);
+    this.acidPools = [];
+    this.reloadTime = 0;
+    this.swarmSerial = 0;
+    this.hudTime = 0;
+    this.qualityTime = 0;
+    this.frameAverage = 16;
     this.started = false;
     this.photoMode = false;
     this.keys = new Set();
@@ -347,7 +368,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         Digit2: () => this.equipWeapon("axe"),
         Digit3: () => this.equipWeapon("rifle"),
         KeyQ: () => this.dodge(),
-        KeyR: () => this.throwStone(),
+        KeyR: () =>
+          this.state.weapon === "rifle"
+            ? this.reloadRifle()
+            : this.throwStone(),
         ArrowUp: () => this.selectTool(-1),
         ArrowDown: () => this.selectTool(1),
         KeyV: () => this.toggleGuidance(),
@@ -355,7 +379,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         KeyG: () => this.useSelectedTool(),
         KeyI: () => this.ui.guide(),
         KeyM: () => this.ui.map(),
-        KeyL: () => this.ui.journal(),
+        KeyL: () => this.ui.travel(),
+        KeyK: () => this.ui.journal(),
         KeyP: () => this.photo(true),
         Space: () => this.jump(),
       };
@@ -511,6 +536,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       return;
     }
     this.started = true;
+    this.narrator.say("chapter-" + this.state.chapter);
     $("welcome").classList.add("hidden");
     $("hud").classList.remove("hidden");
     this.clearInput();
@@ -557,8 +583,31 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.ui.waypoint = null;
     this.ui.location = "";
     this.save();
-    this.ui.toast(`第 ${id} 章 · ${CHAPTERS[id - 1].name}`);
-    this.ui.grandma();
+    this.narrator.clear();
+    this.narrator.say("chapter-" + id);
+    this.ui.toast(
+      `第 ${id} 章 · ${CHAPTERS[id - 1].name} · 按 V 寻找奶奶，开始这趟旅程。`,
+    );
+  }
+  travelChapter(id, boss = false) {
+    this.ui.close();
+    this.narrator.clear();
+    const old = this.state;
+    old.unlocked = Math.max(old.unlocked, id);
+    this.state = startChapter(old, id);
+    this.state.inventory = structuredClone(old.inventory);
+    if (boss) prepareBossTrip(this.state);
+    this.rebuild();
+    this.rescued = false;
+    this.twoMinuteWarning = false;
+    this.ui.location = "";
+    this.save();
+    this.narrator.say("chapter-" + id);
+    this.ui.toast(
+      boss
+        ? `已抵达${BOSS_DESTINATIONS[id].name} · 准备战斗`
+        : `第 ${id} 章 · V 引导主线剧情`,
+    );
   }
   restoreSafePosition() {
     const p = safeSpawn(this.world, this.state, this.state.position);
@@ -574,6 +623,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.ui.notice.close();
     this.swimming = false;
     this.waterTimer = 0;
+    this.clearEnemies();
     this.route.dispose();
     this.world.dispose();
     this.world = buildWorld(
@@ -601,6 +651,20 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.makeEnemies();
     this.applyQuality();
   }
+  clearEnemies() {
+    for (const e of this.enemies || []) {
+      e.art?.dispose();
+      disposeObject(e.object);
+      disposeObject(e.telegraph);
+      disposeObject(e.sweep);
+    }
+    for (const p of this.acidPools || []) disposeObject(p.mesh);
+    this.acidPools = [];
+    this.enemies = [];
+    disposeObject(this.attackRing);
+    this.attackRing = null;
+    this.reloadTime = 0;
+  }
   makeEnemies() {
     this.enemies = [];
     this.traps = [];
@@ -615,14 +679,25 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
             ]
           : [
               [29, 5, "patrol", "leaf"],
-              [-10, -24, "boss", "boss"],
+              [-10, -24, "tree-guard", "rock"],
+              [0, -41, "ant-queen", "antQueen"],
             ];
+    for (const [x, z, id, kind] of [
+      [-17, 0, "bamboo-scout", "leaf"],
+      [19, -18, "lake-scout", "frost"],
+      [5, -18, "north-scout", "leaf"],
+      [-21, -19, "mist-scout", "rock"],
+      [20, 0, "mist-scout-2", "frost"],
+      [-4, -34, "nest-ant-1", "ant"],
+      [4, -38, "nest-ant-2", "ant"],
+    ].slice(0, this.state.chapter === 1 ? 0 : this.state.chapter === 2 ? 3 : 7))
+      positions.push([x, z, id, kind]);
     positions.push(
       [-70, -18, "ridge-snake", "frost"],
       [79, -48, "gorge-snake", "rock"],
     );
-    NIGHT_SPAWNS.forEach(([x, z, kind], i) =>
-      positions.push([x, z, `night-${i}`, kind, true]),
+    NIGHT_SPAWNS.slice(0, 2 + this.state.chapter * 2).forEach(
+      ([x, z, kind], i) => positions.push([x, z, `night-${i}`, kind, true]),
     );
     positions.push(...this.state.ambushes.map((p) => [p.x, p.z, p.id, "leaf"]));
     for (const [x, z, id, kind, night] of positions) {
@@ -646,9 +721,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   }
   spawnEnemy(x, z, id, kind = "leaf", night = false) {
     const type = MONSTER_TYPES[kind],
-      enemy = makeSnake(this.world.root, x, z, kind === "boss");
+      enemy = kind.startsWith("ant")
+        ? makeAnt(this.world.root, x, z, kind === "antQueen")
+        : makeSnake(this.world.root, x, z, kind === "boss");
     Object.assign(enemy, {
       id,
+      species: kind,
       name: type.name,
       kind: type.kind,
       hp: type.hp,
@@ -656,11 +734,85 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       night: !!night,
       nightIndex: night ? Number(id.split("-")[1]) : -1,
     });
-    enemy.segments[0].material.color.setHex(type.color);
+    if (enemy.segments) enemy.segments[0].material.color.setHex(type.color);
     enemy.object.visible = !this.state.defeated.includes(id);
     this.enemies.push(enemy);
     if (this.state.defeated.includes(id)) enemy.hp = 0;
     return enemy;
+  }
+  spawnSwarm(boss) {
+    const expired = this.enemies.filter(
+      (e) => e.id.startsWith("swarm-") && e.hp <= 0,
+    );
+    for (const e of expired) {
+      disposeObject(e.object);
+      disposeObject(e.telegraph);
+      disposeObject(e.sweep);
+    }
+    this.enemies = this.enemies.filter((e) => !expired.includes(e));
+    this.state.defeated = this.state.defeated.filter(
+      (id) => !String(id).startsWith("swarm-"),
+    );
+    const live = this.enemies.filter(
+      (e) => e.ant && !e.boss && e.hp > 0,
+    ).length;
+    const count = Math.min(boss.phase + 1, 6 - live);
+    for (let i = 0; i < count; i++) {
+      const angle = (i * Math.PI * 2) / Math.max(1, count) + this.gameTime;
+      let x = boss.x + Math.cos(angle) * 3,
+        z = boss.z + Math.sin(angle) * 3;
+      const point = safeSpawn(this.world, this.state, { x, z });
+      const e = this.spawnEnemy(
+        point.x,
+        point.z,
+        `swarm-${++this.swarmSerial}`,
+        "ant",
+      );
+      e.timer = 1.2;
+      e.state = "recover";
+    }
+    if (count > 0) {
+      this.enemies = [...this.enemies];
+      this.ui.toast("母巢召来蚁群 · 先清小蚁，别被包围！");
+    }
+  }
+  spawnAcid(owner, point) {
+    if (this.acidPools.length >= 6) disposeObject(this.acidPools.shift().mesh);
+    const mesh = new T.Mesh(
+      new T.CircleGeometry(2.5, 32),
+      new T.MeshBasicMaterial({
+        color: 0x9faa48,
+        transparent: true,
+        opacity: 0.55,
+        side: T.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(point.x, terrainHeight(point.x, point.z) + 0.06, point.z);
+    this.world.root.add(mesh);
+    this.acidPools.push({ mesh, owner, life: 5 });
+  }
+  updateAcid(dt) {
+    const p = this.player.root.position;
+    for (let i = this.acidPools.length - 1; i >= 0; i--) {
+      const pool = this.acidPools[i];
+      pool.life -= dt;
+      if (pool.life <= 0 || pool.owner.hp <= 0) {
+        disposeObject(pool.mesh);
+        this.acidPools.splice(i, 1);
+        continue;
+      }
+      pool.mesh.material.opacity = Math.min(0.55, pool.life * 0.3);
+      if (
+        Math.hypot(p.x - pool.mesh.position.x, p.z - pool.mesh.position.z) <
+          2.5 &&
+        Math.abs(p.y - pool.mesh.position.y) < 1
+      ) {
+        this.hurt(pool.owner);
+        this.slowTime = Math.max(this.slowTime, 0.4);
+      }
+    }
   }
   maybeHarvestSnake(item, key) {
     const s = this.state;
@@ -702,24 +854,18 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     return true;
   }
   refreshDay(dawn) {
-    const position = this.player.root.position.clone(),
-      velocity = this.velocity.clone();
-    const physics = Object.fromEntries(
-      [
-        "vertical",
-        "grounded",
-        "fallPeak",
-        "swimming",
-        "waterTimer",
-        "safePosition",
-        "invincible",
-      ].map((k) => [k, this[k]]),
-    );
-    this.state.position = { x: position.x, z: position.z };
-    this.rebuild();
-    this.player.root.position.copy(position);
-    this.velocity.copy(velocity);
-    Object.assign(this, physics);
+    this.world.refreshForage(this.state);
+    const expired = this.enemies.filter((e) => e.id.startsWith("forage-"));
+    for (const e of expired) {
+      e.art?.dispose();
+      disposeObject(e.object);
+      disposeObject(e.telegraph);
+      disposeObject(e.sweep);
+    }
+    this.enemies = this.enemies.filter((e) => !expired.includes(e));
+    this.nightSignature = "";
+    this.updateNightPopulation();
+    this.route.invalidate();
     this.rescued = false;
     this.twoMinuteWarning = false;
     this.ui.toast(
@@ -748,11 +894,23 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.renderer.setPixelRatio(
       Math.min(
         devicePixelRatio,
-        this.state.settings.quality === "high" ? 1.65 : 1,
+        this.state.settings.quality === "high"
+          ? /Mac/i.test(navigator.platform)
+            ? 1.25
+            : 1.5
+          : 1,
+        Math.sqrt(
+          (this.state.settings.quality === "high" ? 2600000 : 1800000) /
+            (innerWidth * innerHeight),
+        ),
       ),
     );
-    const size = this.state.settings.quality === "high" ? 2048 : 1024;
+    const size =
+      this.state.settings.quality === "high" && !/Mac/i.test(navigator.platform)
+        ? 1536
+        : 1024;
     this.world.sun.shadow.mapSize.set(size, size);
+    this.renderer.shadowMap.needsUpdate = true;
     if (this.world.sun.shadow.map) {
       this.world.sun.shadow.map.dispose();
       this.world.sun.shadow.map = null;
@@ -761,6 +919,21 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.state.settings.quality === "high"
         ? this.world.grass.instanceMatrix.count
         : Math.floor(this.world.grass.instanceMatrix.count * 0.5);
+  }
+  adaptQuality(ms, dt) {
+    if (this.ui.blocking || !this.started || ms > 100) return;
+    this.frameAverage = this.frameAverage * 0.97 + Math.min(ms, 120) * 0.03;
+    this.qualityTime += dt;
+    if (
+      this.qualityTime > 6 &&
+      this.frameAverage > 29 &&
+      this.renderer.getPixelRatio() > 0.7
+    ) {
+      this.renderer.setPixelRatio(
+        Math.max(0.7, this.renderer.getPixelRatio() - 0.15),
+      );
+      this.qualityTime = 0;
+    }
   }
   save() {
     if (!this.started) return;
@@ -838,6 +1011,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   primaryAction(event) {
     if (!this.started || this.ui.blocking || this.photoMode) return;
     this.player.root.rotation.y = this.yaw + Math.PI;
+    if (this.state.weapon === "rifle") return this.attack();
     this.findInteraction();
     const p = this.player.root.position;
     let aimed = null;
@@ -927,6 +1101,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.photoMode
     )
       return;
+    if (this.state.weapon === "rifle") return this.fireRifle();
     const s = this.state,
       weapon = s.weapon,
       w = WEAPONS[weapon],
@@ -1035,6 +1210,139 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.save();
     }
   }
+  reloadRifle() {
+    if (
+      this.ui.blocking ||
+      this.state.weapon !== "rifle" ||
+      this.reloadTime > 0 ||
+      rifleAmmo(this.state) >= Math.min(4, this.state.gear.rifle)
+    )
+      return;
+    this.reloadTime = 1.35;
+    this.ui.toast("装填中…");
+  }
+  updateReload(dt) {
+    if (this.reloadTime <= 0) return;
+    this.reloadTime = Math.max(0, this.reloadTime - dt);
+    if (this.reloadTime === 0 && this.state.weapon === "rifle") {
+      loadRifle(this.state);
+      this.audio.play("stone");
+      this.save();
+    }
+  }
+  fireRifle() {
+    const s = this.state;
+    if (this.reloadTime > 0) return;
+    if (!rifleAmmo(s)) {
+      this.reloadRifle();
+      return;
+    }
+    const p = this.player.root.position,
+      from = { x: p.x, y: p.y + 1.25, z: p.z };
+    const dir = this.camera.getWorldDirection(new T.Vector3());
+    const targets = [
+      ...this.enemies
+        .filter(
+          (e) => e.hp > 0 && e.object.visible && !s.defeated.includes(e.id),
+        )
+        .map((e) => ({
+          type: "enemy",
+          id: e.id,
+          value: e,
+          x: e.x,
+          y: e.object.position.y + (e.ant && e.boss ? 1.1 : 0.5),
+          z: e.z,
+          radius: e.boss ? 1.4 : e.ant ? 0.6 : 0.75,
+        })),
+      ...BREAKABLES.filter((b) => !s.broken.includes(b.id)).map((b) => ({
+        ...b,
+        type: "prop",
+        value: b,
+        y: terrainHeight(b.x, b.z) + 0.65,
+        radius: 0.7,
+      })),
+    ];
+    const hit = rifleTarget(
+      this.world,
+      s,
+      this.camera.position,
+      dir,
+      from,
+      targets,
+    );
+    this.player.root.rotation.y = Math.atan2(dir.x, dir.z);
+    this.attackTime = 0.25;
+    this.attackCooldown = 0.65;
+    s.rifleLoaded--;
+    spendWeapon(s);
+    this.audio.play("shot");
+    this.pitch = Math.min(1.2, this.pitch + 0.025);
+    if (hit?.type === "enemy") {
+      const e = hit.value,
+        damage =
+          4 *
+          (e.state === "stunned"
+            ? 2
+            : e.species === "rock" && e.state === "windup"
+              ? 0.5
+              : 1);
+      e.hp -= damage;
+      e.cooldown = 0.1;
+      this.burst(e.object.position, 0xe8ce7c, 10);
+      if (e.hp <= 0) this.defeat(e);
+    } else if (hit?.type === "prop") {
+      const result = strikeObject(s, hit.value, "rifle");
+      if (result.ok && this.world.exploration.hit(hit.id, result.damage)) {
+        s.broken.push(hit.id);
+        this.world.sync(s);
+        this.route.invalidate();
+      } else if (!result.ok) this.ui.toast(result.message);
+    }
+    const end = hit
+      ? new T.Vector3(hit.x, hit.y, hit.z)
+      : this.camera.position.clone().addScaledVector(dir, 29);
+    const direction = end
+      .clone()
+      .sub(new T.Vector3(from.x, from.y, from.z))
+      .normalize();
+    let distance = Math.min(
+      22,
+      end.distanceTo(new T.Vector3(from.x, from.y, from.z)),
+    );
+    for (let d = 0.5; d < distance; d += 0.5) {
+      const t = {
+        x: from.x + direction.x * d,
+        y: from.y + direction.y * d,
+        z: from.z + direction.z * d,
+      };
+      if (!clearShot(this.world, s, from, t, hit?.id)) {
+        distance = d - 0.5;
+        break;
+      }
+    }
+    end.set(from.x, from.y, from.z).addScaledVector(direction, distance);
+    const geo = new T.BufferGeometry().setFromPoints([
+      new T.Vector3(from.x, from.y, from.z),
+      end,
+    ]);
+    const mat = new T.LineBasicMaterial({
+        color: 0xffdf8a,
+        transparent: true,
+        opacity: 0.9,
+      }),
+      line = new T.Line(geo, mat);
+    this.scene.add(line);
+    this.particles.push({
+      mesh: line,
+      velocity: new T.Vector3(),
+      life: 0.12,
+      geo,
+      mat,
+    });
+    this.burst(new T.Vector3(from.x, from.y, from.z), 0xffc96f, 4);
+    if (s.weapon !== "rifle") this.ui.toast("猎枪弹药用尽 · 已换回竹杖");
+    this.save();
+  }
   defeat(e) {
     e.hp = 0;
     e.object.visible = false;
@@ -1044,7 +1352,20 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.state.defeated.push(e.id);
       this.state.coins += e.boss ? 35 : 8;
       grantTool(this.state, "fruit");
-      if (e.boss) {
+      if (e.species === "antQueen") {
+        if (!this.state.achievements.includes("菌谷守护者"))
+          this.state.achievements.push("菌谷守护者");
+        this.narrator.say("ant-victory");
+        grantTool(this.state, "note");
+        for (const ant of this.enemies.filter((q) => q.ant && !q.boss)) {
+          ant.hp = 0;
+          ant.object.visible = false;
+          ant.sweep.visible = ant.telegraph.visible = false;
+          if (!this.state.defeated.includes(ant.id))
+            this.state.defeated.push(ant.id);
+        }
+        this.ui.toast("毒蚁母巢已击退 · 菌谷开放，收好菌子后去石门旁找奶奶。");
+      } else if (e.boss) {
         grantTool(this.state, "shoes");
         if (!this.state.achievements.includes("青影徽章"))
           this.state.achievements.push("青影徽章");
@@ -1084,6 +1405,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   }
   toggleGuidance() {
     this.state.guidance = !this.state.guidance;
+    if (this.state.guidance) {
+      this.state.waypoint = null;
+      this.state.collection.track = null;
+    }
     this.route.invalidate();
     this.save();
     this.ui.toast(
@@ -1270,6 +1595,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     if (item.type === "specimen") {
       const result = collectSpecimen(s, item.id);
       if (!result.ok) return this.result(result);
+      this.narrator.reward({ rarity: result.rarity });
       this.collectTime = 0.55;
       this.maybeHarvestSnake(item, `${item.type}-${item.id}`);
       this.world.sync(s);
@@ -1308,6 +1634,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       }
       const result = collect(s, item);
       if (!result.ok) return this.result(result);
+      const rare = ["gold", "crescent", "giant"].includes(item.species);
+      this.narrator.reward({ rarity: rare ? "rare" : "common" });
+      if (rare) this.narrator.say("rare");
       this.collectTime = 0.55;
       this.maybeHarvestSnake(item, `${item.type}-${item.id}`);
       this.world.sync(s);
@@ -1364,6 +1693,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       if (item.id === "gold-nest" && s.chapter === 3 && !s.gateOpen)
         return this.ui.toast("先解开石门。");
       this.result(discoverNest(s, item.id));
+      this.narrator.say(s.nests.length >= 2 ? "colony" : "nest");
+      this.narrator.reward({ nest: true });
+      this.save();
       this.audio.play("discover");
       this.burst(item.object.position, 0xccd78d, 24);
       return;
@@ -1460,7 +1792,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     if (item.type === "landmark") {
       if (item.id === "stone" && !s.echoSolved)
         return this.ui.toast("先敲击空心石，找到三声短响的回声。");
-      if (item.id === "trees" && !s.defeated.includes("boss"))
+      if (
+        item.id === "trees" &&
+        !s.defeated.includes("tree-guard") &&
+        !s.defeated.includes("boss")
+      )
         return this.ui.toast("竹叶青挡着旧路牌。侧闪、等待它停顿，再反击。");
       if (!s.landmarks.includes(item.id)) {
         s.landmarks.push(item.id);
@@ -1507,6 +1843,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     $("check-gate").onclick = () => {
       const r = solveGate(s);
       this.result(r);
+      if (r.ok) {
+        this.narrator.say("gate");
+        this.narrator.reward({ gate: true });
+        this.save();
+      }
       if (r.ok) {
         this.ui.close();
         this.audio.play("win");
@@ -1742,7 +2083,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.state.health--;
     this.state.hits++;
     this.invincible = 1.7;
-    this.slowTime = 0.6;
+    this.slowTime = enemy?.species === "frost" ? 2.8 : 0.6;
     this.audio.play("hit");
     this.burst(this.player.root.position, 0xe9aa7f, 15);
     if (this.state.health <= 0) {
@@ -1765,8 +2106,15 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         enemy.x = enemy.home.x;
         enemy.z = enemy.home.z;
         enemy.state = "idle";
+        enemy.phase = 1;
+        enemy.attacks = 0;
         enemy.timer = 1;
         enemy.telegraph.visible = false;
+        enemy.sweep.visible = false;
+        // A pool can cause this respawn while updateAcid is iterating the list.
+        // Expire it in place; that loop owns removal and disposal.
+        for (const pool of this.acidPools)
+          if (pool.owner === enemy) pool.life = 0;
       }
       this.ui.toast(
         "回到最近的休息点 · 菌子与探索记录全部保留，可以再试一次。",
@@ -1781,6 +2129,17 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const p = this.player.root.position;
     for (const e of this.enemies) {
       if (e.hp <= 0 || this.state.defeated.includes(e.id)) continue;
+      const range = Math.hypot(p.x - e.x, p.z - e.z);
+      const locked = e.ant && !this.state.gateOpen;
+      e.object.visible = !locked && range < 60;
+      if (locked || range > 34) {
+        e.telegraph.visible = e.sweep.visible = false;
+        continue;
+      }
+      if (e.ant) {
+        updateAnt(this, e, dt);
+        continue;
+      }
       e.timer -= dt;
       e.cooldown = Math.max(0, e.cooldown - dt);
       const dist = Math.hypot(p.x - e.x, p.z - e.z);
@@ -1830,7 +2189,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         e.x += e.dir.x * (e.boss ? 12 : 10) * dt;
         e.z += e.dir.y * (e.boss ? 12 : 10) * dt;
         if (dist < (e.boss ? 1.5 : 0.9)) this.hurt(e);
-        const collision = this.world.colliders.find(
+        const collision = collidersNear(this.world, e.x, e.z, 1).find(
           (c) =>
             colliderActive(c, this.state) &&
             overlapsCollider(c, e.x, e.z, 0.45),
@@ -1897,9 +2256,17 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         !this.state.defeated.includes(e.id),
     );
     $("boss-bar").classList.toggle("hidden", !boss);
-    if (boss)
-      document.querySelector("#boss-bar i").style.width =
+    if (boss) {
+      $("boss-bar").classList.toggle("ant-boss", !!boss.ant);
+      $("boss-bar").querySelector("span").textContent =
+        `${boss.kind} · ${boss.name}  ${Math.max(0, boss.hp)} / ${boss.maxHp}`;
+      $("boss-bar").querySelector("small").textContent = boss.ant
+        ? `阶段 ${boss.phase} / 3 · ${boss.state === "stunned" ? "毒囊暴露 · 反击伤害翻倍" : "Q 闪避 · 离开酸液 · 优先清理蚁群"}`
+        : "观察预警 · 侧闪 · 等它露出破绽";
+      $("boss-bar").querySelector("i").style.width =
         `${(boss.hp / boss.maxHp) * 100}%`;
+    }
+    this.updateAcid(dt);
     for (const trap of this.traps) {
       if (trap.cleared) continue;
       trap.cooldown = Math.max(0, trap.cooldown - dt);
@@ -1952,6 +2319,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       )
         continue;
       if (item.type === "mushroom" && !item.object.visible) continue;
+      if (item.type === "chest" && !item.object.visible) continue;
       if (
         item.type === "nest" &&
         (this.state.nests.includes(item.id) ||
@@ -2090,6 +2458,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   frame(now) {
     requestAnimationFrame((t) => this.frame(t));
     const dt = Math.min((now - this.lastTime) / 1000, 0.05);
+    this.adaptQuality(now - this.lastTime, dt);
     this.lastTime = now;
     if (document.hidden) return;
     this.gameTime += dt;
@@ -2109,6 +2478,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         "slowTime",
       ])
         this[key] = Math.max(0, this[key] - dt);
+      this.updateReload(dt);
+      this.narrator.update(dt);
       this.updateNightPopulation();
       this.updatePlayer(dt);
       this.updateEnemies(dt);
@@ -2164,7 +2535,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       !this.ui.blocking &&
       this.state.guidance;
     this.updateCamera(dt);
-    if (this.started) this.ui.update(dt);
+    this.hudTime += dt;
+    if (this.started && this.hudTime >= 0.08) {
+      this.ui.update(this.hudTime);
+      this.hudTime = 0;
+    }
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
@@ -2179,6 +2554,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           p.mat.dispose();
         }
       }
+    }
+    this.shadowTime += dt;
+    if (this.shadowTime > 0.12) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this.shadowTime = 0;
     }
     this.renderer.render(this.scene, this.camera);
   }

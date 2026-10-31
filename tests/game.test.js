@@ -21,7 +21,7 @@ import { buildWorld } from "../src/world.js";
 
 function finishExploration(s) {
   s.talked = true;
-  s.defeated.push("boss");
+  s.defeated.push("boss", "ant-queen");
   s.echoSolved = true;
   s.landmarks = ["stone", "moon", "trees"];
   s.gate = [0, 1, 2];

@@ -1,3 +1,6 @@
+import { grandmaPlace, GRANDMA_CLEARINGS } from "./story.js";
+import { CANYONS, canyonAt, baseTerrainHeight } from "./terrain.js";
+import { disposeObject, bakePainted } from "./resources.js";
 import { addProp } from "./prop-model.js";
 import { softenFoliage } from "./camera-collision.js";
 import { addMountainBackdrop } from "./mountains.js";
@@ -11,6 +14,7 @@ import { RIVER_NOTE, RIVER_WALKWAY } from "./navigation.js";
 import { COLLECTION_CLEARINGS } from "./collection.js";
 import { buildCollectionWorld } from "./collection-world.js";
 import {
+  CHAPTERS,
   SPECIES,
   NESTS,
   LANDMARKS,
@@ -103,10 +107,10 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, {
-    left: -45,
-    right: 45,
-    top: 45,
-    bottom: -45,
+    left: -32,
+    right: 32,
+    top: 32,
+    bottom: -32,
     near: 1,
     far: 140,
   });
@@ -149,7 +153,10 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i),
       z = positions.getZ(i);
-    positions.setY(i, height(x, z));
+    const canyon = canyonAt(x, z);
+    // Keep the original valley beneath the imported cliffs. Sampling their
+    // peaks into this coarse plane would create triangles across the rock faces.
+    positions.setY(i, baseTerrainHeight(x, z));
     const path = Math.abs(x - Math.sin(z * 0.08) * 6);
     const patch = Math.sin(x * 0.4 + z * 0.3) * 0.5 + random() * 0.5;
     const c =
@@ -166,6 +173,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         height(x, z) > 23 ? 0x9fa58f : height(x, z) > 10 ? 0x8a9467 : 0x7a8b51,
       );
     if (x > 43 && z < 23) c.set(height(x, z) < 0 ? 0x6e8278 : 0xad9471);
+    if (canyon) c.set(canyon.id === "canyon-two" ? 0x9d693f : 0x6e8278);
     colors.push(c.r, c.g, c.b);
   }
   groundGeo.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
@@ -174,16 +182,39 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     vertexColors: true,
     flatShading: false,
   });
+  // Cut the base terrain only where imported geometry covers it. A texture
+  // mask preserves irregular rock silhouettes without coarse triangular seams.
+  const canyonMasks = CANYONS.map((c) => {
+    const texture = new T.DataTexture(
+      Uint8Array.from(c.data, (h) => (h === null ? 0 : 255)),
+      c.n + 1,
+      c.n + 1,
+      T.RedFormat,
+    );
+    texture.minFilter = texture.magFilter = T.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
+  });
   groundMat.onBeforeCompile = (shader) => {
     shader.vertexShader = "varying vec3 vGround;\n" + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace(
       "#include <begin_vertex>",
       "#include <begin_vertex>\nvGround=position;",
     );
+    let maskCode = "";
+    for (const [i, c] of CANYONS.entries()) {
+      shader.uniforms["canyonMask" + i] = { value: canyonMasks[i] };
+      shader.fragmentShader =
+        `uniform sampler2D canyonMask${i};\n` + shader.fragmentShader;
+      maskCode += `vec2 canyonUV${i}=(vGround.xz-vec2(${c.x.toFixed(1)},${c.z.toFixed(1)}))/vec2(${c.width.toFixed(1)},${c.depth.toFixed(1)})+0.5;
+        if(all(greaterThan(canyonUV${i},vec2(0.0)))&&all(lessThan(canyonUV${i},vec2(1.0)))&&texture2D(canyonMask${i},canyonUV${i}).r>0.15)discard;\n`;
+    }
     shader.fragmentShader = "varying vec3 vGround;\n" + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <color_fragment>",
-      "#include <color_fragment>\nfloat grain=fract(sin(dot(floor(vGround.xz*19.0),vec2(12.9898,78.233)))*43758.5453);diffuseColor.rgb*=0.91+grain*0.18;",
+      "#include <color_fragment>\n" +
+        maskCode +
+        "float grain=fract(sin(dot(floor(vGround.xz*19.0),vec2(12.9898,78.233)))*43758.5453);diffuseColor.rgb*=0.91+grain*0.18;",
     );
   };
   const ground = mesh(groundGeo, groundMat, root);
@@ -209,6 +240,12 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   const safePoints = [
     ...NIGHT_SPAWNS.map(([x, z]) => ({ x, z, r: 3 })),
     ...EXPLORE_CLEARINGS,
+    ...GRANDMA_CLEARINGS,
+    ...CANYONS.map((c) => ({
+      x: c.x,
+      z: c.z,
+      r: Math.max(c.width, c.depth) * 0.7,
+    })),
     { x: 0, z: 30, r: 10 },
     { x: 0, z: -38, r: 9 },
     { x: 25, z: -5, r: 13 },
@@ -337,6 +374,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     const path = Math.abs(x - Math.sin(z * 0.08) * 6);
     if (
       x > 44 ||
+      canyonAt(x, z) ||
       (x < -43 && random() < 0.8) ||
       path < 2.3 ||
       (Math.abs(x + 6) < 4.6 && Math.abs(z - 33) < 4.2) ||
@@ -388,6 +426,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       z = (random() - 0.5) * 110;
     if (
       x > 43 ||
+      canyonAt(x, z) ||
       Math.abs(x - Math.sin(z * 0.08) * 6) < 3 ||
       Math.hypot(x, z - 30) < 8 ||
       (Math.abs(x + 6) < 5 && Math.abs(z - 33) < 4.6)
@@ -418,6 +457,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         Math.sin(z * 0.08) * 6 + (random() > 0.5 ? 1 : -1) * (3 + random() * 8),
       y = height(x, z);
     if (
+      canyonAt(x, z) ||
       Math.hypot(x, z - 30) < 8 ||
       (Math.abs(x + 6) < 4.6 && Math.abs(z - 33) < 4.2)
     )
@@ -853,7 +893,22 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   );
   l.rotation.z = Math.PI / 2;
   l.rotation.y = 0.4;
-  colliders.push({ x: -10, z: 2, r: 1.2 });
+  props.push(
+    addProp(log, "fallen-log", {
+      width: 5.7,
+      height: 1.5,
+      depth: 1.5,
+      fallback: l,
+    }),
+  );
+  colliders.push({
+    id: "fallen-log-prop",
+    x: -10,
+    z: 2,
+    hx: 2.6,
+    hz: 0.65,
+    height: 1.5,
+  });
   const tracks = [];
   for (let i = 0; i < 36; i++) {
     const t = i / 35,
@@ -879,7 +934,6 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   const nestObjects = new Map();
   const items = createMushrooms(chapter, weather, day);
   for (const n of NESTS) {
-    if (!items.some((p) => p.nest === n.id)) continue;
     const g = at(n.x, n.z);
     for (let j = 0; j < 15; j++) {
       const a = j * 2.4,
@@ -895,6 +949,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       leaf.scale.set(0.65, 0.08, 0.35);
       leaf.rotation.y = a;
     }
+    bakePainted(g);
     nestObjects.set(n.id, g);
     interactables.push({
       ...n,
@@ -905,56 +960,79 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     });
   }
   const mushroomObjects = new Map();
-  for (const item of items) {
-    const species = SPECIES.find((s) => s.id === item.species);
-    const g = at(item.x, item.z);
-    g.scale.setScalar(item.scale * (item.species === "giant" ? 2.8 : 1.15));
-    mesh(
-      new T.CylinderGeometry(0.085, 0.14, 0.42, 8),
-      material(species.stem),
-      g,
-      0,
-      0.21,
-    );
-    const points = [
-      new T.Vector2(0, 0.34),
-      new T.Vector2(0.38, 0.36),
-      new T.Vector2(0.4, 0.41),
-      new T.Vector2(0.33, 0.57),
-      new T.Vector2(0.2, 0.67),
-      new T.Vector2(0, 0.7),
-    ];
-    const cap = mesh(
-      new T.LatheGeometry(points, 16),
-      material(species.cap, {
-        flatShading: false,
-        emissive: species.cap,
-        emissiveIntensity: item.species === "crescent" ? 0.22 : 0.03,
-      }),
-      g,
-    );
-    for (let j = 0; j < 4; j++) {
-      const a = j * 2.4,
-        r = 0.12 + random() * 0.12;
-      const dot = mesh(
-        new T.SphereGeometry(0.04, 6, 4),
-        material(0xf4e8c4),
+  function buildFood() {
+    for (const item of items) {
+      const species = SPECIES.find((s) => s.id === item.species);
+      const g = at(item.x, item.z);
+      g.scale.setScalar(item.scale * (item.species === "giant" ? 2.8 : 1.15));
+      mesh(
+        new T.CylinderGeometry(0.085, 0.14, 0.42, 8),
+        material(species.stem),
         g,
-        Math.cos(a) * r,
-        0.64 - r * 0.2,
-        Math.sin(a) * r,
+        0,
+        0.21,
       );
-      dot.scale.y = 0.3;
+      const points = [
+        new T.Vector2(0, 0.34),
+        new T.Vector2(0.38, 0.36),
+        new T.Vector2(0.4, 0.41),
+        new T.Vector2(0.33, 0.57),
+        new T.Vector2(0.2, 0.67),
+        new T.Vector2(0, 0.7),
+      ];
+      const cap = mesh(
+        new T.LatheGeometry(points, 16),
+        material(species.cap, {
+          flatShading: false,
+          emissive: species.cap,
+          emissiveIntensity: item.species === "crescent" ? 0.22 : 0.03,
+        }),
+        g,
+      );
+      for (let j = 0; j < 4; j++) {
+        const a = j * 2.4,
+          r = 0.12 + random() * 0.12;
+        const dot = mesh(
+          new T.SphereGeometry(0.04, 6, 4),
+          material(0xf4e8c4),
+          g,
+          Math.cos(a) * r,
+          0.64 - r * 0.2,
+          Math.sin(a) * r,
+        );
+        dot.scale.y = 0.3;
+      }
+      bakePainted(g);
+      mushroomObjects.set(item.id, g);
+      interactables.push({
+        ...item,
+        type: "mushroom",
+        name: `采集 ${species.name}`,
+        category: `${species.rarity}菌物 · 按 F 观察`,
+        object: g,
+        radius: 2.15,
+      });
     }
-    mushroomObjects.set(item.id, g);
-    interactables.push({
-      ...item,
-      type: "mushroom",
-      name: `采集 ${species.name}`,
-      category: `${species.rarity}菌物 · 按 F 观察`,
-      object: g,
-      radius: 2.15,
-    });
+  }
+  buildFood();
+  function refreshForage(state) {
+    for (const g of mushroomObjects.values()) disposeObject(g);
+    mushroomObjects.clear();
+    for (let i = interactables.length - 1; i >= 0; i--)
+      if (interactables[i].type === "mushroom") interactables.splice(i, 1);
+    items.splice(
+      0,
+      items.length,
+      ...createMushrooms(
+        chapter,
+        state.weather,
+        Math.floor(
+          state.day + state.elapsed / (CHAPTERS[chapter - 1].duration + 240),
+        ),
+      ),
+    );
+    buildFood();
+    sync(state);
   }
   if (chapter >= 2) {
     for (const side of [-1, 1]) {
@@ -1354,7 +1432,18 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     stones,
     surfaces,
   );
+  function moveGrandma(state) {
+    const p = grandmaPlace(state),
+      interaction = interactables.find((o) => o.type === "grandma");
+    grandma.position.set(p.x, height(p.x, p.z), p.z);
+    Object.assign(interaction, {
+      x: p.x,
+      z: p.z,
+      category: p.area + " · 奶奶在这里",
+    });
+  }
   function update(t, state) {
+    moveGrandma(state);
     villagers.forEach((v) => v.update(t));
     exploration.update(t, state);
     sun.position.set(
@@ -1415,6 +1504,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     ring.rotation.z = t * 0.3;
   }
   function sync(state) {
+    moveGrandma(state);
     exploration.sync(state);
     collection.sync(state);
     for (const item of items) {
@@ -1422,18 +1512,26 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       g.visible =
         !state.collected.includes(item.id) &&
         (!item.nest || state.nests.includes(item.nest)) &&
-        (!item.gate || state.gateOpen) &&
+        (!item.gate ||
+          (state.gateOpen &&
+            (chapter !== 3 || state.defeated.includes("ant-queen")))) &&
         (!item.boss || state.defeated.includes("boss"));
     }
-    for (const [id, g] of nestObjects) g.visible = !state.nests.includes(id);
+    for (const [id, g] of nestObjects)
+      g.visible = items.some((p) => p.nest === id) && !state.nests.includes(id);
     chestArt.setOpen(state.chests.includes("hidden"));
     riverNote.visible = !state.riverNoteFound;
-    chest.visible = chapter !== 3 || state.mouseRevealed;
+    chest.visible =
+      (!state.collection.opened.includes("story-hidden") ||
+        collection.rewardBox === "story-hidden") &&
+      (chapter !== 3 || state.mouseRevealed);
     for (const obj of interactables)
       if (obj.type === "marker")
         obj.cloth.visible = state.markers.includes(obj.id);
   }
   function dispose() {
+    canyonMasks.forEach((texture) => texture.dispose());
+    sun.shadow.map?.dispose();
     mountains.dispose();
     props.forEach((p) => p.dispose());
     exploration.dispose();
@@ -1456,6 +1554,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   }
   return {
     mountains,
+    refreshForage,
     foliageFocus,
     foliageEye,
     collection,

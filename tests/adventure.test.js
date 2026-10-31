@@ -188,7 +188,7 @@ test("weapon arcs respect range and facing, terrain and furniture stop shots, an
   );
   assert.equal(
     new Set(Object.values(MONSTER_TYPES).map((m) => m.kind)).size,
-    4,
+    6,
   );
 });
 test("edge warning grows gradually and remains clear in the original village", () => {

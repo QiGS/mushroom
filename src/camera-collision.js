@@ -1,4 +1,5 @@
 import { terrainHeight, colliderActive, insideHouse } from "./terrain.js";
+import { collidersNear } from "./spatial.js";
 const top = (c) =>
   c.height ??
   (c.id === "house-bed"
@@ -22,7 +23,12 @@ export function constrainCamera(world, state, focus, candidate, radius = 0.28) {
   }
   const d = { x: end.x - focus.x, y: end.y - focus.y, z: end.z - focus.z };
   let fraction = 1;
-  for (const c of world.colliders) {
+  for (const c of collidersNear(
+    world,
+    (focus.x + end.x) / 2,
+    (focus.z + end.z) / 2,
+    Math.hypot(d.x, d.z) / 2 + radius,
+  )) {
     if (!colliderActive(c, state)) continue;
     const base = terrainHeight(c.x, c.z),
       hx = (c.hx ?? c.r) + radius,

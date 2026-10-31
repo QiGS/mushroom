@@ -179,8 +179,9 @@ test("every treasure and specimen has a dry accessible interaction point in all 
     for (let day = 1; day <= 2; day++) {
       const scene = new T.Scene(),
         world = buildWorld(scene, chapter, "sun", day);
+      world.sync({...newGame(),chapter,weather:'sun',day});
       const targets = world.interactables.filter((p) =>
-        ["treasure", "specimen"].includes(p.type),
+        ["treasure", "specimen"].includes(p.type) && p.object.visible,
       );
       assert.equal(
         targets.length,

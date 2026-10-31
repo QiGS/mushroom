@@ -1,5 +1,6 @@
 import { WORLD_BOUNDS, terrainHeight } from "./terrain.js";
-import { fieldDay, dayPeriod } from "./seasons.js";
+import { fieldDay, dayPeriod, TIME_SCALES } from "./seasons.js";
+import { grandmaPlace } from "./story.js";
 export { terrainHeight } from "./terrain.js";
 import {
   newCollection,
@@ -152,6 +153,7 @@ export function newGame() {
     markers: [],
     recipes: [],
     achievements: [],
+    storySeen: [],
     coins: 0,
     capacity: 24,
     totalCollected: 0,
@@ -181,6 +183,7 @@ export function newGame() {
     houseLoot: {},
     gear: { axe: 0, rifle: 0, boots: 0 },
     weapon: "staff",
+    rifleLoaded: 0,
     timber: 0,
     broken: [],
     looted: [],
@@ -260,6 +263,7 @@ export function sanitizeSave(raw) {
     "markers",
     "recipes",
     "achievements",
+    "storySeen",
   ])
     s[key] = Array.isArray(raw[key])
       ? [
@@ -283,7 +287,7 @@ export function sanitizeSave(raw) {
     sensitivity: finite(raw.settings?.sensitivity, 1, 0.3, 2),
   };
   s.day = Math.max(1, Math.floor(s.day));
-  s.timeScale = [1, 2, 4].includes(raw.timeScale) ? raw.timeScale : 1;
+  s.timeScale = TIME_SCALES.includes(raw.timeScale) ? raw.timeScale : 1;
   s.growthCycle = Math.floor(
     s.elapsed / (CHAPTERS[s.chapter - 1].duration + 240),
   );
@@ -324,6 +328,9 @@ export function sanitizeSave(raw) {
     ["axe", "rifle"].includes(raw.weapon) && s.gear[raw.weapon] > 0
       ? raw.weapon
       : "staff";
+  s.rifleLoaded = Math.floor(
+    finite(raw.rifleLoaded, 0, 0, Math.min(4, s.gear.rifle)),
+  );
   s.selectedTool = raw.selectedTool;
   normalizeToolSelection(s);
   if (
@@ -350,6 +357,7 @@ export function startChapter(old, chapter, weather) {
     "discovered",
     "recipes",
     "achievements",
+    "storySeen",
     "coins",
     "capacity",
     "totalCollected",
@@ -358,6 +366,7 @@ export function startChapter(old, chapter, weather) {
     "cooked",
     "gear",
     "weapon",
+    "rifleLoaded",
     "timber",
     "surveyed",
     "bedOwned",
@@ -395,6 +404,8 @@ export function collect(s, item) {
     return { ok: false, message: "先拨开落叶，找到菌窝。" };
   if (item.gate && !s.gateOpen)
     return { ok: false, message: "石门后仍有未解的秘密。" };
+  if (item.gate && s.chapter === 3 && !s.defeated.includes("ant-queen"))
+    return { ok: false, message: "毒蚁母巢正守着菌谷，先击退它与蚁群。" };
   if (item.boss && !s.defeated.includes("boss"))
     return { ok: false, message: "青影仍守着这处菌窝。" };
   if (item.species !== "giant" && basketCount(s) >= s.capacity)
@@ -413,7 +424,7 @@ export function requirementsMet(s) {
     ) &&
     (s.chapter !== 1 || s.nests.length >= 1) &&
     (s.chapter !== 2 || s.defeated.includes("boss")) &&
-    (s.chapter !== 3 || s.gateOpen)
+    (s.chapter !== 3 || (s.gateOpen && s.defeated.includes("ant-queen")))
   );
 }
 export function settle(s) {
@@ -504,7 +515,7 @@ export function quest(s) {
   if (!s.talked)
     return {
       title: ch.name,
-      detail: "与村口奶奶交谈，领取采集线索",
+      detail: `与${grandmaPlace(s).area}的奶奶交谈，领取采集线索`,
       step: `第 ${s.chapter} 章 · 山野来信`,
     };
   const progress = Object.entries(ch.requirements)
@@ -514,8 +525,10 @@ export function quest(s) {
     )
     .join(" · ");
   return {
-    title: requirementsMet(s) ? "满载回村" : ch.name,
-    detail: requirementsMet(s) ? "返回村口，把收获交给奶奶" : progress,
+    title: requirementsMet(s) ? "满载而归" : ch.name,
+    detail: requirementsMet(s)
+      ? `到${grandmaPlace(s).area}把收获交给奶奶`
+      : progress,
     step: `第 ${s.chapter} 章 · ${s.chapter === 3 ? `地标 ${s.landmarks.length}/3` : s.chapter === 2 ? "留心草丛里的动静" : `菌窝 ${Math.min(s.nests.length, 1)}/1`}`,
   };
 }

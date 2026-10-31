@@ -183,8 +183,11 @@ test("route display toggles, updates to a changed target, and removes its geomet
   const previous = guide.key;
   s.waypoint = { x: -5, z: 23, kind: "treasure" };
   guide.update(0.1, s, s.position);
+  assert.equal(guide.key,previous);
+  s.talked=true;
+  guide.update(.1,s,s.position);
   assert.notEqual(guide.key, previous);
-  assert.equal(guide.target.kind, "treasure");
+  assert.equal(guide.target.kind, "task");
   s.guidance = false;
   guide.update(0.1, s, s.position);
   assert.equal(guide.points.length, 0);

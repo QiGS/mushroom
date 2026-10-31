@@ -54,7 +54,7 @@ export const TOOL_DEFS = [
     name: "猎枪",
     icon: "⌁",
     color: "#c9b091",
-    description: "装备 12 发猎枪；左键向准星射击，3 键切换。",
+    description: "装备 12 发猎枪；左键按准星射击，4 发弹匣，R 装填，3 键切换。",
   },
   {
     id: "boots",

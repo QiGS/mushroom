@@ -7,6 +7,7 @@ import {
   houseUnlocked,
   insideHouse,
   canyonCenter,
+  CANYONS,
 } from "./terrain.js";
 import { BREAKABLES, EXPLORATION_SPOTS } from "./exploration.js";
 import { HOUSE_SUPPLIES, supplyReady } from "./journey.js";
@@ -72,6 +73,22 @@ export function buildExplorationWorld(
   };
 
   const models = [];
+  for (const c of CANYONS) {
+    const g = group(c.x, c.z, c.base);
+    box(
+      g,
+      0,
+      -0.2,
+      0,
+      c.width,
+      0.1,
+      c.depth,
+      c.id === "canyon-two" ? 0x9d693f : 0x6e8278,
+    ).castShadow = false;
+    models.push(
+      addProp(g, c.id, { width: c.width, height: c.height, depth: c.depth }),
+    );
+  }
   const house = group(-6, 33, height(-6, 33) + 0.16),
     base = house.position.y;
   box(house, 0, 0, 0, 7.2, 0.24, 6.2, 0x867458);
@@ -556,13 +573,17 @@ export function buildExplorationWorld(
     );
     rock.rotation.y = i * 0.73;
     models.push(
-      addProp(g, "rock", {
-        width: 2.7,
-        height: 4 + (i % 4),
-        depth: 2.6,
-        rotation: i * 0.73,
-        fallback: rock,
-      }),
+      addProp(
+        g,
+        i % 3 === 0 ? "rock-two" : i % 3 === 1 ? "rock-three" : "rock",
+        {
+          width: 2.7,
+          height: 4 + (i % 4),
+          depth: 2.6,
+          rotation: i * 0.73,
+          fallback: rock,
+        },
+      ),
     );
     colliders.push({ x, z, r: 1.35 });
   }

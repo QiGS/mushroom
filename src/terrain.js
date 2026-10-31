@@ -1,3 +1,55 @@
+import { collidersNear } from "./spatial.js";
+import { CANYONS } from "./frontier-height.js";
+export { CANYONS } from "./frontier-height.js";
+export function canyonAt(x, z) {
+  return CANYONS.find(
+    (c) => Math.abs(x - c.x) < c.width / 2 && Math.abs(z - c.z) < c.depth / 2,
+  );
+}
+export function canyonSurface(x, z) {
+  for (const c of CANYONS) {
+    const u = (x - c.x) / c.width + 0.5,
+      v = (z - c.z) / c.depth + 0.5;
+    if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
+    const gx = u * c.n,
+      gz = v * c.n,
+      ix = Math.floor(gx),
+      iz = Math.floor(gz),
+      fx = gx - ix,
+      fz = gz - iz;
+    const sample = (dx, dz) => c.data[(iz + dz) * (c.n + 1) + ix + dx];
+    const a = sample(0, 0),
+      b = sample(1, 0),
+      d = sample(0, 1),
+      e = sample(1, 1);
+    const samples = [a, b, d, e].filter((p) => p !== null);
+    if (!samples.length) return c.id === "canyon-two" ? c.base : -Infinity;
+    const weights = [
+      (1 - fx) * (1 - fz),
+      fx * (1 - fz),
+      (1 - fx) * fz,
+      fx * fz,
+    ];
+    let sum = 0,
+      weight = 0;
+    [a, b, d, e].forEach((p, i) => {
+      if (p !== null) {
+        sum += p * weights[i];
+        weight += weights[i];
+      }
+    });
+    // At a cliff edge choose the upper surface instead of interpolating a ramp
+    // through the rock. Smooth valley floors keep their bilinear surface.
+    let y =
+      Math.max(...samples) - Math.min(...samples) > 0.65
+        ? Math.max(...samples)
+        : weight > 0
+          ? sum / weight
+          : Math.max(...samples);
+    return y;
+  }
+  return -Infinity;
+}
 export const WORLD_BOUNDS = { minX: -92, maxX: 92, minZ: -94, maxZ: 56 };
 export const MAP_SPACE = { x: -100, z: -100, span: 200 };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -6,7 +58,7 @@ const smooth = (a, b, v) => {
   return t * t * (3 - 2 * t);
 };
 export const canyonCenter = (z) => 64 + Math.sin(z * 0.065) * 3;
-export function terrainHeight(x, z) {
+export function baseTerrainHeight(x, z) {
   const base =
     Math.sin(x * 0.07) * 0.85 +
     Math.cos(z * 0.09) * 0.65 +
@@ -32,16 +84,42 @@ export function terrainHeight(x, z) {
     (1 - smooth(26, 38, z)) *
     length *
     (1 - smooth(4.7, 7.5, Math.abs(x - canyonCenter(z))));
-  return (
+  const land =
     base * (1 - waterBlend) -
     1.1 * waterBlend +
     mountain +
     plateau -
     gorge +
-    shore
-  );
+    shore;
+  // A short earthen apron meets the imported canyon's low southern entrance.
+  if (x > -30 && x < -17 && z > -51 && z < -48) {
+    const blend =
+      smooth(48, 51, -z) *
+      Math.min(smooth(-30, -28, x), 1 - smooth(-19, -17, x));
+    return land * (1 - blend) - 0.8 * blend;
+  }
+  return land;
+}
+export function terrainHeight(x, z) {
+  const canyon = canyonSurface(x, z);
+  return Number.isFinite(canyon)
+    ? canyon - (Number.isFinite(canyonStream(x, z)) ? 0.9 : 0)
+    : baseTerrainHeight(x, z);
+}
+function canyonStream(x, z) {
+  // Follow the narrow watercourse baked into the supplied mossy canyon model.
+  if (z > -54 || z < -80) return -Infinity;
+  const rise = (-z - 54) * 0.23,
+    center = 30 + rise;
+  if (Math.abs(x - center) > 1.15) return -Infinity;
+  const surface = canyonSurface(x, z);
+  return Number.isFinite(surface) && Math.abs(surface - rise) < 1.3
+    ? surface + 0.03
+    : -Infinity;
 }
 export function waterLevel(x, z) {
+  const stream = canyonStream(x, z);
+  if (Number.isFinite(stream)) return stream;
   if (Math.hypot((x - 25) / 8.5, (z + 4) / 13) < 1.02) return 0.04;
   if (z > -73 && z < 10 && Math.abs(x - canyonCenter(z)) < 4.7) return -10.4;
   return -Infinity;
@@ -93,7 +171,7 @@ export function fallDamage(distance) {
 }
 export function safeSpawn(world, s, position) {
   const valid = (x, z) =>
-    !world.colliders.some(
+    !collidersNear(world, x, z).some(
       (c) => colliderActive(c, s) && overlapsCollider(c, x, z),
     ) &&
     !(insideHouse(x, z) && !houseUnlocked(s)) &&
@@ -116,7 +194,7 @@ export function stepBody(world, s, body, dx, dz, dt) {
     wasSwimming = body.swimming === true;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.15));
   const blocked = (x, z) =>
-    world.colliders.some(
+    collidersNear(world, x, z).some(
       (c) => colliderActive(c, s) && overlapsCollider(c, x, z),
     ) ||
     (s.chapter === 3 && !s.gateOpen && z < -32.5 && z > -46 && Math.abs(x) < 5);

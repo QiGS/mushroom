@@ -1,6 +1,7 @@
 import * as T from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { TREASURES, collectionLayout, RARITIES } from "./collection.js";
+import { fieldDay } from "./seasons.js";
 import { createChestVisual } from "./chest-model.js";
 
 const assets = new Map();
@@ -54,7 +55,11 @@ export function buildCollectionWorld(
       radius: 2.9,
     });
   }
-  for (const item of collectionLayout(chapter, day, weather)) {
+  // Allocate each possible species once; dawn only moves/shows existing objects.
+  const all = new Map();
+  for (let d = 1; d <= 4; d++)
+    for (const p of collectionLayout(chapter, d, "rain")) all.set(p.id, p);
+  for (const item of all.values()) {
     const group = place(item.x, item.z);
     const placeholder = new T.Group();
     group.add(placeholder);
@@ -89,8 +94,7 @@ export function buildCollectionWorld(
     ring.position.y = 0.025;
     group.add(ring);
     ring.visible = false;
-    specimens.set(item.id, { group, ring, item });
-    interactables.push({
+    const interaction = {
       id: item.id,
       x: item.x,
       z: item.z,
@@ -99,7 +103,9 @@ export function buildCollectionWorld(
       category: `${RARITIES[item.species.rarity].name}收藏 · 永久记入图鉴`,
       object: group,
       radius: item.radius,
-    });
+    };
+    specimens.set(item.id, { group, ring, item, interaction });
+    interactables.push(interaction);
     if (typeof window !== "undefined")
       model(item.id)
         .then((gltf) => {
@@ -130,13 +136,25 @@ export function buildCollectionWorld(
   return {
     boxes,
     specimens,
+    rewardBox: null,
     sync(state) {
       for (const [id, b] of boxes) {
         b.opened = state.collection.opened.includes(id);
         b.art.setOpen(b.opened);
+        b.group.visible = !b.opened || this.rewardBox === id;
       }
+      const layout = new Map(
+        collectionLayout(state.chapter, fieldDay(state), state.weather).map(
+          (p) => [p.id, p],
+        ),
+      );
       for (const [id, p] of specimens) {
-        p.group.visible = !state.collection.picked.includes(id);
+        const placed = layout.get(id);
+        p.group.visible = !!placed && !state.collection.picked.includes(id);
+        if (placed) {
+          p.group.position.set(placed.x, height(placed.x, placed.z), placed.z);
+          Object.assign(p.interaction, { x: placed.x, z: placed.z });
+        }
         p.ring.visible = state.collection.clues.includes(id);
       }
     },
