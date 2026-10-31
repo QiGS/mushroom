@@ -3,16 +3,18 @@ import {
   RARITIES,
   TREASURES,
   collectionImage,
+  journalImage,
   collectionStats,
   activeClues,
   openTreasure,
   trackClue,
 } from "./collection.js";
 import "./collection.css";
+import { TOOL_DEFS } from "./tools.js";
 const $ = (id) => document.getElementById(id);
 const speciesById = (id) => COLLECTION.find((p) => p.id === id);
-const picture = (p, known = true, cls = "") =>
-  `<img class="collection-portrait ${known ? "" : "undiscovered"} ${cls}" src="${collectionImage(p.id)}" alt="${known ? p.name : "尚未发现的菌子剪影"}" draggable="false"/>`;
+const picture = (p, known = true, cls = "", detail = false) =>
+  `<img class="collection-portrait ${known ? "" : "undiscovered"} ${cls}" src="${journalImage(p.id, known && detail)}" alt="${known ? p.name : "尚未发现的菌子剪影"}" draggable="false"/>`;
 
 export class CollectionUI {
   constructor(ui) {
@@ -69,7 +71,7 @@ export class CollectionUI {
     const detail = p
       ? `<section class="book-detail" aria-label="菌子详情">
       <div class="book-detail-heading"><div><span class="book-number">FIELD NOTE / ${String(COLLECTION.indexOf(p) + 1).padStart(2, "0")}</span><h3>${known ? p.name : "尚未发现"}</h3></div><button id="collection-favorite" class="favorite-button ${c.favorites.includes(p.id) ? "selected" : ""}" aria-label="${c.favorites.includes(p.id) ? "取消关注" : "标记关注"}">★</button></div>
-      <div class="book-hero ${p.rarity}">${picture(p, known)}<span class="rarity-seal ${p.rarity}">${RARITIES[p.rarity].icon} ${RARITIES[p.rarity].name}</span>${known ? `<span class="hero-count">累计收藏 <strong>×${c.counts[p.id]}</strong></span>` : ""}</div>
+      <div class="book-hero ${p.rarity} ${known ? "illustrated" : ""}">${picture(p, known, "", true)}<span class="rarity-seal ${p.rarity}">${RARITIES[p.rarity].icon} ${RARITIES[p.rarity].name}</span>${known ? `<span class="hero-count">累计收藏 <strong>×${c.counts[p.id]}</strong></span>` : ""}</div>
       <p class="book-description">${known ? p.note : "这页故事还在等待一场相遇。寻找林间宝箱，或亲手采集散落在山野中的菌子，便能点亮这一页。"}</p>
       <div class="book-facts"><div><span>生长区域</span><b>${p.area}</b></div><div><span>首次发现</span><b>${found ? `第 ${found.day} 天 · ${found.source === "box" ? "宝箱惊喜" : "林间采集"}` : "尚未记录"}</b></div><div><span>收藏规则</span><b>重复累计 · 永久保留</b></div></div>
       <div class="book-clue"><span>⌖ 采集提示</span><p>${p.hint}</p>${hasClue ? `<button id="collection-track">${c.track === p.id ? "查看正在追踪的线索" : "在地图追踪线索"} ↗</button>` : `<small>${p.rarity === "common" ? "常见菌每趟都可找到，也会出现在盲盒中。" : "开启林间宝箱，可获得本趟稀有与史诗菌的便笺。"}</small>`}</div>
@@ -143,6 +145,7 @@ export class CollectionUI {
     if (!result.ok) return this.ui.toast(result.message, true);
     this.game.save();
     this.ui.waypoint = null;
+    this.game.route.invalidate();
     this.ui.map();
     this.ui.toast("线索已圈在地图上，沿指南针寻找搜索区域。");
   }
@@ -155,7 +158,7 @@ export class CollectionUI {
     this.ui.show(
       name,
       "A LITTLE SURPRISE",
-      `<div class="loot-stage sealed"><div class="loot-orbit"></div><img class="loot-basket" src="${collectionImage("basket")}" alt="等待打开的寻菌竹篮"/><span class="loot-ribbon">山野寻菌盲盒</span><h3>这次，森林会送来什么？</h3><p>一份菌子收藏，一点意料之外的惊喜。<br/>数量随机，重复的菌子也会累积进图鉴。</p><button id="open-mushroom-box" class="loot-open">揭开封签 · 打开盲盒</button><details class="loot-odds"><summary>看看盒子里的可能</summary><p>常见 72%（2–6 朵） · 稀有 24%（1–3 朵） · 史诗 4%（1–2 朵）。连续 7 盒未出稀有或史诗，第 8 盒至少稀有。宝箱仅通过探索获得。</p></details></div>`,
+      `<div class="loot-stage sealed"><div class="loot-orbit"></div><img class="loot-basket" src="${collectionImage("chest-closed")}" alt="等待开启的神秘宝箱"/><span class="loot-ribbon">山野寻菌盲盒</span><h3>这次，森林会送来什么？</h3><p>一份菌子收藏，一点意料之外的惊喜。<br/>数量随机，重复的菌子也会累积进图鉴。</p><button id="open-mushroom-box" class="loot-open">揭开封签 · 打开盲盒</button><details class="loot-odds"><summary>看看盒子里的可能</summary><p>常见 72%（2–6 朵） · 稀有 24%（1–3 朵） · 史诗 4%（1–2 朵）。连续 7 盒未出稀有或史诗，第 8 盒至少稀有。宝箱仅通过探索获得。</p></details></div>`,
       "treasure",
     );
     $("open-mushroom-box").onclick = () => {
@@ -182,11 +185,12 @@ export class CollectionUI {
   result(reward, wild = false) {
     const p = speciesById(reward.id),
       rarity = RARITIES[p.rarity],
-      clue = speciesById(reward.clue);
+      clue = speciesById(reward.clue),
+      tool = TOOL_DEFS.find((t) => t.id === reward.tool?.id);
     this.ui.show(
       wild ? "林间的新收藏" : "森林送来了一份惊喜",
       "A LITTLE WONDER",
-      `<div class="loot-stage revealed ${p.rarity}"><span class="loot-rarity">${rarity.icon} ${rarity.name}收藏</span><div class="loot-portrait">${picture(p)}<span class="loot-quantity">×${reward.quantity}</span></div><span class="loot-first">${reward.first ? "首次发现 · 图鉴已点亮" : "再次相遇 · 收藏数量已累加"}</span><h3>${p.name}</h3><p>累计收藏 <b>${reward.total}</b> 朵${reward.bonus ? ` · 收藏成就奖励 +${reward.bonus} 竹叶币` : ""}${reward.guaranteed ? " · 本次触发稀有保底" : ""}</p>${clue ? `<div class="loot-clue"><span>⌖ 还找到一张${RARITIES[clue.rarity].name}菌便笺</span><p>${clue.area}的搜索范围，已经记在地图上。</p><button id="loot-track">查看地图线索 ↗</button></div>` : ""}<div class="loot-actions"><button id="loot-continue">收好收藏，继续寻宝</button><button id="loot-guide">翻开图鉴 →</button></div></div>`,
+      `<div class="loot-stage revealed ${p.rarity}"><span class="loot-rarity">${rarity.icon} ${rarity.name}收藏</span><div class="loot-portrait">${picture(p)}<span class="loot-quantity">×${reward.quantity}</span></div><span class="loot-first">${reward.first ? "首次发现 · 图鉴已点亮" : "再次相遇 · 收藏数量已累加"}</span><h3>${p.name}</h3><p>累计收藏 <b>${reward.total}</b> 朵${reward.bonus ? ` · 收藏成就奖励 +${reward.bonus} 竹叶币` : ""}${reward.guaranteed ? " · 本次触发稀有保底" : ""}</p>${clue ? `<div class="loot-clue"><span>⌖ 还找到一张${RARITIES[clue.rarity].name}菌便笺</span><p>${clue.area}的搜索范围，已经记在地图上。</p><button id="loot-track">查看地图线索 ↗</button></div>` : ""}${tool ? `<div class="loot-tool"><b>${tool.icon} ${tool.name} ×${reward.tool.quantity}</b><span>已放入道具栏 · ↑↓ 选择，G 使用</span></div>` : ""}<div class="loot-actions"><button id="loot-continue">收好收藏，继续寻宝</button><button id="loot-guide">翻开图鉴 →</button></div></div>`,
       "treasure",
     );
     $("loot-continue").onclick = () => {

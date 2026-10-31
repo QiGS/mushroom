@@ -1,4 +1,6 @@
 import * as T from "three";
+import { createChestVisual } from "./chest-model.js";
+import { RIVER_NOTE, RIVER_WALKWAY } from "./navigation.js";
 import { COLLECTION_CLEARINGS } from "./collection.js";
 import { buildCollectionWorld } from "./collection-world.js";
 import {
@@ -171,6 +173,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     ...NESTS.map((p) => ({ ...p, r: 5.8 })),
     ...LANDMARKS.map((p) => ({ ...p, r: 4 })),
     ...COLLECTION_CLEARINGS.map((p) => ({ ...p, r: 3.2 })),
+    ...RIVER_WALKWAY.map((p) => ({ ...p, r: 2 })),
     { x: -25, z: 5, r: 4 },
     { x: -31, z: 0, r: 5 },
     { x: 22, z: -18, r: 4 },
@@ -397,6 +400,84 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   water.castShadow = false;
   water.receiveShadow = false;
   const stones = [];
+  // A continuous wooden approach makes the clue platform reachable in every chapter.
+  for (const [i, p] of RIVER_WALKWAY.entries()) {
+    mesh(
+      new T.BoxGeometry(0.74, 0.18, 1.65),
+      material(i % 2 ? 0x917651 : 0xa48759),
+      root,
+      p.x,
+      0.39,
+      p.z,
+    );
+    stones.push({ ...p });
+    if (i % 3 === 0)
+      for (const side of [-1, 1]) {
+        mesh(
+          new T.CylinderGeometry(0.055, 0.07, 0.75, 6),
+          material(0x6c5942),
+          root,
+          p.x,
+          0.71,
+          p.z + side * 0.78,
+        );
+      }
+  }
+  mesh(
+    new T.CylinderGeometry(1.35, 1.65, 0.65, 10),
+    material(0x8f9e83),
+    root,
+    RIVER_NOTE.x,
+    0.15,
+    RIVER_NOTE.z,
+  );
+  stones.push({ ...RIVER_NOTE, r: 1.35, y: 0.48 });
+  const riverNote = new T.Group();
+  riverNote.position.set(RIVER_NOTE.x, 0.48, RIVER_NOTE.z);
+  root.add(riverNote);
+  mesh(
+    new T.CylinderGeometry(0.2, 0.2, 0.52, 10),
+    material(0x80b5a1, { transparent: true, opacity: 0.8 }),
+    riverNote,
+    0,
+    0.32,
+    0,
+  );
+  mesh(
+    new T.BoxGeometry(0.18, 0.29, 0.1),
+    material(0xf5e0af),
+    riverNote,
+    0,
+    0.35,
+    0,
+  );
+  mesh(
+    new T.CylinderGeometry(0.12, 0.12, 0.12, 8),
+    material(0x9b7948),
+    riverNote,
+    0,
+    0.62,
+    0,
+  );
+  const riverBeacon = mesh(
+    new T.OctahedronGeometry(0.17),
+    material(0xf0d38b, { emissive: 0xceba7e, emissiveIntensity: 0.5 }),
+    riverNote,
+    0,
+    1.06,
+    0,
+  );
+  animated.push((t) => {
+    riverBeacon.position.y = 1.06 + Math.sin(t * 2) * 0.1;
+    riverBeacon.rotation.y = t;
+  });
+  interactables.push({
+    ...RIVER_NOTE,
+    type: "river-note",
+    category: "河心线索 · 收入道具栏后按 G 阅读",
+    object: riverNote,
+    radius: 1.7,
+  });
   for (let i = 0; i < 8; i++) {
     const z = 7 - i * 3;
     const x = 25 + Math.sin(i) * 0.8;
@@ -793,31 +874,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         ? { x: 22, z: -19 }
         : { x: -29, z: -20 };
   const chest = at(chestAt.x, chestAt.z);
-  mesh(new T.BoxGeometry(1.25, 0.65, 0.8), material(0x835d35), chest, 0, 0.33);
-  const lid = mesh(
-    new T.BoxGeometry(1.3, 0.22, 0.85),
-    material(0xa6874b),
-    chest,
-    0,
-    0.76,
-    -0.02,
-  );
-  for (let x of [-0.4, 0.4])
-    mesh(
-      new T.BoxGeometry(0.08, 0.9, 0.87),
-      material(0xcfb369, { metalness: 0.5 }),
-      chest,
-      x,
-      0.45,
-    );
-  mesh(
-    new T.BoxGeometry(0.18, 0.2, 0.1),
-    material(0xe7ca79),
-    chest,
-    0,
-    0.48,
-    0.45,
-  );
+  const chestArt = createChestVisual(chest, 1.5);
   interactables.push({
     type: "chest",
     id: "hidden",
@@ -1208,7 +1265,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         (!item.boss || state.defeated.includes("boss"));
     }
     for (const [id, g] of nestObjects) g.visible = !state.nests.includes(id);
-    lid.rotation.x = state.chests.includes("hidden") ? -0.9 : 0;
+    chestArt.setOpen(state.chests.includes("hidden"));
+    riverNote.visible = !state.riverNoteFound;
     chest.visible = chapter !== 3 || state.mouseRevealed;
     for (const obj of interactables)
       if (obj.type === "marker")
@@ -1216,6 +1274,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   }
   function dispose() {
     collection.dispose();
+    chestArt.dispose();
     scene.remove(root);
     const gs = new Set(),
       ms = new Set();

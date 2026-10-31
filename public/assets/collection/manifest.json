@@ -89,5 +89,19 @@
     "sourceTriangles": 1980219,
     "triangles": 9997,
     "bytes": 524908
+  },
+  {
+    "id": "chest-closed",
+    "source": "宝箱.glb",
+    "sourceTriangles": 1848839,
+    "triangles": 17998,
+    "bytes": 1297760
+  },
+  {
+    "id": "chest-open",
+    "source": "宝箱开箱版.glb",
+    "sourceTriangles": 1934020,
+    "triangles": 18000,
+    "bytes": 1195740
   }
 ]

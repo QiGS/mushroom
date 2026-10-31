@@ -1,6 +1,7 @@
 import * as T from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { TREASURES, collectionLayout, RARITIES } from "./collection.js";
+import { createChestVisual } from "./chest-model.js";
 
 const assets = new Map();
 function model(id) {
@@ -42,28 +43,7 @@ export function buildCollectionWorld(
   };
   for (const box of TREASURES) {
     const group = place(box.x, box.z);
-    solid(group, new T.BoxGeometry(0.95, 0.58, 0.7), 0x725038, 0, 0.29, 0);
-    const lid = new T.Group();
-    lid.position.set(0, 0.58, -0.35);
-    group.add(lid);
-    solid(lid, new T.BoxGeometry(1.02, 0.18, 0.77), 0xa47b47, 0, 0.06, 0.35);
-    for (const x of [-0.32, 0.32]) {
-      solid(group, new T.BoxGeometry(0.065, 0.6, 0.72), 0xc8a462, x, 0.3, 0, {
-        metalness: 0.4,
-      });
-      solid(lid, new T.BoxGeometry(0.07, 0.2, 0.79), 0xd2b46c, x, 0.06, 0.35, {
-        metalness: 0.5,
-      });
-    }
-    const gem = solid(
-      group,
-      new T.OctahedronGeometry(0.1),
-      0xe5c779,
-      0,
-      0.38,
-      0.4,
-      { emissive: 0xcda958, emissiveIntensity: 0.6 },
-    );
+    const art = createChestVisual(group);
     const glow = new T.Mesh(
       new T.CircleGeometry(0.85, 32),
       new T.MeshBasicMaterial({
@@ -76,7 +56,7 @@ export function buildCollectionWorld(
     glow.rotation.x = -Math.PI / 2;
     glow.position.y = 0.035;
     group.add(glow);
-    boxes.set(box.id, { group, lid, gem, glow, opened: false });
+    boxes.set(box.id, { group, art, glow, opened: false });
     interactables.push({
       ...box,
       type: "treasure",
@@ -164,7 +144,8 @@ export function buildCollectionWorld(
     sync(state) {
       for (const [id, b] of boxes) {
         b.opened = state.collection.opened.includes(id);
-        b.gem.visible = b.glow.visible = !b.opened;
+        b.glow.visible = !b.opened;
+        b.art.setOpen(b.opened);
       }
       for (const [id, p] of specimens) {
         p.group.visible = !state.collection.picked.includes(id);
@@ -173,11 +154,6 @@ export function buildCollectionWorld(
     },
     update(t, state) {
       for (const b of boxes.values()) {
-        b.lid.rotation.x = T.MathUtils.lerp(
-          b.lid.rotation.x,
-          b.opened ? -1.7 : 0,
-          0.12,
-        );
         b.glow.material.opacity = 0.11 + Math.sin(t * 2) * 0.035;
       }
       for (const p of specimens.values())
@@ -186,6 +162,7 @@ export function buildCollectionWorld(
     },
     dispose() {
       disposed = true;
+      for (const b of boxes.values()) b.art.dispose();
     },
   };
 }

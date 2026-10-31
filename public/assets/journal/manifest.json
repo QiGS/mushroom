@@ -1,0 +1,146 @@
+[
+  {
+    "id": "bolete",
+    "kind": "card",
+    "source": "牛肝菌_子图.png",
+    "file": "bolete-card.webp"
+  },
+  {
+    "id": "bolete",
+    "kind": "detail",
+    "source": "牛肝菌_详情插画.png",
+    "file": "bolete-detail.webp"
+  },
+  {
+    "id": "chanterelle",
+    "kind": "card",
+    "source": "鸡油菌_子图.png",
+    "file": "chanterelle-card.webp"
+  },
+  {
+    "id": "chanterelle",
+    "kind": "detail",
+    "source": "鸡油菌_详情插画.png",
+    "file": "chanterelle-detail.webp"
+  },
+  {
+    "id": "russula",
+    "kind": "card",
+    "source": "红菇_子图.png",
+    "file": "russula-card.webp"
+  },
+  {
+    "id": "russula",
+    "kind": "detail",
+    "source": "红菇_详情插画.png",
+    "file": "russula-detail.webp"
+  },
+  {
+    "id": "milkcap",
+    "kind": "card",
+    "source": "奶浆菌_子图.png",
+    "file": "milkcap-card.webp"
+  },
+  {
+    "id": "milkcap",
+    "kind": "detail",
+    "source": "奶浆菌_详情插画.png",
+    "file": "milkcap-detail.webp"
+  },
+  {
+    "id": "greenhead",
+    "kind": "card",
+    "source": "青头菌_子图.png",
+    "file": "greenhead-card.webp"
+  },
+  {
+    "id": "greenhead",
+    "kind": "detail",
+    "source": "青头菌_详情插画.png",
+    "file": "greenhead-detail.webp"
+  },
+  {
+    "id": "termite",
+    "kind": "card",
+    "source": "鸡纵菌_子图.png",
+    "file": "termite-card.webp"
+  },
+  {
+    "id": "termite",
+    "kind": "detail",
+    "source": "鸡纵菌_详情插画.png",
+    "file": "termite-detail.webp"
+  },
+  {
+    "id": "ganba",
+    "kind": "card",
+    "source": "干巴菌_子图.png",
+    "file": "ganba-card.webp"
+  },
+  {
+    "id": "ganba",
+    "kind": "detail",
+    "source": "干巴菌_详情插画.png",
+    "file": "ganba-detail.webp"
+  },
+  {
+    "id": "bluebolete",
+    "kind": "card",
+    "source": "见手青_子图.png",
+    "file": "bluebolete-card.webp"
+  },
+  {
+    "id": "bluebolete",
+    "kind": "detail",
+    "source": "见手青_详情插画.png",
+    "file": "bluebolete-detail.webp"
+  },
+  {
+    "id": "bamboofungus",
+    "kind": "card",
+    "source": "竹荪_子图.png",
+    "file": "bamboofungus-card.webp"
+  },
+  {
+    "id": "bamboofungus",
+    "kind": "detail",
+    "source": "竹荪_详情插画.png",
+    "file": "bamboofungus-detail.webp"
+  },
+  {
+    "id": "morel",
+    "kind": "card",
+    "source": "羊肚菌_子图.png",
+    "file": "morel-card.webp"
+  },
+  {
+    "id": "morel",
+    "kind": "detail",
+    "source": "羊肚菌_详情插画.png",
+    "file": "morel-detail.webp"
+  },
+  {
+    "id": "matsutake",
+    "kind": "card",
+    "source": "松茸_子图.png",
+    "file": "matsutake-card.webp"
+  },
+  {
+    "id": "matsutake",
+    "kind": "detail",
+    "source": "松茸_详情插画.png",
+    "file": "matsutake-detail.webp"
+  },
+  {
+    "id": "truffle",
+    "kind": "card",
+    "source": "松露_子图.png",
+    "file": "truffle-card.webp"
+  },
+  {
+    "id": "truffle",
+    "kind": "detail",
+    "source": "松露_详情插画.png",
+    "file": "truffle-detail.webp"
+  }
+]

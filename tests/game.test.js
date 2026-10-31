@@ -181,23 +181,23 @@ test("damaged and unexpected saves recover finite bounded defaults", () => {
 test("starting a new chapter retains permanent rewards and resets per-run rewards", () => {
   const s = finishExploration(newGame());
   settle(s);
-  s.compass = true;
+  s.tools.compass = 1;
   s.markers = [0];
-  s.hatUsed = true;
+  s.shielded = true;
   const n = startChapter(s, 2, "fog");
   assert.equal(n.chapter, 2);
   assert.equal(n.weather, "fog");
-  assert.equal(n.compass, true);
+  assert.equal(n.tools.compass, 1);
   assert.equal(n.recipes.length, 1);
   assert.equal(n.collected.length, 0);
   assert.equal(n.markers.length, 0);
-  assert.equal(n.hatUsed, false);
-  assert.equal(n.compassUses, 2);
+  assert.equal(n.shielded, true);
+  assert.equal(n.tools.fruit, s.tools.fruit);
 });
 test("consumable cannot be spent at full health or when empty", () => {
   const s = newGame();
   assert.equal(heal(s).ok, false);
-  assert.equal(s.potions, 1);
+  assert.equal(s.tools.fruit, 1);
   s.health = 2;
   assert.equal(heal(s).ok, true);
   assert.equal(s.health, 5);

@@ -1,6 +1,8 @@
 // Local development only. This module is excluded from production builds.
 import { terrainHeight, CHAPTERS } from "./state.js";
 import { activeClues } from "./collection.js";
+import { RIVER_NOTE, surfaceHeight } from "./navigation.js";
+import { grantTool, TOOL_DEFS } from "./tools.js";
 export function attachQA(game) {
   const bar = document.createElement("div");
   bar.id = "qa-controls";
@@ -8,7 +10,7 @@ export function attachQA(game) {
     "position:fixed;top:85px;right:16px;z-index:90;display:flex;gap:4px;flex-wrap:wrap;max-width:650px;background:#142c29e8;padding:8px;border:1px solid #e6c77d;";
   const move = (x, z) => {
     game.ui.close();
-    game.player.root.position.set(x, terrainHeight(x, z), z);
+    game.player.root.position.set(x, surfaceHeight(game.world, x, z), z);
     game.state.position = { x, z };
     game.vertical = 0;
     game.clearInput();
@@ -60,6 +62,34 @@ export function attachQA(game) {
     if (item) move(item.x, item.z + 0.3);
   });
   add("QA 图鉴", () => game.ui.guide());
+  add("QA 河心", () => move(RIVER_NOTE.x, RIVER_NOTE.z + 0.4));
+  add("QA 浮桥", () => {
+    move(15, -4);
+    game.yaw = -Math.PI / 2;
+    game.pitch = 0.35;
+    game.distance = 9;
+  });
+  add("QA 道具", () => {
+    for (const t of TOOL_DEFS) grantTool(game.state, t.id);
+    game.state.health = 3;
+    game.state.selectedTool = "fruit";
+    game.save();
+    game.ui.updateToolbelt();
+  });
+  add("QA 走过浮桥", () => {
+    move(15, -4);
+    game.yaw = -Math.PI / 2;
+    game.keys.add("KeyW");
+    // Exercise real movement/collision in fixed steps, independent of background
+    // tab frame throttling. This is not a teleport to the destination.
+    for (let step = 0; step < 240 && game.player.root.position.x < 24.3; step++)
+      game.updatePlayer(1 / 60);
+    game.keys.delete("KeyW");
+    game.findInteraction();
+  });
+  add("QA 使用 G", () => game.useSelectedTool());
+  add("QA 下选", () => game.selectTool(1));
+  add("QA 引导 V", () => game.toggleGuidance());
   add("QA 隐藏面板", () => {
     bar.hidden = true;
     bar.style.display = "none";

@@ -3,6 +3,13 @@ import {
   sanitizeCollection,
   nextCollectionTrip,
 } from "./collection.js";
+import {
+  newTools,
+  sanitizeTools,
+  normalizeToolSelection,
+  grantTool,
+  activateTool,
+} from "./tools.js";
 export const SAVE_KEY = "mushroom-wilds-v2";
 export const CAMP = { x: 0, z: 30 };
 export const SPECIES = [
@@ -169,13 +176,13 @@ export function newGame() {
     gate: [0, 0, 0],
     completed: false,
     settled: false,
-    hat: false,
-    hatUsed: false,
-    shoes: false,
-    bell: false,
-    compass: false,
-    compassUses: 2,
-    potions: 1,
+    tools: newTools(),
+    selectedTool: "fruit",
+    shielded: false,
+    boostTime: 0,
+    riverNoteFound: false,
+    waypoint: null,
+    guidance: false,
     hits: 0,
     guideUsed: false,
     settings: { sound: true, quality: "high", sensitivity: 1 },
@@ -201,9 +208,8 @@ export function sanitizeSave(raw) {
     ["playSeconds", 999999],
     ["day", 9999],
     ["elapsed", 99999],
-    ["potions", 99],
     ["hits", 999],
-    ["compassUses", 2],
+    ["boostTime", 8],
   ])
     s[key] = finite(raw[key], s[key], 0, max);
   s.capacity = raw.capacity === 36 ? 36 : 24;
@@ -224,11 +230,9 @@ export function sanitizeSave(raw) {
     "gateOpen",
     "completed",
     "settled",
-    "hat",
-    "hatUsed",
-    "shoes",
-    "bell",
-    "compass",
+    "shielded",
+    "riverNoteFound",
+    "guidance",
     "guideUsed",
   ])
     s[key] = raw[key] === true;
@@ -265,6 +269,24 @@ export function sanitizeSave(raw) {
   };
   s.day = Math.max(1, Math.floor(s.day));
   s.collection = sanitizeCollection(raw.collection, s.chapter, s.day);
+  s.tools = sanitizeTools(raw.tools, raw);
+  s.selectedTool = raw.selectedTool;
+  normalizeToolSelection(s);
+  if (
+    raw.waypoint &&
+    Number.isFinite(raw.waypoint.x) &&
+    Number.isFinite(raw.waypoint.z)
+  ) {
+    s.waypoint = {
+      x: finite(raw.waypoint.x, 0, -51, 51),
+      z: finite(raw.waypoint.z, 0, -49, 39),
+      kind: ["river", "treasure", "nest", "landmark", "camp"].includes(
+        raw.waypoint.kind,
+      )
+        ? raw.waypoint.kind
+        : "custom",
+    };
+  }
   return s;
 }
 export function startChapter(old, chapter, weather) {
@@ -277,10 +299,9 @@ export function startChapter(old, chapter, weather) {
     "coins",
     "capacity",
     "totalCollected",
-    "hat",
-    "shoes",
-    "bell",
-    "compass",
+    "tools",
+    "selectedTool",
+    "shielded",
     "settings",
     "playSeconds",
   ])
@@ -289,7 +310,6 @@ export function startChapter(old, chapter, weather) {
   s.day = old.day + 1;
   s.collection = nextCollectionTrip(old.collection || newCollection());
   s.weather = weather || ["rain", "sun", "fog"][s.chapter - 1];
-  s.potions = Math.max(1, old.potions);
   return s;
 }
 export function basketCount(s) {
@@ -360,7 +380,7 @@ export function settle(s) {
   if (s.chapter === 1 && !s.achievements.includes("采菌新手"))
     s.achievements.push("采菌新手");
   if (s.chapter === 2) {
-    s.shoes = true;
+    grantTool(s, "shoes");
     if (!s.achievements.includes("竹纹采菌服"))
       s.achievements.push("竹纹采菌服");
     if (s.hits === 0 && !s.achievements.includes("你扑了个空"))
@@ -388,14 +408,7 @@ export function sell(s) {
   return { ok: true, message: `出售多余收获 · +${value} 竹叶币` };
 }
 export function heal(s) {
-  if (s.potions <= 0)
-    return { ok: false, message: "回复果用完了，回村休息可以恢复体力。" };
-  if (s.health >= 5)
-    return { ok: false, message: "你现在精神很好，留着回复果吧。" };
-  s.potions--;
-  s.health = 5;
-  s.stamina = 100;
-  return { ok: true, message: "使用回复果 · 体力恢复" };
+  return activateTool(s, "fruit");
 }
 export function discoverNest(s, id) {
   if (s.nests.includes(id)) return { ok: false, message: "菌窝已经显露。" };

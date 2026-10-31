@@ -1,4 +1,5 @@
 // Collection rewards are permanent keepsakes. Story ingredients stay in the basket.
+import { grantTool } from "./tools.js";
 export const RARITIES = {
   common: { name: "常见", color: "#658551", icon: "✦", weight: 72 },
   rare: { name: "稀有", color: "#3c8ea0", icon: "✧", weight: 24 },
@@ -104,6 +105,8 @@ export const COLLECTION = [
 ];
 export const collectionImage = (id) =>
   `${import.meta.env?.BASE_URL || "./"}assets/collection/${id}.webp`;
+export const journalImage = (id, detail = false) =>
+  `${import.meta.env?.BASE_URL || "./"}assets/journal/${id}-${detail ? "detail" : "card"}.webp`;
 export const TREASURES = [
   { id: "trail", x: -5, z: 23, name: "村口的寻菌礼盒", area: "村口小径" },
   { id: "bridge", x: -8, z: 11, name: "木桥旁的旧宝箱", area: "旧木桥" },
@@ -288,6 +291,21 @@ export function activeClues(s) {
       s.collection.clues.includes(p.id) && !s.collection.picked.includes(p.id),
   );
 }
+export function revealClue(s, preferEpic = false) {
+  const candidates = collectionLayout(s.chapter, s.day).filter(
+    (p) =>
+      p.species.rarity !== "common" &&
+      !s.collection.clues.includes(p.id) &&
+      !s.collection.picked.includes(p.id),
+  );
+  if (preferEpic)
+    candidates.sort(
+      (a, b) => (b.species.rarity === "epic") - (a.species.rarity === "epic"),
+    );
+  const clue = candidates[0];
+  if (clue) s.collection.clues.push(clue.id);
+  return clue || null;
+}
 export function openTreasure(s, boxId) {
   const c = s.collection;
   if (!(
@@ -327,7 +345,18 @@ export function openTreasure(s, boxId) {
     ? candidates[Math.floor(rng() * candidates.length)]
     : null;
   if (clue) c.clues.push(clue.id);
-  c.lastReward = { ...reward, boxId, clue: clue?.id || null, guaranteed };
+  const toolId = {
+    trail: "compass",
+    bridge: "fruit",
+    fern: "shoes",
+    shore: "note",
+    pine: "hat",
+    ridge: "bell",
+    moon: "compass",
+  }[boxId];
+  const tool = toolId ? { id: toolId, quantity: 1 } : null;
+  if (tool) grantTool(s, tool.id, tool.quantity);
+  c.lastReward = { ...reward, boxId, clue: clue?.id || null, guaranteed, tool };
   return { ok: true, ...c.lastReward };
 }
 export function collectSpecimen(s, id) {

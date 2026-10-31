@@ -11,7 +11,21 @@ import {
   angleDelta,
 } from "./character-motion.js";
 import { DesktopLook } from "./desktop-look.js";
-import { collectSpecimen } from "./collection.js";
+import {
+  collectSpecimen,
+  revealClue,
+  trackClue,
+  TREASURES,
+} from "./collection.js";
+import {
+  TOOL_DEFS,
+  grantTool,
+  consumeTool,
+  cycleTool,
+  activateTool,
+} from "./tools.js";
+import { navigationTarget, surfaceHeight } from "./navigation.js";
+import { RouteGuide } from "./route-guide.js";
 import {
   SAVE_KEY,
   SPECIES,
@@ -86,11 +100,12 @@ class Game {
       this.state.weather,
       this.state.day,
     );
+    this.route = new RouteGuide(this.scene, this.world);
     this.player = makeTraveler();
     this.scene.add(this.player.root);
     this.player.root.position.set(
       this.state.position.x,
-      terrainHeight(this.state.position.x, this.state.position.z),
+      surfaceHeight(this.world, this.state.position.x, this.state.position.z),
       this.state.position.z,
     );
     this.player.root.rotation.y = Math.PI;
@@ -116,10 +131,7 @@ class Game {
     this.collectTime = 0;
     this.holdTime = 0;
     this.stepTime = 0;
-    this.shoeTime = 0;
-    this.shoeCooldown = 0;
     this.stoneCooldown = 0;
-    this.bellCooldown = 0;
     this.slowTime = 0;
     this.rescued =
       this.state.elapsed >= CHAPTERS[this.state.chapter - 1].duration;
@@ -246,6 +258,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           "ArrowDown",
           "ArrowLeft",
           "ArrowRight",
+          "PageUp",
+          "PageDown",
           "Tab",
         ].includes(e.code) &&
         !this.ui.panel
@@ -269,12 +283,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         KeyJ: () => this.attack(),
         KeyQ: () => this.dodge(),
         KeyR: () => this.throwStone(),
-        KeyH: () => this.useFruit(),
-        KeyC: () => this.compass(),
-        KeyX: () => this.shoes(),
-        KeyV: () => this.bell(),
+        ArrowUp: () => this.selectTool(-1),
+        ArrowDown: () => this.selectTool(1),
+        KeyV: () => this.toggleGuidance(),
         KeyB: () => this.ui.bag(),
-        KeyG: () => this.ui.guide(),
+        KeyG: () => this.useSelectedTool(),
+        KeyI: () => this.ui.guide(),
         KeyM: () => this.ui.map(),
         KeyL: () => this.ui.journal(),
         KeyP: () => this.photo(true),
@@ -449,7 +463,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.ui.toast("主角资源未能加载，已启用内置旅人。", true);
     if (!this.state.collection.totalBoxes)
       this.ui.toast(
-        "村口小径藏着寻菌礼盒 · 靠近按 E 开箱，按 G 翻开收藏图鉴。",
+        "村口小径有寻菌礼盒 · E 开箱 · I 图鉴 · ↑↓ 选道具，G 使用 · V 路线",
         false,
         6500,
       );
@@ -479,6 +493,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.ui.grandma();
   }
   rebuild() {
+    this.route.dispose();
     this.world.dispose();
     this.world = buildWorld(
       this.scene,
@@ -486,10 +501,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.state.weather,
       this.state.day,
     );
+    this.route = new RouteGuide(this.scene, this.world);
     this.world.sync(this.state);
     this.player.root.position.set(
       this.state.position.x,
-      terrainHeight(this.state.position.x, this.state.position.z),
+      surfaceHeight(this.world, this.state.position.x, this.state.position.z),
       this.state.position.z,
     );
     this.vertical = 0;
@@ -674,9 +690,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     if (!this.state.defeated.includes(e.id)) {
       this.state.defeated.push(e.id);
       this.state.coins += e.boss ? 35 : 8;
-      this.state.potions++;
+      grantTool(this.state, "fruit");
       if (e.boss) {
-        this.state.shoes = true;
+        grantTool(this.state, "shoes");
         if (!this.state.achievements.includes("青影徽章"))
           this.state.achievements.push("青影徽章");
         this.ui.toast("青影化成一阵竹叶 · 获得徽章、疾风草鞋与回复果");
@@ -708,54 +724,85 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.ui.toast("石子落在前方 · 竹叶青正在调查声响");
     this.audio.play("stone");
   }
-  shoes() {
-    if (!this.state.shoes) return this.ui.toast("击败青影后可获得疾风草鞋。");
-    if (this.shoeCooldown > 0)
-      return this.ui.toast(`疾风草鞋冷却：${Math.ceil(this.shoeCooldown)} 秒`);
-    this.shoeTime = 5;
-    this.shoeCooldown = 25;
-    this.ui.toast("疾风草鞋 · 5 秒加速");
-    this.audio.play("bell");
-  }
-  compass() {
-    if (!this.state.compass)
-      return this.ui.toast("旧木桥附近的树洞宝箱里，藏着寻菌指南针。");
-    if (this.state.compassUses <= 0)
-      return this.ui.toast("本局指南针已经使用两次。");
-    const p = this.player.root.position;
-    const list = NESTS.filter((n) =>
-      this.world.items.some(
-        (m) => m.nest === n.id && !this.state.collected.includes(m.id),
-      ),
-    ).sort(
-      (a, b) =>
-        Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z),
-    );
-    if (!list.length) return this.ui.toast("这一带的菌窝已经采完了。");
-    this.state.compassUses--;
-    this.ui.waypoint = {
-      x: Math.round(list[0].x / 8) * 8,
-      z: Math.round(list[0].z / 8) * 8,
-    };
-    this.ui.toast(`指针轻轻转向一片林地 · 剩余 ${this.state.compassUses} 次`);
-    this.audio.play("bell");
+  selectTool(direction) {
+    cycleTool(this.state, direction);
     this.save();
+    this.ui.updateToolbelt();
   }
-  bell() {
-    if (!this.state.bell)
-      return this.ui.toast("识破雾中的假菌伞，寻找听风铃。");
-    if (this.bellCooldown > 0)
-      return this.ui.toast(`听风铃冷却：${Math.ceil(this.bellCooldown)} 秒`);
-    this.bellCooldown = 20;
-    const known = LANDMARKS.filter((l) => this.state.landmarks.includes(l.id));
-    const p = this.player.root.position;
-    known.sort(
-      (a, b) =>
-        Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z),
+  toggleGuidance() {
+    this.state.guidance = !this.state.guidance;
+    this.route.invalidate();
+    this.save();
+    this.ui.toast(
+      this.state.guidance
+        ? `虚线引导已开启 · ${navigationTarget(this.state).name}`
+        : "虚线引导已关闭",
     );
-    this.ui.waypoint = known[0] || CAMP;
-    this.audio.play("bell");
-    this.ui.toast(`风带来${known[0]?.name || "村口风铃"}的回响，已指明方向。`);
+  }
+  useSelectedTool(id = this.state.selectedTool) {
+    const s = this.state;
+    if (!id || !s.tools[id])
+      return this.ui.toast("道具栏为空，探索宝箱和河心石台可以获得道具。");
+    if (["fruit", "hat", "shoes"].includes(id)) {
+      const result = activateTool(s, id);
+      this.result(result);
+      if (result.ok) this.audio.play("bell");
+      this.ui.updateToolbelt();
+      return;
+    }
+    if (id === "note" || id === "compass") {
+      const clue = revealClue(s, id === "note");
+      if (clue) {
+        trackClue(s, clue.id);
+        this.ui.waypoint = null;
+      } else if (id === "compass") {
+        const p = s.position,
+          box = TREASURES.filter(
+            (b) => !s.collection.opened.includes(b.id),
+          ).sort(
+            (a, b) =>
+              Math.hypot(a.x - p.x, a.z - p.z) -
+              Math.hypot(b.x - p.x, b.z - p.z),
+          )[0];
+        if (!box)
+          return this.ui.toast(
+            "这趟的菌子线索和宝箱都已探索，道具留到下一趟吧。",
+          );
+        this.ui.waypoint = { x: box.x, z: box.z, kind: "treasure" };
+        s.collection.track = null;
+      } else
+        return this.ui.toast("本趟可用线索已记录，这张便笺可以留到下一趟。");
+      consumeTool(s, id);
+      this.world.sync(s);
+      this.route.invalidate();
+      this.save();
+      this.audio.play("discover");
+      this.ui.toast(
+        `${TOOL_DEFS.find((t) => t.id === id).name}已使用 · 目标已记在地图上，按 V 显示路线。`,
+        false,
+        5000,
+      );
+    }
+    if (id === "bell") {
+      const known = LANDMARKS.filter((l) => s.landmarks.includes(l.id)).sort(
+        (a, b) =>
+          Math.hypot(a.x - s.position.x, a.z - s.position.z) -
+          Math.hypot(b.x - s.position.x, b.z - s.position.z),
+      );
+      const target = known[0] || CAMP;
+      this.ui.waypoint = {
+        x: target.x,
+        z: target.z,
+        kind: known.length ? "landmark" : "camp",
+      };
+      s.collection.track = null;
+      consumeTool(s, id);
+      this.route.invalidate();
+      this.save();
+      this.audio.play("bell");
+      this.ui.toast(`听风铃已使用 · 地图指向${known[0]?.name || "山野村庄"}`);
+    }
+    this.ui.updateToolbelt();
   }
   observe() {
     const p = this.player.root.position;
@@ -794,6 +841,25 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const item = this.nearest;
     if (!item) return;
     const s = this.state;
+    if (item.type === "river-note") {
+      if (s.riverNoteFound) return;
+      s.riverNoteFound = true;
+      grantTool(s, "note");
+      grantTool(s, "compass");
+      s.selectedTool = "note";
+      this.ui.updateToolbelt();
+      if (s.waypoint?.kind === "river") s.waypoint = null;
+      this.world.sync(s);
+      this.route.invalidate();
+      this.save();
+      this.audio.play("discover");
+      this.ui.toast(
+        "河心漂流瓶 · 采菌便笺 +1、指南针 +1 · 按 G 阅读便笺，线索会记在地图上。",
+        false,
+        6500,
+      );
+      return;
+    }
     if (item.type === "treasure") {
       this.ui.collection.offer(item.id);
       return;
@@ -900,17 +966,16 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       }
       s.chests.push(item.id);
       if (s.chapter === 1) {
-        s.compass = true;
-        this.ui.toast("树洞的礼物 · 获得寻菌指南针，按 C 使用（每局 2 次）");
+        grantTool(s, "compass", 2);
+        this.ui.toast("树洞的礼物 · 指南针 ×2 已放入道具栏，↑↓ 选择、G 使用");
       }
       if (s.chapter === 2) {
-        s.hat = true;
-        s.hatUsed = false;
-        this.ui.toast("获得护身斗笠 · 本局抵挡一次伤害；旧地图指向北方双石。");
+        grantTool(s, "hat");
+        this.ui.toast("护身斗笠已放入道具栏 · 按 G 使用后抵挡一次伤害。");
       }
       if (s.chapter === 3) {
-        s.bell = true;
-        this.ui.toast("获得听风铃 · 按 V 聆听已发现地标的方向");
+        grantTool(s, "bell");
+        this.ui.toast("听风铃已放入道具栏 · ↑↓ 选择、G 使用，V 开关引导路线");
       }
       this.audio.play("discover");
       this.world.sync(s);
@@ -1010,7 +1075,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   returnBasket() {
     if (this.state.basketReturned) return;
     this.state.basketReturned = true;
-    this.state.potions++;
+    grantTool(this.state, "fruit");
     this.world.root.remove(
       this.world.interactables.find((i) => i.type === "badger")?.object,
     );
@@ -1074,8 +1139,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       1.8;
     this.pitch = clamp(
       this.pitch +
-        ((this.keys.has("ArrowDown") ? 1 : 0) -
-          (this.keys.has("ArrowUp") ? 1 : 0)) *
+        ((this.keys.has("PageDown") ? 1 : 0) -
+          (this.keys.has("PageUp") ? 1 : 0)) *
           dt,
       this.desktopControls ? -0.35 : 0.08,
       this.desktopControls ? 1.2 : 1.15,
@@ -1084,7 +1149,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight")) &&
       this.state.stamina > 3 &&
       moving;
-    let speed = this.shoeTime > 0 ? 8.5 : sprint ? 6.5 : 3.6;
+    let speed = this.state.boostTime > 0 ? 8.5 : sprint ? 6.5 : 3.6;
     if (this.slowTime > 0) speed *= 0.45;
     if (this.collectTime > 0) speed *= 0.1;
     this.state.stamina = clamp(
@@ -1134,7 +1199,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     ) {
       p.z = -32.5;
     }
-    let floor = terrainHeight(p.x, p.z);
+    let floor = surfaceHeight(this.world, p.x, p.z);
     const stone = this.world.stones.find(
       (s) => Math.hypot(p.x - s.x, p.z - s.z) < s.r + 0.1,
     );
@@ -1250,8 +1315,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   }
   hurt(enemy) {
     if (this.invincible > 0) return;
-    if (this.state.hat && !this.state.hatUsed) {
-      this.state.hatUsed = true;
+    if (this.state.shielded) {
+      this.state.shielded = false;
+      this.save();
       this.invincible = 1.4;
       this.ui.toast("护身斗笠替你挡下了一次惊吓！");
       this.audio.play("bell");
@@ -1421,8 +1487,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       }
       if (d < 1.25) {
         trap.cleared = true;
-        if (this.state.hat && !this.state.hatUsed) {
-          this.state.hatUsed = true;
+        if (this.state.shielded) {
+          this.state.shielded = false;
+          this.save();
           this.ui.toast("护身斗笠替你挡下了一次惊吓！");
         } else {
           this.slowTime = 5;
@@ -1437,6 +1504,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     let best = null,
       bestDist = Infinity;
     for (const item of this.world.interactables) {
+      if (item.type === "river-note" && this.state.riverNoteFound) continue;
       if (item.type === "specimen" && !item.object.visible) continue;
       if (
         item.type === "treasure" &&
@@ -1576,6 +1644,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.gameTime += dt;
     const active = this.started && !this.ui.panel && !this.photoMode;
     if (active) {
+      this.state.boostTime = Math.max(0, this.state.boostTime - dt);
       this.state.elapsed += dt;
       this.state.playSeconds += dt;
       for (const key of [
@@ -1584,10 +1653,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         "dodgeTime",
         "invincible",
         "collectTime",
-        "shoeTime",
-        "shoeCooldown",
         "stoneCooldown",
-        "bellCooldown",
         "slowTime",
       ])
         this[key] = Math.max(0, this[key] - dt);
@@ -1629,6 +1695,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       }
     }
     this.world.update(this.gameTime, this.state);
+    this.route.update(dt, this.state, this.player.root.position);
+    this.route.group.visible =
+      this.started && !this.photoMode && !this.ui.panel && this.state.guidance;
     this.updateCamera(dt);
     if (this.started) this.ui.update(dt);
     for (let i = this.particles.length - 1; i >= 0; i--) {

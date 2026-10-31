@@ -1,0 +1,301 @@
+#toolbelt {
+  position: absolute;
+  bottom: 93px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 450px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px 8px;
+  border: 1px solid #d4c28b66;
+  border-radius: 10px;
+  background: linear-gradient(115deg, #203c31eb, #182e2be8);
+  box-shadow: 0 9px 26px #061c1940;
+  color: #ede5c6;
+  pointer-events: auto;
+  backdrop-filter: blur(12px);
+}
+.belt-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+  font: 13px var(--serif);
+  letter-spacing: 2px;
+}
+.belt-heading small {
+  font: 10px sans-serif;
+  letter-spacing: 1px;
+  color: #c3bfa4;
+}
+.belt-body {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.belt-switch {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+.belt-switch button {
+  height: 26px;
+  width: 22px;
+  font-size: 9px;
+  border: 1px solid #c8c6a833;
+  border-radius: 3px;
+  color: #d7c795;
+}
+#tool-slots {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 3px;
+  scrollbar-width: thin;
+}
+.tool-slot {
+  min-width: 49px;
+  flex: 1;
+  border: 1px solid #d2ca9d3d;
+  background: #a3b39a12;
+  border-radius: 5px;
+  position: relative;
+  padding: 5px 3px;
+  color: #d2d9bd;
+  text-align: center;
+}
+.tool-slot.selected {
+  border-color: #e5c97b;
+  box-shadow:
+    0 0 0 1px #e8d28b,
+    inset 0 0 15px #d2ba6940;
+  background: #b5aa5f22;
+}
+.tool-slot > span {
+  font: 25px serif;
+  display: block;
+}
+.tool-slot small {
+  font: 9px sans-serif;
+  display: block;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+.tool-slot > b {
+  position: absolute;
+  right: 3px;
+  top: 1px;
+  font: 9px sans-serif;
+  color: #f9e6b5;
+}
+#tool-use {
+  min-width: 44px;
+  border-radius: 5px;
+  background: linear-gradient(#dfc581, #baa469);
+  color: #273d2d;
+  padding: 5px;
+}
+#tool-use kbd {
+  display: block;
+  background: #253b2d;
+  color: #eedfb0;
+  font-size: 15px;
+  margin: 3px auto;
+  width: 26px;
+  line-height: 25px;
+}
+#tool-use > span {
+  font-size: 10px;
+}
+#tool-caption {
+  font-size: 10px;
+  color: #afbda5;
+  margin-top: 7px;
+  line-height: 1.5;
+  min-height: 15px;
+}
+#tool-effects {
+  font-size: 10px;
+  color: #e7d88e;
+  margin-top: 3px;
+  min-height: 0;
+}
+.empty-tools {
+  font-size: 11px;
+  align-self: center;
+  color: #aebb9f;
+  margin: 0;
+}
+#route-status {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 5px;
+  background: #1c382cd9;
+  color: #dfd9b4;
+  font-size: 11px;
+  border: 1px solid #b5be8955;
+  pointer-events: auto;
+  max-width: 350px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+#route-status kbd {
+  background: #d6c391;
+  color: #294235;
+  padding: 3px 6px;
+  border-radius: 3px;
+}
+#route-status small {
+  color: #adbea0;
+}
+#route-status.active {
+  border-color: #d4d391;
+  color: #e3e7b7;
+}
+#interaction {
+  bottom: 245px;
+}
+#hud #boss-bar {
+  bottom: 255px;
+}
+.modal-open #toolbelt,
+.modal-open #route-status {
+  opacity: 0;
+  pointer-events: none;
+}
+.map-route-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  background: #e0dfc4;
+  border: 1px solid #b2ad83;
+  font-size: 12px;
+}
+.map-route-summary strong {
+  display: block;
+  margin-bottom: 5px;
+  font-family: var(--serif);
+}
+.map-route-summary small {
+  color: #7a8563;
+}
+.map-route-summary button {
+  margin-left: auto;
+  background: #63794f;
+  color: #f9efd1;
+  padding: 9px 12px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.map-clues .river-note {
+  color: #967435;
+  border-color: #b6a26d;
+}
+.map-compass-hint {
+  color: #758162;
+  font-size: 11px;
+  margin-top: 12px;
+}
+.bag-tool-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+  margin-top: 20px;
+}
+.bag-tool-row button {
+  padding: 12px;
+  border: 1px solid #a9ad83;
+  border-radius: 5px;
+  background: #dbe0c7;
+  color: #566943;
+  text-align: left;
+}
+.bag-tool-row span {
+  font-size: 22px;
+  margin-right: 8px;
+}
+.bag-tool-row small {
+  display: block;
+  font-size: 10px;
+  margin-top: 6px;
+  color: #86906c;
+}
+@media (max-width: 1100px) {
+  #toolbelt {
+    left: 24px;
+    transform: none;
+    width: 400px;
+    bottom: 104px;
+  }
+  #interaction {
+    bottom: 245px;
+  }
+}
+@media (max-width: 700px) {
+  #toolbelt {
+    left: 12px;
+    bottom: 78px;
+    width: calc(100vw - 24px);
+    max-width: 360px;
+    padding: 8px 10px;
+  }
+  #tool-caption {
+    display: none;
+  }
+  .tool-slot {
+    min-width: 39px;
+  }
+  .tool-slot small {
+    font-size: 8px;
+  }
+  #interaction {
+    bottom: 218px;
+    left: 12px;
+    transform: none;
+    min-width: 0;
+    max-width: calc(100vw - 154px);
+    gap: 8px;
+    padding: 10px;
+  }
+  #interaction .key {
+    flex-shrink: 0;
+  }
+  #interaction .interaction-arrow {
+    display: none;
+  }
+  #route-status {
+    top: 139px;
+    font-size: 10px;
+    max-width: 85vw;
+    width: max-content;
+  }
+  .belt-heading {
+    font-size: 11px;
+  }
+  #hud .quest {
+    top: 186px;
+  }
+  #hud .map-widget {
+    bottom: 207px;
+  }
+  #mobile-controls {
+    bottom: 190px;
+  }
+  .map-route-summary {
+    align-items: flex-start;
+  }
+  .map-route-summary button {
+    font-size: 10px;
+    padding: 8px;
+  }
+  .bag-tool-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

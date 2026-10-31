@@ -19,6 +19,9 @@ import {
   requirementsMet,
   CAMP,
 } from "./state.js";
+import { ToolbeltUI } from "./toolbelt-ui.js";
+import { TOOL_DEFS, ownedTools } from "./tools.js";
+import { navigationTarget, RIVER_NOTE, RIVER_WALKWAY } from "./navigation.js";
 import { CollectionUI } from "./collection-ui.js";
 import {
   RARITIES,
@@ -50,14 +53,26 @@ export class UI {
     this.mapCtx = $("minimap").getContext("2d");
     this.lastFocus = null;
     this.location = "";
-    this.waypoint = null;
+
     this.mapTimer = 0;
     this.collection = new CollectionUI(this);
+    this.toolbelt = new ToolbeltUI(this);
     this.bind();
     icons();
   }
+  get waypoint() {
+    return this.game.state.waypoint;
+  }
+  set waypoint(value) {
+    this.game.state.waypoint = value;
+    this.game.route?.invalidate();
+  }
+  updateToolbelt() {
+    this.toolbelt.update();
+  }
   bind() {
     const on = (id, fn) => $(id).addEventListener("click", fn);
+    on("route-status", () => this.game.toggleGuidance());
     on("begin", () => this.game.begin(false));
     on("continue", () => this.game.begin(true));
     on("bag-button", () => this.bag());
@@ -145,41 +160,32 @@ export class UI {
     );
   }
   bag() {
-    const s = this.game.state;
+    const s = this.game.state,
+      stats = collectionStats(s);
     this.show(
       "竹篮里的山野",
       "YOUR LITTLE HARVEST",
-      `<p class="panel-subtitle">${basketCount(s)} / ${s.capacity} 朵 · 任务食材在出售时会自动保留。巨型云团菌作为收藏，不占背篓。</p><div class="species-grid">${SPECIES.map((p) => `<button class="species-card ${s.inventory[p.id] ? "" : "locked"}" data-species="${p.id}"><span class="species-count">× ${s.inventory[p.id]}</span>${mushroomSVG(p.color)}<h3>${p.name}</h3><small>${p.rarity} · ${p.area}</small></button>`).join("")}</div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong> · 回复果 ${s.potions}</span><button id="use-fruit">使用回复果</button></div><p class="map-note">${[s.compass ? "寻菌指南针" : "", s.shoes ? "疾风草鞋" : "", s.hat ? `护身斗笠${s.hatUsed ? "（本局已用）" : ""}` : "", s.bell ? "听风铃" : ""].filter(Boolean).join(" · ") || "探索树洞与隐藏宝箱，发现更多道具。"}</p>`,
+      `<div class="collection-bag-link"><span>永久收藏 ${stats.unique} / 12 种 · ${stats.total} 朵</span><button id="bag-collection">翻开收藏图鉴 →</button></div><p class="panel-subtitle">${basketCount(s)} / ${s.capacity} 朵 · 任务食材在出售时自动保留，永久收藏不占容量。</p><div class="species-grid">${SPECIES.map((p) => `<button class="species-card ${s.inventory[p.id] ? "" : "locked"}" data-species="${p.id}"><span class="species-count">× ${s.inventory[p.id]}</span>${mushroomSVG(p.color)}<h3>${p.name}</h3><small>${p.rarity} · ${p.area}</small></button>`).join("")}</div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><span>↑↓ 切换随身道具 · G 使用</span></div><div class="bag-tool-row">${
+        ownedTools(s)
+          .map(
+            (t) =>
+              `<button data-bag-tool="${t.id}"><span>${t.icon}</span>${t.name} ×${s.tools[t.id]}<small>选入道具栏，返回后按 G 使用</small></button>`,
+          )
+          .join("") || '<p class="map-note">道具已用完，探索宝箱可以补充。</p>'
+      }</div>`,
       "bag",
     );
     this.bindSpecies();
-    const collectionSummary = document.createElement("div");
-    collectionSummary.className = "collection-bag-link";
-    const stats = collectionStats(s);
-    collectionSummary.innerHTML = `<span>永久收藏 ${stats.unique} / 12 种 · ${stats.total} 朵</span><button>翻开收藏图鉴 →</button>`;
-    collectionSummary.querySelector("button").onclick = () => this.guide();
-    $("panel-body").prepend(collectionSummary);
-    $("use-fruit").onclick = () => {
-      this.game.useFruit();
-      this.bag();
-    };
-    const tools = document.createElement("div");
-    tools.className = "bag-tools";
-    for (const [label, method, owned] of [
-      ["寻菌指南针", "compass", s.compass],
-      ["疾风草鞋", "shoes", s.shoes],
-      ["听风铃", "bell", s.bell],
-    ]) {
-      const button = document.createElement("button");
-      button.textContent = label;
-      button.disabled = !owned;
-      button.onclick = () => {
-        this.close();
-        this.game[method]();
-      };
-      tools.append(button);
-    }
-    $("panel-body").append(tools);
+    document.getElementById("bag-collection").onclick = () => this.guide();
+    document.querySelectorAll("[data-bag-tool]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          s.selectedTool = b.dataset.bagTool;
+          this.game.save();
+          this.close();
+          this.updateToolbelt();
+        }),
+    );
   }
   bindSpecies() {
     document
@@ -278,7 +284,7 @@ export class UI {
     $("guide-hint").onclick = () => {
       s.guideUsed = true;
       this.close();
-      this.waypoint = { ...CAMP };
+      this.waypoint = { ...CAMP, kind: "camp" };
       this.toast("向导提示：村庄在南方。指南针已标记归途。");
       this.game.save();
     };
@@ -417,12 +423,12 @@ export class UI {
   settings() {
     const s = this.game.state;
     const cameraHelp = this.game.desktopControls
-      ? "移动鼠标 / 方向键"
-      : "拖动鼠标 / 方向键";
+      ? "移动鼠标 / ←→ / PgUp·Dn"
+      : "拖动鼠标 / ←→ / PgUp·Dn";
     this.show(
       "让旅程更合心意",
       "SETTINGS",
-      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>J</kbd>竹杖攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>R</kbd>投石诱导</span><span><kbd>H</kbd>回复果</span><span><kbd>C</kbd>寻菌指南针</span><span><kbd>X</kbd>疾风草鞋</span><span><kbd>V</kbd>听风铃</span><span><kbd>L</kbd>旅途手记</span><span><kbd>M / B / G</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
+      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>J</kbd>竹杖攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>R</kbd>投石诱导</span><span><kbd>↑ / ↓</kbd>切换道具</span><span><kbd>G</kbd>使用当前道具</span><span><kbd>V</kbd>虚线引导开关</span><span><kbd>L</kbd>旅途手记</span><span><kbd>M / B / I</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
       "settings",
     );
     $("set-sound").onclick = () => {
@@ -453,6 +459,8 @@ export class UI {
     };
   }
   map() {
+    const s = this.game.state,
+      target = navigationTarget(s);
     this.show(
       "山野行路图",
       "THE WILDWOOD / MAP",
@@ -462,14 +470,26 @@ export class UI {
     this.drawMap($("large-map").getContext("2d"), 600, true);
     $("panel-body").insertAdjacentHTML(
       "beforeend",
-      this.collection.cluesMarkup(),
+      `<div class="map-route-summary"><div><strong>⌖ ${target.name}</strong><small>距离 ${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · 道具栏指南针 ×${s.tools.compass}</small></div><button id="map-guide-toggle">V · ${s.guidance ? "关闭" : "显示"}虚线引导</button></div><p class="map-compass-hint">右上罗盘指示目标方向 · 金色标记为当前目标 · 河心石台可沿浮桥抵达</p>${!s.riverNoteFound ? '<div class="map-clues"><button class="river-note" id="map-river"><span>▤</span><div><b>河心石台 · 未拾取的便笺</b><small>点击追踪，再按 V 查看通路</small></div></button></div>' : ""}${this.collection.cluesMarkup()}`,
     );
+    $("map-guide-toggle").onclick = () => {
+      this.game.toggleGuidance();
+      this.map();
+    };
+    if ($("map-river"))
+      $("map-river").onclick = () => {
+        s.collection.track = null;
+        this.waypoint = { x: RIVER_NOTE.x, z: RIVER_NOTE.z, kind: "river" };
+        this.game.save();
+        this.map();
+      };
     document.querySelectorAll("[data-map-clue]").forEach((button) => {
       button.onclick = () => this.collection.track(button.dataset.mapClue);
     });
     $("large-map").onclick = (e) => {
       const r = e.currentTarget.getBoundingClientRect();
       this.waypoint = {
+        kind: "custom",
         x: ((e.clientX - r.left) / r.width) * 110 - 55,
         z: ((e.clientY - r.top) / r.height) * 110 - 55,
       };
@@ -506,6 +526,25 @@ export class UI {
     ctx.beginPath();
     ctx.ellipse(px(25), pz(-4), 8.5 * scale, 13 * scale, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = "#a99467";
+    ctx.lineWidth = large ? 7 : 3;
+    ctx.beginPath();
+    RIVER_WALKWAY.forEach((p, i) =>
+      i ? ctx.lineTo(px(p.x), pz(p.z)) : ctx.moveTo(px(p.x), pz(p.z)),
+    );
+    ctx.stroke();
+    ctx.fillStyle = s.riverNoteFound ? "#819675" : "#ad8437";
+    ctx.font = `${large ? 19 : 12}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(
+      s.riverNoteFound ? "✓" : "▤",
+      px(RIVER_NOTE.x),
+      pz(RIVER_NOTE.z),
+    );
+    if (large) {
+      ctx.font = "11px sans-serif";
+      ctx.fillText("河心石台", px(RIVER_NOTE.x), pz(RIVER_NOTE.z) + 19);
+    }
     ctx.lineWidth = large ? 7 : 3;
     ctx.strokeStyle = "#d7c394";
     ctx.beginPath();
@@ -606,16 +645,58 @@ export class UI {
         );
       }
     }
-    if (this.waypoint) {
+    if (s.guidance && this.game.route.points.length > 1) {
+      ctx.strokeStyle = "#f7edb5";
+      ctx.lineWidth = large ? 3 : 1.6;
+      ctx.setLineDash([large ? 7 : 3, large ? 5 : 3]);
+      ctx.beginPath();
+      this.game.route.points.forEach((q, i) =>
+        i ? ctx.lineTo(px(q.x), pz(q.z)) : ctx.moveTo(px(q.x), pz(q.z)),
+      );
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    const navTarget = navigationTarget(s);
+    if (navTarget) {
       ctx.strokeStyle = "#d39435";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(px(this.waypoint.x), pz(this.waypoint.z), large ? 8 : 5, 0, 6.28);
+      ctx.arc(px(navTarget.x), pz(navTarget.z), large ? 9 : 5, 0, 6.28);
       ctx.stroke();
+    }
+    if (large) {
+      ctx.save();
+      ctx.translate(size - 52, 52);
+      ctx.fillStyle = "#f1ead1";
+      ctx.strokeStyle = "#849170";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, 32, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#647551";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("北", 0, -20);
+      ctx.fillText("南", 0, 28);
+      ctx.fillText("西", -24, 4);
+      ctx.fillText("东", 24, 4);
+      ctx.rotate(
+        Math.atan2(navTarget.x - s.position.x, -(navTarget.z - s.position.z)),
+      );
+      ctx.beginPath();
+      ctx.moveTo(0, -18);
+      ctx.lineTo(-5, 7);
+      ctx.lineTo(0, 3);
+      ctx.lineTo(5, 7);
+      ctx.closePath();
+      ctx.fillStyle = "#bb8a35";
+      ctx.fill();
+      ctx.restore();
     }
     ctx.save();
     ctx.translate(px(s.position.x), pz(s.position.z));
-    ctx.rotate(this.game.player.root.rotation.y);
+    ctx.rotate(-this.game.player.root.rotation.y);
     ctx.beginPath();
     ctx.moveTo(0, large ? 10 : 6);
     ctx.lineTo(-5, -5);
@@ -648,6 +729,12 @@ export class UI {
       sun: "☀ 晴朗",
       fog: "☁ 薄雾",
     }[s.weather];
+    this.updateToolbelt();
+    const target = navigationTarget(s);
+    $("route-label").textContent = target.name;
+    $("route-distance").textContent =
+      `${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · ${s.guidance ? (this.game.route.points.length ? "引导中" : "暂无安全路线") : "显示路线"}`;
+    $("route-status").classList.toggle("active", s.guidance);
     const p = s.position;
     const region =
       p.z > 22
@@ -683,11 +770,7 @@ export class UI {
       if (this.panel === "map")
         this.drawMap($("large-map").getContext("2d"), 600, true);
     }
-    const tracked = activeClues(s).find((p) => p.id === s.collection.track);
-    const dir =
-      this.waypoint ||
-      tracked ||
-      (requirementsMet(s) ? CAMP : { x: 0, z: -35 });
+    const dir = navigationTarget(s);
     const angle = Math.atan2(dir.x - p.x, dir.z - p.z) - this.game.yaw;
     const diff = Math.atan2(Math.sin(angle), Math.cos(angle));
     $("compass-target").style.left =
