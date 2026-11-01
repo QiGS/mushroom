@@ -185,7 +185,7 @@ test("default guidance follows chapter tasks and an arrived manual clue clears i
   assert.equal(finishGuidance(s, p, world), null);
   s.chapter = 3;
   s.uncle = false;
-  assert.equal(navigationTarget(s).name, "询问采菌大叔");
+  assert.equal(navigationTarget(s).name, "询问采菌向导");
   s.uncle = true;
   assert.match(navigationTarget(s).hint, /三声/);
   world.dispose();

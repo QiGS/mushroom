@@ -42,7 +42,7 @@ export class AdventureUI {
       s = g.state;
     const guide = g.world?.guide;
     this.guideLabel.hidden = true;
-    if (guide) {
+    if (guide?.object.visible) {
       this.vector.copy(guide.object.position);
       this.vector.y += guide.height + .45;
       this.vector.project(g.camera);

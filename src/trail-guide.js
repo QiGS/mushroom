@@ -41,6 +41,7 @@ export class TrailGuide {
   }
   update(dt, s, player) {
     this.actor.walking = false;
+    if (!this.actor.object.visible) { this.stop(); return null; }
     if (!['walking', 'waiting'].includes(this.phase)) return null;
     const p = this.body.position;
     if (Math.hypot(player.x - p.x, player.z - p.z) > 8) {

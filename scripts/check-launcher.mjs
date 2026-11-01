@@ -103,6 +103,7 @@ try {
     ...['flower-guide', 'forager-guide', 'herder-guide'].map((id) => [`villagers/${id}.glb`, 'model/gltf-binary']),
     ["fonts/wildwood-wenkai.woff2", "font/woff2"],
     ["fonts/jingmai-rounded.woff2", "font/woff2"],
+    ...['map', 'bag', 'collection', 'journal', 'achievements', 'settings'].map(id => [`icons/${id}.webp`, 'image/webp']),
     ...["note", "fruit", "hat", "shoes", "bell", "compass"].map((id) => [
       `tools/${id}.webp`,
       "image/webp",
@@ -149,6 +150,11 @@ try {
     "woodland-tree-three",
     "bamboo-stalk",
     "bamboo-grove",
+    "market-fruit",
+    "market-shoes",
+    "market-bell",
+    "market-note",
+    "market-basket",
   ]) {
     const r = await fetch(`${url}assets/props/${id}.glb`, {
       ...options,

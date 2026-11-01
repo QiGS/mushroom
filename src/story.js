@@ -1,22 +1,9 @@
 import { BOSSES } from "./progression.js";
 // Story locations and rewards are deterministic, so hints, map and actors agree.
-export function grandmaPlace(s) {
-  if (s.chapter === 1) return { x: 1, z: 29, area: "村口" };
-  if (s.chapter === 4) return { x: 12, z: 10, area: "花雾山径" };
-  if (s.chapter === 5) return { x: -34, z: -27, area: "赤岩驿亭" };
-  if (s.chapter === 2) return { x: -15, z: 12, area: "竹林歇脚处" };
-  if (s.gateOpen) return { x: 9, z: -27, area: "菌谷石门旁" };
-  if (s.uncle) return { x: -19, z: -7, area: "回声坡茶棚" };
-  return { x: -18, z: 8, area: "雾山岔路" };
+export function grandmaPlace() {
+  return { x: 1, z: 29, area: "村口" };
 }
-export const GRANDMA_CLEARINGS = [
-  { x: 12, z: 10, r: 4 },
-  { x: -34, z: -27, r: 4 },
-  { x: -15, z: 12, r: 3.5 },
-  { x: 9, z: -27, r: 4 },
-  { x: -19, z: -7, r: 3.5 },
-  { x: -18, z: 8, r: 3.5 },
-];
+export const GRANDMA_CLEARINGS = [{ x: 1, z: 29, r: 3.5 }];
 export const STORY_LINES = {
   "chapter-1": "雨停了。奶奶说，找到一朵以后，先别急着走。",
   "chapter-2": "竹影深处有嘶嘶声。这一趟，得抬头看路，也得留心脚下。",

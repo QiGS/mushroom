@@ -1,3 +1,4 @@
+import { chapterGuide } from "./guide-data.js";
 import { BOSSES, WEAPONS } from "./progression.js";
 import {
   CHAPTERS,
@@ -51,10 +52,10 @@ export function missionTarget(s) {
   if (s.chapter === 3) {
     if (!s.uncle)
       return target(
-        -25,
-        5,
-        "询问采菌大叔",
-        "先到西侧缺口石询问大叔，了解雾山的三个地标。",
+        chapterGuide(3).x,
+        chapterGuide(3).z,
+        "询问采菌向导",
+        "到回声石旁询问阿山叔，了解雾山的三个地标。",
       );
     if (!s.echoSolved)
       return target(
@@ -119,8 +120,8 @@ export function missionTarget(s) {
     !missing.includes("bamboo")
   )
     return target(
-      0,
-      -29,
+      BOSSES[2].approach.x,
+      BOSSES[2].approach.z,
       "击退青影，寻找金伞菌",
       "青影突进前会抬头。侧闪后反击，击败它才能采北方菌窝。",
     );
@@ -159,7 +160,7 @@ export function missionTarget(s) {
     );
   }
   if (s.chapter === 2 && !s.defeated.includes("boss"))
-    return target(0, -29, "击退青影", "观察突进预警，闪避后反击青影。");
+    return target(BOSSES[2].approach.x, BOSSES[2].approach.z, "击退青影", "前往青影竹林，观察突进预警，闪避后反击青影。");
   return target(
     8,
     29,

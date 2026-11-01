@@ -1,4 +1,5 @@
 import { BOSSES, loadGun, gunAmmo } from "./progression.js";
+import { addTravelQA } from './qa-travel.js';
 import { collect, requirementsMet } from "./state.js";
 // Local development only. This module is excluded from production builds.
 import { terrainHeight, CHAPTERS, newGame } from "./state.js";
@@ -50,6 +51,7 @@ export function attachQA(game) {
     bar.append(b);
   };
   add("QA 开始", () => game.begin(true));
+  addTravelQA(game, add);
   add('QA 手记满背篓', () => {
     game.state.coins = 1286;
     for (const [i, id] of Object.keys(game.state.inventory).entries()) game.state.inventory[id] = i + 2;
@@ -754,7 +756,10 @@ export function attachQA(game) {
     const i = game.world.interactables.find((i) => i.type === "chest");
     move(i.x, i.z + 1);
   });
-  add("QA 大叔", () => move(-25, 6));
+  add("QA 大叔", () => {
+    const npc = game.state.chapter === 3 ? game.world.guide : game.world.interactables.find(i => i.type === 'shop');
+    if (npc) move(npc.x, npc.z + 1.5);
+  });
   add("QA 雾尾鼠", () => move(-27, -16));
   add("QA 山獾", () => move(-31, 1));
   add("QA 移动一步", () => {

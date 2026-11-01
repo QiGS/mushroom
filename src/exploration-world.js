@@ -1,4 +1,5 @@
 import * as T from "three";
+import { createShopModel, normalizeShopModel, SHOP_ASSETS } from './shop-models.js';
 import { addProp } from "./prop-model.js";
 import { addVillager } from "./villagers.js";
 import { addCanyonWalkway } from './trail-surfaces.js';
@@ -243,15 +244,13 @@ export function buildExplorationWorld(
   const awning = box(shop, 0, 3, 0.2, 3.8, 0.13, 2.3, 0x718964);
   awning.rotation.x = -0.13;
   box(shop, 0, 2.1, 0.7, 1.9, 0.55, 0.1, 0xc9b583);
-  for (let i = 0; i < 5; i++)
-    add(
-      shop,
-      new T.SphereGeometry(0.16, 8, 5),
-      0xb0b35e,
-      -1 + i * 0.4,
-      1.02,
-      0,
-    );
+  ['hat', 'fruit', 'compass', 'bell', 'basket'].forEach((id, i) => {
+    const stand = new T.Group();stand.position.set(-1.05+i*.53,.88,-.12);shop.add(stand);
+    const goods = normalizeShopModel(createShopModel(id));
+    goods.scale.multiplyScalar(.22);
+    goods.position.y=.24;goods.rotation.y=-.25+i*.12;stand.add(goods);
+    if (SHOP_ASSETS[id]) models.push(addProp(stand,SHOP_ASSETS[id],{height:.48,fallback:goods,rotation:goods.rotation.y}));
+  });
   const keeper = new T.Group(),
     vendorFallback = new T.Group();
   keeper.position.set(0, 0, 1.35);

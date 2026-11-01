@@ -1,0 +1,44 @@
+[
+  {
+    "id": "map",
+    "source": "图标\\地图.png",
+    "width": 256,
+    "height": 192,
+    "bytes": 31362
+  },
+  {
+    "id": "bag",
+    "source": "图标\\背篓.png",
+    "width": 256,
+    "height": 234,
+    "bytes": 31584
+  },
+  {
+    "id": "collection",
+    "source": "图标\\菌子图鉴.png",
+    "width": 256,
+    "height": 256,
+    "bytes": 30958
+  },
+  {
+    "id": "journal",
+    "source": "图标\\任务.png",
+    "width": 256,
+    "height": 192,
+    "bytes": 28780
+  },
+  {
+    "id": "achievements",
+    "source": "图标\\采菌成就.png",
+    "width": 256,
+    "height": 192,
+    "bytes": 23704
+  },
+  {
+    "id": "settings",
+    "source": "图标\\设置.png",
+    "width": 256,
+    "height": 192,
+    "bytes": 25554
+  }
+]

@@ -1,4 +1,7 @@
 import { BOSSES } from "./progression.js";
+import { TRAVEL_ANCHORS } from './fast-travel.js';
+import { addTravelAnchors } from './travel-world.js';
+import { requirementsMet } from "./state.js";
 import { CHAPTER_GUIDES, chapterGuide } from "./guide-data.js";
 import { grandmaPlace, GRANDMA_CLEARINGS } from "./story.js";
 import { CANYONS, canyonAt, baseTerrainHeight, surfaceHeight } from "./terrain.js";
@@ -245,9 +248,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     ...EXPLORE_CLEARINGS,
     ...GRANDMA_CLEARINGS,
     ...CHAPTER_GUIDES.map((p) => ({ ...p, r: 4 })),
-    ...(chapter >= 4
-      ? [{ ...BOSSES[chapter], r: BOSSES[chapter].radius + 9 }]
-      : []),
+    ...Object.values(BOSSES).map(b => ({ ...b, r: b.radius + 6 })),
+    ...TRAVEL_ANCHORS.map(a => ({ ...a, r: 3.5 })),
     ...CANYONS.map((c) => ({
       x: c.x,
       z: c.z,
@@ -1094,11 +1096,11 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       radius: 2.3,
     });
   }
-  if (chapter >= 4) {
-    const b = BOSSES[chapter],
+  for (const b of [BOSSES[4], BOSSES[5]]) {
+    const
       arena = new T.Group();
     root.add(arena);
-    if (chapter === 5) {
+    if (b.chapter === 5) {
       for (const a of [0, 0.7, 2.45, Math.PI]) {
         const x = b.x + Math.cos(a) * 11,
           z = b.z + Math.sin(a) * 11;
@@ -1251,24 +1253,9 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   }
   const landmarks = new Map();
   let gate = null,
-    uncle = null,
     badger = null,
     mouse = null;
   if (chapter === 3) {
-    uncle = at(-25, 5);
-    const fallback = npc(0, 0, 0x6a7a8c);
-    fallback.position.set(0, 0, 0);
-    uncle.add(fallback);
-    villagers.push(addVillager(uncle, "uncle", fallback));
-    interactables.push({
-      type: "uncle",
-      name: "询问采菌大叔",
-      category: "山里的熟面孔",
-      x: -25,
-      z: 5,
-      object: uncle,
-      radius: 3,
-    });
     for (const p of LANDMARKS) {
       const g = sign(p.x, p.z);
       landmarks.set(p.id, g);
@@ -1492,6 +1479,11 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   ring.castShadow = false;
   ring.receiveShadow = false;
   const exploration = buildExplorationWorld(root, colliders, interactables, stones, surfaces);
+  const travelAnchors = addTravelAnchors(root, { colliders, stones, surfaces }, chapter);
+  for (const a of travelAnchors) interactables.push({
+    ...a, type: 'travel-anchor', radius: 2.4,
+    name: a.name + ' · 打开传送地图', category: '传送锚点 · 全境可用',
+  });
   const collection = buildCollectionWorld(
     root,
     interactables,
@@ -1513,7 +1505,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   function update(t, state) {
     moveGrandma(state);
     villagers.forEach((v) => v.update(t));
-    guide.visual.update(t, guide.walking);
+    guide.object.visible = !state.settled && !requirementsMet(state);
+    if (guide.object.visible) guide.visual.update(t, guide.walking);
     exploration.update(t, state);
     sun.position.set(
       state.position.x - 30,
@@ -1581,6 +1574,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   }
   function sync(state) {
     moveGrandma(state);
+    guide.object.visible = !state.settled && !requirementsMet(state);
     exploration.sync(state);
     collection.sync(state);
     for (const item of items) {
@@ -1632,6 +1626,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
   }
   return {
     mountains,
+    travelAnchors,
     guide,
     refreshForage,
     foliageFocus,

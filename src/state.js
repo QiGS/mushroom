@@ -124,8 +124,8 @@ export const CHAPTERS = [
     requirements: { cloud: 10, crescent: 6 },
     recipe: "云雾菌煲",
     intro:
-      "山里的雾一阵浓一阵淡。先去西侧找采菌大叔，路口记得系上红布。你家在后面那边。",
-    hint: "脚印通向西侧缺口石旁的大叔。会响的石头、月牙潭、抱抱树，是菌谷入口的线索。",
+      "山里的雾一阵浓一阵淡。先去回声石旁找阿山叔，路口记得系上红布。你家在后面那边。",
+    hint: "回声石旁的阿山叔会为你带路。会响的石头、月牙潭、抱抱树，是菌谷入口的线索。",
   },
   {
     id: 4,
@@ -137,7 +137,7 @@ export const CHAPTERS = [
     recipe: "花雾清菌汤",
     intro:
       "花雾高地落下了有毒的鳞粉。大叔新到的狙击枪能穿透毒蝶的鳞甲，先准备好，再抬头寻找它。",
-    hint: "在大叔处购入狙击枪，沿东侧山径进入花雾空域；毒蝶只会被狙击枪击中。",
+    hint: "在大叔处购入狙击枪，前往西侧风铃山巅的花雾空域；毒蝶只会被狙击枪击中。",
   },
   {
     id: 5,
@@ -149,7 +149,7 @@ export const CHAPTERS = [
     recipe: "峡谷丰收煲",
     intro:
       "峡谷口的岩石被巨钳翻开了。买好手持大炮，等毒蝎王撞上岩壁，再把最后一篮菌子带回来。",
-    hint: "先在大叔处购买手持大炮，前往赤岩峡谷南口。尾针落下前离开红圈，撞石后的背甲最脆弱。",
+    hint: "先在大叔处购买手持大炮，前往东侧赤石峡谷。尾针落下前离开红圈，撞石后的背甲最脆弱。",
   },
 ];
 export function seededRandom(seed = 73419) {
@@ -386,6 +386,8 @@ export function sanitizeSave(raw) {
         ? raw.waypoint.kind
         : "custom",
     };
+    if (s.waypoint.kind === 'boss' && Object.values(BOSSES).some(b => b.id === raw.waypoint.bossId))
+      s.waypoint.bossId = raw.waypoint.bossId;
   }
   return s;
 }

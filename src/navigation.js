@@ -53,7 +53,7 @@ export function navigationTarget(s) {
       ...s.waypoint,
       name:
         {
-          boss: BOSSES[s.chapter]?.name || "首领位置",
+          boss: (Object.values(BOSSES).find(b => b.id === s.waypoint.bossId) || BOSSES[s.chapter])?.name || "首领位置",
           guide: '本章引路人',
           river: "河心线索",
           treasure: "探索宝箱",

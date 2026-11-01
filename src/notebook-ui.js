@@ -1,18 +1,11 @@
+import { menuIcon } from "./menu-icons.js";
 import { SPECIES, CHAPTERS, basketCount } from './state.js';
 import { COLLECTION, RARITIES, journalImage } from './collection.js';
 import { ownedTools } from './tools.js';
 import { toolArt } from './tool-art.js';
 import { PANTRY } from './cooking.js';
 
-const paths = {
-  map: '<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2Z M9 3v16 M15 5v16"/>',
-  bag: '<path d="M8 7V5a4 4 0 0 1 8 0v2 M5 8h14l2 12H3Z M8 12v5 M12 12v5 M16 12v5"/>',
-  collection: '<path d="M12 6c-3-3-7-3-10-2v15c4-1 7-1 10 2 3-3 6-3 10-2V4c-3-1-7-1-10 2Z M12 6v15"/>',
-  journal: '<path d="M6 3h12v18H6Z M9 8h6 M9 12h6 M9 16h4 M3 7h3 M3 17h3"/>',
-  achievements: '<path d="m12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z"/>',
-  settings: '<path d="M4 5h16 M4 12h16 M4 19h16 M8 2v6 M16 9v6 M10 16v6"/>',
-};
-export const notebookIcon = (id) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[id] || paths.bag}</svg>`;
+export const notebookIcon = id => menuIcon(id);
 const tabs = [['map', '地图'], ['bag', '背篓'], ['collection', '菌子图鉴'], ['journal', '任务'], ['achievements', '成就'], ['settings', '设置']];
 export const notebookSection = (kind) => ['guide', 'species'].includes(kind) ? 'collection' : tabs.some(([id]) => id === kind) ? kind : null;
 export const notebookNav = (kind) => `<nav class="book-nav" aria-label="山野手记导航">${tabs.map(([id, label]) => `<button data-notebook-nav="${id}" class="${notebookSection(kind) === id ? 'active' : ''}" ${notebookSection(kind) === id ? 'aria-current="page"' : ''}>${notebookIcon(id)}<span>${label}</span></button>`).join('')}</nav>`;

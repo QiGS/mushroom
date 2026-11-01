@@ -1,0 +1,37 @@
+[
+  {
+    "id": "market-fruit",
+    "source": "Jingmai_Mountains/回复果.glb",
+    "sourceTriangles": 1875080,
+    "triangles": 4998,
+    "bytes": 724904
+  },
+  {
+    "id": "market-shoes",
+    "source": "Jingmai_Mountains/疾风草鞋.glb",
+    "sourceTriangles": 1899812,
+    "triangles": 5500,
+    "bytes": 718848
+  },
+  {
+    "id": "market-bell",
+    "source": "Jingmai_Mountains/听风铃.glb",
+    "sourceTriangles": 1930458,
+    "triangles": 5496,
+    "bytes": 808488
+  },
+  {
+    "id": "market-note",
+    "source": "图标/菌子便签.glb",
+    "sourceTriangles": 1896463,
+    "triangles": 5000,
+    "bytes": 603456
+  },
+  {
+    "id": "market-basket",
+    "source": "图标/背篓.glb",
+    "sourceTriangles": 1930952,
+    "triangles": 5996,
+    "bytes": 800620
+  }
+]

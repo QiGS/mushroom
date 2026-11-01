@@ -1,4 +1,6 @@
 import { BOSSES, isGun, gunAmmo, loadGun, damageFor } from "./progression.js";
+import { resetAfterDeath } from './fast-travel.js';
+import './travel-shop.css';
 import {
   makeEncounter,
   updateEncounter,
@@ -730,16 +732,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           ? [
               [-9, 7, "guard", "leaf"],
               [17, -10, "patrol", "leaf"],
-              [0, -29, "boss", "boss"],
             ]
           : this.state.chapter >= 4
             ? [
-                [
-                  BOSSES[this.state.chapter].x,
-                  BOSSES[this.state.chapter].z,
-                  BOSSES[this.state.chapter].id,
-                  BOSSES[this.state.chapter].species,
-                ],
                 [-12, -5, "late-guard", "rock"],
                 [34, -16, "late-scout", "frost"],
                 [-40, -19, "late-scout-two", "rock"],
@@ -747,8 +742,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
             : [
                 [29, 5, "patrol", "leaf"],
                 [-10, -24, "tree-guard", "rock"],
-                [0, -41, "ant-queen", "antQueen"],
               ];
+    positions.push(...Object.values(BOSSES).map(b => [b.x, b.z, b.id, b.species]));
     for (const [x, z, id, kind] of [
       [-17, 0, "bamboo-scout", "leaf"],
       [19, -18, "lake-scout", "frost"],
@@ -770,7 +765,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       positions.push([x, z, id, kind]);
     positions.push(
       [-70, -18, "ridge-snake", "frost"],
-      [79, -48, "gorge-snake", "rock"],
+      [79, -15, "gorge-snake", "rock"],
     );
     NIGHT_SPAWNS.slice(0, 2 + this.state.chapter * 2).forEach(
       ([x, z, kind], i) => positions.push([x, z, `night-${i}`, kind, true]),
@@ -820,7 +815,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.enemies.push(enemy);
     if (this.state.defeated.includes(id)) enemy.hp = 0;
     this.world.actors.track(enemy, () => {
-      if (enemy.hp <= 0 || this.state.defeated.includes(enemy.id) || (enemy.ant && !this.state.gateOpen)) return null;
+      if (enemy.hp <= 0 || this.state.defeated.includes(enemy.id) || (enemy.ant && this.state.chapter === 3 && !this.state.gateOpen)) return null;
       const y = enemy.object.position.y;
       return { discs: enemyFootprint(enemy), bottom: y - .15, top: y + (enemy.boss ? 2.5 : .85) };
     });
@@ -1785,6 +1780,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const item = this.nearest;
     if (!item) return;
     const s = this.state;
+    if (item.type === 'travel-anchor') return this.ui.map();
     if (item.type === 'trail-guide') return this.talkGuide();
     if (item.type === "shop") return this.ui.shop();
     if (item.type === "bed" && s.bedOwned) return this.ui.bed();
@@ -1965,16 +1961,6 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.world.sync(s);
       this.save();
       this.ui.collection.offer("story-hidden", extraTool);
-      return;
-    }
-    if (item.type === "uncle") {
-      s.uncle = true;
-      this.ui.dialog.show({
-        speaker: '大叔 · 篮子还在散步', actor: item,
-        text: '篮子放地上，一转头就没了。不好说，它走的时候还挺有礼貌。\n帮我找回竹篮，回复果和额外路标就送给你。\n菌谷入口要认三处地方：会响的石头、弯月形的水潭，还有两棵抱在一起的老树。找到一处，把旧路牌扶起来。',
-        actions: [{ label: '记下了，我去看看', run: () => this.ui.dialog.close() }],
-      });
-      this.save();
       return;
     }
     if (item.type === "badger-tube") {
@@ -2311,28 +2297,18 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.state.position = { x: p.x, z: p.z };
   }
   environmentHit(amount, message) {
+    if (this.pendingRespawn) return;
     this.state.health -= amount;
     this.state.hits++;
     this.invincible = 1.7;
     this.playerImpact();
     if (this.state.health <= 0) {
-      const p = this.player.root.position;
-      p.set(CAMP.x, surfaceHeight(this.world, CAMP.x, CAMP.z), CAMP.z);
-      this.state.health = 5;
-      this.state.stamina = 100;
-      this.vertical = 0;
-      this.grounded = true;
-      this.fallPeak = p.y;
-      this.velocity.set(0, 0, 0);
-      this.swimming = false;
-      this.waterTimer = 0;
-      document.body.classList.remove("in-water");
-      this.ui.toast("向导把你送回村庄 · 收获保留，先休息一下。");
+      this.pendingRespawn = true;
     } else this.ui.toast(message + " · 选中回复果按 G 恢复");
-    this.save();
+    if (!this.pendingRespawn) this.save();
   }
   hurt(enemy) {
-    if (this.invincible > 0) return;
+    if (this.invincible > 0 || this.pendingRespawn) return;
     if (this.state.shielded) {
       this.state.shielded = false;
       this.save();
@@ -2351,42 +2327,62 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     }
     this.playerImpact();
     if (this.state.health <= 0) {
-      this.playerRecoil = null;
-      const checkpoint = enemy?.boss
-        ? { x: enemy.home.x, z: enemy.home.z + 8 }
-        : CAMP;
-      const respawn = safeSpawn(this.world, this.state, checkpoint);
-      this.player.root.position.set(respawn.x, surfaceHeight(this.world, respawn.x, respawn.z), respawn.z);
-      this.state.health = 5;
-      this.state.stamina = 100;
-      this.vertical = 0;
-      this.grounded = true;
-      this.fallPeak = this.player.root.position.y;
-      this.velocity.set(0, 0, 0);
-      if (enemy) {
-        enemy.hp = enemy.maxHp;
-        placeGroundEnemy(this.world, this.state, enemy);
-        enemy.state = "idle";
-        enemy.phase = 1;
-        enemy.attacks = 0;
-        enemy.timer = 1;
-        enemy.telegraph.visible = false;
-        enemy.sweep.visible = false;
-        // A pool can cause this respawn while updateAcid is iterating the list.
-        // Expire it in place; that loop owns removal and disposal.
-        for (const pool of this.acidPools)
-          if (pool.owner === enemy) pool.life = 0;
-      }
-      this.ui.toast(
-        "回到最近的休息点 · 菌子与探索记录全部保留，可以再试一次。",
-      );
-      this.save();
+      // Resolve at the frame boundary, after acid/projectile loops finish.
+      this.pendingRespawn = true;
     } else {
       this.ui.toast("受伤了 · 选中回复果按 G 使用，Q 侧向闪避");
       this.save();
     }
   }
+  relocatePlayer(destination) {
+    const p = safeSpawn(this.world, this.state, destination);
+    this.player.root.position.set(p.x, surfaceHeight(this.world, p.x, p.z), p.z);
+    this.state.position = { ...p };
+    this.safePosition = { ...p };
+    this.vertical = 0;
+    this.grounded = true;
+    this.velocity.set(0, 0, 0);
+    this.fallPeak = this.player.root.position.y;
+    this.swimming = false;
+    this.waterTimer = this.slowTime = this.hurtTime = this.attackTime = this.dodgeTime = this.collectTime = this.holdTime = this.reloadTime = 0;
+    this.playerRecoil = null;
+    this.scoped = false;
+    this.invincible = 2.5;
+    this.nearest = null;
+    this.guide?.stop();
+    $('boss-bar').classList.add('hidden');
+    this.clearInput();
+    document.body.classList.remove('in-water');
+    this.cameraArm.reset();
+    this.cameraFocus = null;
+    this.route.invalidate();
+    this.world.actors?.refreshAll();
+  }
+  fastTravel(id) {
+    if (this.pendingRespawn || this.state.health <= 0) return false;
+    const anchor = this.world.travelAnchors.find(a => a.id === id);
+    if (!anchor) return false;
+    this.ui.close();
+    this.relocatePlayer(anchor);
+    this.save();
+    this.ui.toast(`已传送至${anchor.name} · 当前章节与行囊保留`);
+    return true;
+  }
+  respawnAtVillage() {
+    this.pendingRespawn = false;
+    resetAfterDeath(this.state);
+    this.clearEnemies();
+    this.relocatePlayer(CAMP);
+    this.makeEnemies();
+    this.world.sync(this.state);
+    this.save();
+    this.ui.toast('已在村口重生 · 所有怪物已重置，行囊与已获得的成就保留');
+  }
   talkGuide() {
+    if (this.state.chapter === 3 && !this.state.uncle) {
+      this.state.uncle = true;
+      this.save();
+    }
     const guide = this.guide, actor = guide.actor, destination = guideDestination(this.state);
     this.ui.dialog.show({
       speaker: `${actor.displayName} · ${actor.role}`,
@@ -2407,7 +2403,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     for (const e of this.enemies) {
       if (e.hp <= 0 || this.state.defeated.includes(e.id)) continue;
       const range = Math.hypot(p.x - e.x, p.z - e.z);
-      const locked = e.ant && !this.state.gateOpen;
+      const locked = e.ant && this.state.chapter === 3 && !this.state.gateOpen;
       e.object.visible = !locked && range < (e.encounter ? 80 : 60);
       if (locked || range > (e.flying ? 70 : 34)) {
         e.telegraph.visible = e.sweep.visible = false;
@@ -2525,14 +2521,15 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           0.18;
       });
     }
-    const boss = this.enemies.find(
+    const boss = this.enemies.filter(
       (e) =>
         e.boss &&
         e.hp > 0 &&
+        e.object.visible &&
         Math.hypot(p.x - e.x, p.z - e.z) <
           (e.flying ? 65 : e.encounter ? 30 : 18) &&
         !this.state.defeated.includes(e.id),
-    );
+    ).sort((a, b) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(p.x - b.x, p.z - b.z))[0];
     $("boss-bar").classList.toggle("hidden", !boss);
     if (boss) {
       $("boss-bar").classList.toggle("ant-boss", !!boss.ant);
@@ -2822,6 +2819,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         this.save();
       }
     }
+    if (this.pendingRespawn) this.respawnAtVillage();
     this.ui.dialog.update(dt);
     this.world.update(this.gameTime, this.state);
     this.trailLight.intensity = daylight(this.state).night * 2.2;

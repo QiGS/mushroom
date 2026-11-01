@@ -136,12 +136,12 @@ test("chapter three needs the ant queen before collecting protected mushrooms or
   assert.equal(requirementsMet(s), true);
   assert.equal(collect(s, item).ok, true);
 });
-test("granny moves with story milestones and is the same delivery target as the actor", () => {
+test("granny stays at the village through story milestones and delivery", () => {
   const s = newGame();
   s.chapter = 3;
   const initial = grandmaPlace(s);
   s.uncle = true;
-  assert.notDeepEqual(initial, grandmaPlace(s));
+  assert.deepEqual(initial, grandmaPlace(s));
   s.gateOpen = true;
   s.talked = true;
   s.defeated = ["ant-queen"];
@@ -152,7 +152,7 @@ test("granny moves with story milestones and is the same delivery target as the 
     [grandmaPlace(s).x, grandmaPlace(s).z],
   );
   s.settled = true;
-  assert.equal(grandmaPlace(s).area, "菌谷石门旁");
+  assert.equal(grandmaPlace(s).area, "村口");
 });
 test("boss shortcut grants access but does not grant completion, ingredients or money", () => {
   const s = newGame();

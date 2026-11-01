@@ -1,4 +1,6 @@
 import { toolArt } from "./tool-art.js";
+import { mountShopPreview } from './shop-preview.js';
+const goodsArt = p => `<button class="goods-model" data-goods-model="${p.id}" data-name="${p.name}" data-color="${p.color || '#b77d55'}" aria-label="旋转查看${p.name}三维模型" aria-pressed="false"><canvas width="480" height="260" aria-hidden="true"></canvas><small>查看三维实物 ↗</small></button>`;
 import {
   ingredients,
   recipeFor,
@@ -105,7 +107,7 @@ export class JourneyPanels {
                 (s.tools[p.id] > 0 ||
                   s[p.id === "bed" ? "bedOwned" : "forecastOwned"]);
               const locked = p.id === "bed" && !houseUnlocked(s);
-              return `<article class="shop-item"><span>${toolArt(p)}</span><h3>${p.name}</h3><p>${p.detail}</p><button data-tool-buy="${p.id}" ${owned || locked || s.coins < p.price ? "disabled" : ""}>${owned ? "已购入 · 永久设施" : locked ? "完成第一章后可购买" : `购买 ${p.name} · ${p.price} 竹叶币`}</button></article>`;
+              return `<article class="shop-item">${goodsArt(p)}<h3>${p.name}</h3><p>${p.detail}</p><button data-tool-buy="${p.id}" ${owned || locked || s.coins < p.price ? "disabled" : ""}>${owned ? "已购入 · 永久设施" : locked ? "完成第一章后可购买" : `购买 ${p.name} · ${p.price} 竹叶币`}</button></article>`;
             })
             .join("")
         : mode === "ingredients"
@@ -117,7 +119,7 @@ export class JourneyPanels {
             ]
               .map(
                 (p) =>
-                  `<article class="shop-item">${foodArt(p)}<h3>${p.name}</h3><p>${p.key.startsWith("food:") ? "本章任务食材，也可在山林中采集" : "烹饪辅料 · 收入食材行囊"}</p><button data-food-buy="${p.key}" ${s.coins < p.price ? "disabled" : ""}>购买 ${p.name} · ${p.price} 竹叶币</button></article>`,
+                  `<article class="shop-item">${goodsArt(p)}<h3>${p.name}</h3><p>${p.key.startsWith("food:") ? "本章任务食材，也可在山林中采集" : "烹饪辅料 · 收入食材行囊"}</p><button data-food-buy="${p.key}" ${s.coins < p.price ? "disabled" : ""}>购买 ${p.name} · ${p.price} 竹叶币</button></article>`,
               )
               .join("")
           : ingredients(s)
@@ -131,15 +133,19 @@ export class JourneyPanels {
                     ? ch.requirements[p.id] || 0
                     : 0;
                 const count = Math.max(0, p.stock - reserve);
-                return `<article class="shop-item">${foodArt(p)}<h3>${p.name}</h3><p>持有 ${p.stock} · 可售 ${count}${reserve ? " · 任务保留 " + reserve : ""}</p><button data-sell="${p.key}" ${count ? "" : "disabled"}>出售 1 份 · +${price} 竹叶币</button></article>`;
+                return `<article class="shop-item">${goodsArt(p)}<h3>${p.name}</h3><p>持有 ${p.stock} · 可售 ${count}${reserve ? " · 任务保留 " + reserve : ""}</p><button data-sell="${p.key}" ${count ? "" : "disabled"}>出售 1 份 · +${price} 竹叶币</button></article>`;
               })
               .join("");
     this.ui.show(
       "大叔的山货铺",
       "A FAIR TRADE BY THE HEARTH",
-      `<div class="shop-heading"><span>竹叶币 <strong>${s.coins}</strong></span><span>竹材 ${s.timber}</span></div><nav class="market-tabs"><button data-market="tools" aria-pressed="${mode === "tools"}">任务道具与装备</button><button data-market="ingredients" aria-pressed="${mode === "ingredients"}">食材与调料</button><button data-market="sell" aria-pressed="${mode === "sell"}">出售持有菌子</button></nav><p class="panel-subtitle">${mode === "sell" ? "按份出售持有的菌子。图鉴累计发现和首次记录保留，本章任务所需食材自动留下。" : mode === "ingredients" ? "补足任务食材，或为自己的新配方准备辅料。" : "购买后进入底部道具栏，↑↓ 选中、G 使用或装备。"}</p><p class="craft-message" role="status">${message}</p><div class="shop-grid">${goods || "<p>还没有可以出售的菌子。</p>"}</div><div class="shop-footer"><button id="market-close">收好行囊，离开</button><button id="market-basket">${s.capacity === 36 ? "大竹篮已备好" : "扩容竹篮 · 80 币"}</button><button class="shop-material" id="sell-timber" ${s.timber ? "" : "disabled"}>出售竹材 · +${s.timber * 4}</button></div>`,
+      `<div class="shop-heading"><span>竹叶币 <strong>${s.coins}</strong></span><span>竹材 ${s.timber}</span></div><nav class="market-tabs"><button data-market="tools" aria-pressed="${mode === "tools"}">任务道具与装备</button><button data-market="ingredients" aria-pressed="${mode === "ingredients"}">食材与调料</button><button data-market="sell" aria-pressed="${mode === "sell"}">出售持有菌子</button></nav><p class="panel-subtitle">${mode === "sell" ? "按份出售持有的菌子。图鉴累计发现和首次记录保留，本章任务所需食材自动留下。" : mode === "ingredients" ? "补足任务食材，或为自己的新配方准备辅料。" : "购买后进入底部道具栏，↑↓ 选中、G 使用或装备。"}</p><p class="craft-message" role="status">${message}</p><div class="shop-grid">${goods || "<p>还没有可以出售的菌子。</p>"}</div><div class="shop-footer"><button id="market-close">收好行囊，离开</button><div class="shop-basket-preview">${goodsArt({id:"basket",name:"大竹篮"})}<button id="market-basket">${s.capacity === 36 ? "大竹篮已备好" : "扩容竹篮 · 80 币"}</button></div><button class="shop-material" id="sell-timber" ${s.timber ? "" : "disabled"}>出售竹材 · +${s.timber * 4}</button></div>`,
       "shop",
     );
+    if (document.querySelector('[data-goods-model]')) {
+      document.querySelector('.shop-grid').insertAdjacentHTML('beforebegin', '<div class="shop-model-stage"><strong></strong><small>拖动旋转 · 滚轮缩放 · 点击下方商品切换模型</small></div>');
+      this.ui.panelCleanup = mountShopPreview(document.getElementById('panel-body'));
+    }
     document
       .querySelectorAll("[data-market]")
       .forEach((b) => (b.onclick = () => this.market(b.dataset.market)));

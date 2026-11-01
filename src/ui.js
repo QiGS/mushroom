@@ -1,6 +1,8 @@
+import { menuIcon } from "./menu-icons.js";
 import { SatchelUI, notebookNav, notebookSection } from "./notebook-ui.js";
 import { BOSSES, WEAPONS } from "./progression.js";
-import { bossMapMarker, drawMapSymbol, mapViewport } from "./map-markers.js";
+import { bossMapMarker, bossMapMarkers, drawMapSymbol, mapViewport, zoomMapViewport } from "./map-markers.js";
+import { anchorAtPoint } from './fast-travel.js';
 import { toolArt } from "./tool-art.js";
 import { grandmaPlace, BOSS_DESTINATIONS } from "./story.js";
 import { cycleTimeScale } from "./seasons.js";
@@ -80,6 +82,11 @@ export function mushroomSVG(color = "#b79056") {
 }
 export class UI {
   constructor(game) {
+    for (const [button, icon] of [['bag-button','bag'],['guide-button','collection'],['settings-button','settings'],['journal-button','journal']]) {
+      const element = document.getElementById(button);
+      element.querySelector('i,svg')?.remove();
+      element.insertAdjacentHTML('afterbegin', menuIcon(icon));
+    }
     this.game = game;
     this.panel = null;
     this.mapCtx = $("minimap").getContext("2d");
@@ -167,6 +174,8 @@ export class UI {
     );
   }
   show(title, kicker, html, kind = "other") {
+    this.panelCleanup?.();
+    this.panelCleanup = null;
     this.notice.close();
     this.dialog.close();
     if (!this.panel) this.lastFocus = document.activeElement;
@@ -195,6 +204,8 @@ export class UI {
     $("close-panel").focus();
   }
   close() {
+    this.panelCleanup?.();
+    this.panelCleanup = null;
     this.dialog.close();
     this.panel = null;
     $("modal-backdrop").classList.add("hidden");
@@ -312,7 +323,7 @@ export class UI {
             : [
                 [
                   "找到采菌大叔",
-                  "西侧缺口石附近有新鲜脚印。大叔的竹篮支线不会阻塞主线。",
+                  "回声石旁的阿山叔会为你指路。竹篮支线不会阻塞主线。",
                   s.uncle,
                 ],
                 [
@@ -645,16 +656,34 @@ export class UI {
     };
   }
   map() {
-    const boss = bossMapMarker(this.game.state, this.game.enemies);
+    this.mapZoom = Number(this.mapZoom) || 1;
+    const boss = bossMapMarkers(this.game.state, this.game.enemies).find(b => b.chapter === this.mapSelectedBoss)
+      || bossMapMarker(this.game.state, this.game.enemies)
+      || bossMapMarkers(this.game.state, this.game.enemies)[0];
     const s = this.game.state,
       target = navigationTarget(s);
     this.show(
       "山野行路图",
       "THE WILDWOOD / MAP",
-      `<div class="map-toolbar"><span>第 ${s.chapter} 章 · 北向上 · 点击地图标记</span><button id="map-zoom" aria-pressed="${!!this.mapZoom}">${this.mapZoom ? "查看全境" : "放大身边 2×"}</button><button id="map-detail" aria-pressed="${!!this.mapEssentials}">${this.mapEssentials ? "显示全部标记" : "仅主线与首领"}</button></div><div class="map-sheet"><div class="map-large-wrap"><canvas id="large-map" width="600" height="600" aria-label="山野地图，首领位置与服务点，点击标记方向"></canvas></div><aside class="boss-map-card">${boss ? `<small>CHAPTER 0${s.chapter} / ${boss.defeated ? "已击退" : "首领情报"}</small>${s.chapter >= 4 ? `<img src="${import.meta.env.BASE_URL}assets/bosses/poison-${boss.species}.webp" alt="${boss.name}"/>` : ""}<h3>${boss.name}</h3><div class="boss-map-stats"><span>${boss.kind}</span><b>${Math.ceil(boss.health)} / ${boss.hp}</b></div><div class="boss-life"><i style="width:${(boss.health / boss.hp) * 100}%"></i></div><p>${boss.hint}</p>${boss.weapon ? `<p>推荐装备：<b>${WEAPONS[boss.weapon].name}</b><br>基础伤害 ${WEAPONS[boss.weapon].damage} · 弱点伤害 ${WEAPONS[boss.weapon].damage * 2}</p>` : ""}<button id="map-boss-track" ${boss.defeated ? "disabled" : ""}>${boss.defeated ? "这片山野已安宁" : "罗盘追踪首领"}</button>` : `<small>初见山野</small><h3>慢慢走，低头看。</h3><p>第一章没有首领。循着主线，找到倒木边的第一处菌窝。</p>`}<p>金色空心圈：当前目标<br>红褐色徽记：首领<br>绿色徽记：村庄服务</p></aside></div><div class="map-legend"><span><b style="background:#d1a65a"></b>旅人 / 当前方向</span><span><b style="background:#986658"></b>首领 / 危险</span><span><b style="background:#4e7563"></b>山货铺 / 奶奶</span><span><b style="background:#a6894b"></b>菌窝 / 收藏线索</span></div><p class="map-note">首领会在大小地图同步显示；击退后变为绿色勾号。V 始终只跟随主线剧情。</p>`,
+      `<div class="map-toolbar"><span>第 ${s.chapter} 章 · 北向上 · 点击地图标记</span><button id="map-zoom" aria-pressed="${!!this.mapZoom}">${this.mapZoom ? "查看全境" : "放大身边 2×"}</button><button id="map-detail" aria-pressed="${!!this.mapEssentials}">${this.mapEssentials ? "显示全部标记" : "仅主线与首领"}</button></div><div class="map-sheet"><div class="map-large-wrap"><canvas id="large-map" width="600" height="600" aria-label="山野地图，首领位置与服务点，点击标记方向"></canvas></div><aside class="boss-map-card">${boss ? `<small>${boss.terrain} / ${boss.defeated ? "已击退" : "首领情报"}</small>${boss.chapter >= 4 ? `<img src="${import.meta.env.BASE_URL}assets/bosses/poison-${boss.species}.webp" alt="${boss.name}"/>` : ""}<h3>${boss.name}</h3><div class="boss-map-stats"><span>${boss.kind}</span><b>${Math.ceil(boss.health)} / ${boss.hp}</b></div><div class="boss-life"><i style="width:${(boss.health / boss.hp) * 100}%"></i></div><p>${boss.hint}</p>${boss.weapon ? `<p>推荐装备：<b>${WEAPONS[boss.weapon].name}</b><br>基础伤害 ${WEAPONS[boss.weapon].damage} · 弱点伤害 ${WEAPONS[boss.weapon].damage * 2}</p>` : ""}<button id="map-boss-track" ${boss.defeated ? "disabled" : ""}>${boss.defeated ? "这片山野已安宁" : "罗盘追踪首领"}</button>` : `<small>初见山野</small><h3>慢慢走，低头看。</h3><p>第一章没有首领。循着主线，找到倒木边的第一处菌窝。</p>`}<p>金色空心圈：当前目标<br>红褐色徽记：首领<br>绿色徽记：村庄服务</p></aside></div><div class="map-legend"><span><b style="background:#d1a65a"></b>旅人 / 当前方向</span><span><b style="background:#986658"></b>首领 / 危险</span><span><b style="background:#4e7563"></b>山货铺 / 奶奶</span><span><b style="background:#a6894b"></b>菌窝 / 收藏线索</span></div><p class="map-note">首领会在大小地图同步显示；击退后变为绿色勾号。V 始终只跟随主线剧情。</p>`,
       "map",
     );
-    this.drawMap($("large-map").getContext("2d"), 600, true);
+    const mapCanvas = $('large-map');
+    const refreshMap = () => {
+      $('map-zoom').textContent = `${Math.round(this.mapZoom * 100)}% · 重置全境`;
+      $('map-zoom').setAttribute('aria-pressed', String(this.mapZoom > 1));
+      this.drawMap(mapCanvas.getContext('2d'), 600, true);
+    };
+    document.querySelector('.map-note').textContent = '滚轮缩放（以鼠标位置为中心） · 点击青色锚点直接传送 · 点击空白处标记方向';
+    mapCanvas.setAttribute('aria-label', '山野地图：滚轮缩放，点击青色锚点快捷传送');
+    mapCanvas.addEventListener('wheel', e => {
+      e.preventDefault(); e.stopPropagation();
+      const r = mapCanvas.getBoundingClientRect();
+      const next = zoomMapViewport(s, this.mapZoom, this.mapCentre, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.height : 1));
+      this.mapZoom = next.zoom; this.mapCentre = next.centre;
+      refreshMap();
+    }, { passive: false });
+    refreshMap();
     document.querySelector(".notebook-content").insertAdjacentHTML(
       "beforeend",
       `<div class="map-route-summary"><div><strong>⌖ ${target.name}</strong><small>距离 ${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · 道具栏指南针 ×${s.tools.compass}</small></div><button id="map-guide-toggle">V · ${s.guidance ? "关闭" : "显示"}虚线引导</button></div><p class="map-compass-hint">右上罗盘指示目标方向 · 金色标记为当前目标 · 河心石台可沿浮桥抵达</p>${!s.riverNoteFound ? '<div class="map-clues"><button class="river-note" id="map-river"><span>▤</span><div><b>河心石台 · 未拾取的便笺</b><small>点击后由罗盘指向便笺 · V 始终引导主线</small></div></button></div>' : ""}${this.collection.cluesMarkup()}<div class="explore-map-links">${EXPLORATION_SPOTS.map((p) => `<button data-explore="${p.id}">◇ ${p.name}</button>`).join("")}<button data-explore="shop">山货铺</button></div>`,
@@ -670,9 +699,18 @@ export class UI {
       (child.matches('.map-toolbar,.map-sheet,.map-legend,.map-note') ? mapMain : mapNotes).append(child);
     }
     mapPage.append(mapMain, mapNotes);
+    mapMain.insertAdjacentHTML('beforeend', `<div class="map-anchor-list" aria-label="快捷传送">${this.game.world.travelAnchors.map(a => `<button data-travel-anchor="${a.id}">⌖ ${a.name}</button>`).join('')}</div>`);
+    document.querySelectorAll('[data-travel-anchor]').forEach(button => button.onclick = () => this.game.fastTravel(button.dataset.travelAnchor));
+    mapNotes.insertAdjacentHTML('afterbegin', `<div class="map-territories" aria-label="各地形首领">${bossMapMarkers(s, this.game.enemies).map(b => `<button data-territory="${b.chapter}">${b.name} · ${b.terrain}${b.defeated ? ' ✓' : b.sealed ? ' · 石门未开' : ''}</button>`).join('')}</div>`);
+    document.querySelectorAll('[data-territory]').forEach(button => button.onclick = () => {
+      const b = bossMapMarkers(s, this.game.enemies).find(p => p.chapter === Number(button.dataset.territory));
+      this.mapSelectedBoss = b.chapter;
+      this.waypoint = { x: b.x, z: b.z, kind: 'boss', bossId: b.id }; s.guidance = false; s.collection.track = null;
+      this.mapCentre = b; this.mapZoom = 2; this.game.save(); this.map();
+    });
     $("map-zoom").onclick = () => {
-      this.mapZoom = !this.mapZoom;
-      this.map();
+      this.mapZoom = 1; this.mapCentre = undefined;
+      refreshMap();
     };
     const guide = this.game.world.guide;
     const guideButton = document.createElement('button');
@@ -685,7 +723,7 @@ export class UI {
       this.game.save();
       this.map();
     };
-    document.querySelector('.explore-map-links').append(guideButton);
+    if (guide.object.visible) document.querySelector('.explore-map-links').append(guideButton);
     $("map-detail").onclick = () => {
       this.mapEssentials = !this.mapEssentials;
       this.map();
@@ -694,7 +732,7 @@ export class UI {
       $("map-boss-track").onclick = () => {
         s.guidance = false;
         s.collection.track = null;
-        this.waypoint = { x: boss.x, z: boss.z, kind: "boss" };
+        this.waypoint = { x: boss.x, z: boss.z, kind: "boss", bossId: boss.id };
         this.game.save();
         this.map();
       };
@@ -727,7 +765,9 @@ export class UI {
     );
     $("large-map").onclick = (e) => {
       const r = e.currentTarget.getBoundingClientRect(),
-        view = mapViewport(s, true, this.mapZoom ? 2 : 1);
+        view = mapViewport(s, true, this.mapZoom, this.mapCentre);
+      const anchor = anchorAtPoint(this.game.world.travelAnchors, view, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, r.width, r.height);
+      if (anchor) { this.game.fastTravel(anchor.id); return; }
       s.guidance = false;
       this.waypoint = {
         kind: "custom",
@@ -746,11 +786,8 @@ export class UI {
           ),
         ),
       };
-      if (
-        boss &&
-        Math.hypot(this.waypoint.x - boss.x, this.waypoint.z - boss.z) < 6
-      )
-        this.waypoint = { x: boss.x, z: boss.z, kind: "boss" };
+      const clickedBoss = bossMapMarkers(s, this.game.enemies).find(b => Math.hypot(this.waypoint.x - b.x, this.waypoint.z - b.z) * r.width / view.span < 16);
+      if (clickedBoss) this.waypoint = { x: clickedBoss.x, z: clickedBoss.z, kind: 'boss', bossId: clickedBoss.id };
       this.game.state.collection.track = null;
       this.game.save();
       this.toast("已记下方向，指南针会为你指路。");
@@ -759,7 +796,7 @@ export class UI {
   }
   drawMap(ctx, size, large = false) {
     const s = this.game.state;
-    const view = mapViewport(s, large, this.mapZoom ? 2 : 1),
+    const view = mapViewport(s, large, this.mapZoom || 1, this.mapCentre),
       essential = large && this.mapEssentials;
     const scale = size / view.span,
       px = (x) => (x - view.x) * scale,
@@ -977,8 +1014,8 @@ export class UI {
     const navTarget = navigationTarget(s);
     const granny = grandmaPlace(s);
     const guide = this.game.world.guide;
-    drawMapSymbol(ctx, 'granny', px(guide.x), pz(guide.z), large ? 10 : 5, '#377e8a');
-    if (large) {
+    if (guide.object.visible) drawMapSymbol(ctx, 'granny', px(guide.x), pz(guide.z), large ? 10 : 5, '#377e8a');
+    if (large && guide.object.visible) {
       ctx.fillStyle = '#275d63';
       ctx.font = '12px JingmaiRounded, sans-serif';
       ctx.fillText(guide.displayName + ' · 引路人', px(guide.x), pz(guide.z) - 16);
@@ -1002,8 +1039,7 @@ export class UI {
       large ? 9 : 5,
       "#627f58",
     );
-    const boss = bossMapMarker(s, this.game.enemies);
-    if (boss) {
+    for (const boss of bossMapMarkers(s, this.game.enemies)) {
       if (large && !boss.defeated) {
         ctx.fillStyle = "#98665816";
         ctx.strokeStyle = "#98665888";
@@ -1033,10 +1069,17 @@ export class UI {
         ctx.font = "bold 12px JingmaiRounded,sans-serif";
         ctx.fillStyle = "#6e493d";
         ctx.fillText(
-          boss.name + (boss.defeated ? " · 已击退" : ""),
+          boss.name + (boss.defeated ? " · 已击退" : boss.sealed ? ' · 石门未开' : ''),
           px(boss.x),
           pz(boss.z) - 22,
         );
+      }
+    }
+    for (const anchor of this.game.world.travelAnchors) {
+      drawMapSymbol(ctx, 'anchor', px(anchor.x), pz(anchor.z), large ? 10 : 5, '#267f7b');
+      if (large) {
+        ctx.font = '11px JingmaiRounded,sans-serif'; ctx.fillStyle = '#205c56';
+        ctx.fillText(anchor.name, px(anchor.x), pz(anchor.z) + 23);
       }
     }
     if (navTarget) {

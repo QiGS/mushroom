@@ -5,7 +5,7 @@ import { fieldDay } from "./seasons.js";
 import { createChestVisual } from "./chest-model.js";
 
 const assets = new Map();
-function model(id) {
+export function loadCollectionModel(id) {
   if (!assets.has(id)) {
     assets.set(
       id,
@@ -107,7 +107,7 @@ export function buildCollectionWorld(
     specimens.set(item.id, { group, ring, item, interaction });
     interactables.push(interaction);
     if (typeof window !== "undefined")
-      model(item.id)
+      loadCollectionModel(item.id)
         .then((gltf) => {
           if (disposed) return;
           const object = gltf.scene.clone(true);
