@@ -19,6 +19,7 @@ import { grantTool, TOOL_DEFS } from "./tools.js";
 import { daylight } from "./journey.js";
 import { missionTarget } from "./mission.js";
 import { stepBody } from './terrain.js';
+import { enemyFits, turnGroundEnemy, placeGroundEnemy } from './enemy-movement.js';
 export function attachQA(game) {
   const bar = document.createElement("div");
   bar.id = "qa-controls";
@@ -49,6 +50,79 @@ export function attachQA(game) {
     bar.append(b);
   };
   add("QA 开始", () => game.begin(true));
+  let impactEnemy;
+  let cameraAudit = '';
+  add('QA 打击准备', () => {
+    game.photo(false);
+    game.state.weapon = 'staff';
+    game.state.health = 5;
+    game.invincible = 10;
+    impactEnemy = game.enemies.find(e => e.id === 'qa-impact') || game.spawnEnemy(0, 20, 'qa-impact');
+    impactEnemy.hp = impactEnemy.maxHp = 8;
+    impactEnemy.cooldown = 0;
+    impactEnemy.state = 'recover'; impactEnemy.timer = 20;
+    game.state.defeated = game.state.defeated.filter(id => id !== impactEnemy.id);
+    impactEnemy.object.visible = true;
+    placeGroundEnemy(game.world, game.state, impactEnemy, { x: 0, z: 20 });
+    impactEnemy.home = { x: impactEnemy.x, z: impactEnemy.z };
+    move(impactEnemy.x, impactEnemy.z + 1.7);
+    game.yaw = .35; game.pitch = .28; game.distance = 5.5;
+    game.player.root.rotation.y = Math.PI;
+    game.cameraArm.reset(); game.updateCamera(.1);
+  });
+  add('QA 命中定格', () => {
+    game.attackCooldown = 0;
+    game.attack();
+    game.attackTime = .14;
+    game.updatePlayer(.12);
+    game.photo(true);
+    game.hitEffects.update(0, game.camera);
+  });
+  add('QA 受击反馈', () => {
+    game.photo(false);
+    game.invincible = 0;
+    game.hurt(impactEnemy);
+  });
+  add('QA 障碍绕行检查', () => {
+    game.photo(false);
+    game.invincible = 300;
+    game.state.weapon = 'staff';
+    move(-.5, 29.8);
+    game.yaw = .65; game.pitch = .28; game.distance = 7;
+    game.cameraArm.reset(); game.updateCamera(.1);
+    let maxAngleError = 0, minDistance = 100, maxDistance = 0;
+    for (const key of ['KeyD', 'KeyA', 'KeyW', 'KeyS']) {
+      game.keys.add(key);
+      for (let i = 0; i < 90; i++) {
+        game.updatePlayer(1 / 60); game.updateCamera(1 / 60);
+        const direction = game.camera.getWorldDirection(game.player.root.position.clone());
+        const yaw = Math.atan2(-direction.x, -direction.z);
+        maxAngleError = Math.max(maxAngleError, Math.abs(Math.atan2(Math.sin(yaw - game.yaw), Math.cos(yaw - game.yaw))));
+        minDistance = Math.min(minDistance, game.cameraArm.length);
+        maxDistance = Math.max(maxDistance, game.cameraArm.length);
+      }
+      game.keys.clear();
+    }
+    cameraAudit = ` WASD绕行角误差:${maxAngleError.toFixed(5)} 视距:${minDistance.toFixed(2)}-${maxDistance.toFixed(2)}`;
+  });
+  add('QA 蛇撞石检查', () => {
+    const rock = game.world.colliders.find(c => c.height && c.r > 1 && c.height < 2 && Math.abs(c.x) < 45 && Math.abs(c.z) < 45);
+    if (!rock) return;
+    game.photo(false);
+    impactEnemy = game.enemies.find(e => e.id === 'qa-impact') || game.spawnEnemy(rock.x, rock.z + rock.r + 3, 'qa-impact');
+    placeGroundEnemy(game.world, game.state, impactEnemy, { x: rock.x, z: rock.z + rock.r + 3 });
+    impactEnemy.home = { x: impactEnemy.x, z: impactEnemy.z };
+    impactEnemy.hp = impactEnemy.maxHp = 8;
+    impactEnemy.object.visible = true;
+    impactEnemy.dir.set(0, -1);
+    turnGroundEnemy(game.world, game.state, impactEnemy, Math.PI);
+    impactEnemy.state = 'charge'; impactEnemy.timer = 1;
+    move(impactEnemy.x + 3, impactEnemy.z - 1);
+    game.invincible = 300;
+    for (let i = 0; i < 45 && impactEnemy.state === 'charge'; i++) game.updateEnemies(1 / 60);
+    cameraAudit = ` 撞石状态:${impactEnemy.state} 整蛇无重叠:${enemyFits(game.world, game.state, impactEnemy, impactEnemy.x, impactEnemy.z)}`;
+    game.yaw = .5; game.pitch = .4; game.distance = 8;
+  });
   add('QA 引路人', () => {
     game.state.talked = true;
     game.invincible = 300;
@@ -639,6 +713,7 @@ export function attachQA(game) {
         .join(
           ",",
         )} | ${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} 高${p.y.toFixed(1)} HP${game.state.health} | 武器:${game.state.weapon} | 最近: ${game.nearest?.name || "无"} | ${game.world.mountains.loaded}/6 山体 ${game.world.mountains.sections} 片 | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
+      cameraAudit + ` 命中星芒:${game.hitEffects.pool.filter(p => p.life > 0).length} 亮闪:${game.hitEffects.flashes.size} 受击:${game.hurtTime.toFixed(2)} 音频:${game.audio.ctx?.state || '无'}` +
       (game.desktopControls
         ? ` | 夜行:${game.enemies.filter((e) => e.night && e.hp > 0).length} | 游泳:${game.swimming} | 水中:${game.waterTimer.toFixed(1)} | 时刻:${daylight(game.state).hour.toFixed(1)} | 鼠标:${game.look?.locked ? "已捕获" : "自由"} | 镜头:${game.yaw.toFixed(2)},${game.pitch.toFixed(2)} | 骨骼:${game.motion?.rig.skeleton.bones.length || 0} | 步速:${game.motion?.speed.toFixed(2) || 0}`
         : "");

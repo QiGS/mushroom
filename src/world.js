@@ -288,7 +288,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       y = height(x, z),
       pine = random() > 0.45;
     trees.push({ x, z, r: r + 0.1 });
-    colliders.push({ x, z, r: r + 0.2 });
+    colliders.push({ x, z, r: r + .2, height: h });
     trunks.push({
       x,
       y: y + h * 0.5,
@@ -357,7 +357,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       sz: s * 0.72,
       ry: random() * 6,
     });
-    if (s > 1) colliders.push({ x, z, r: s * 0.65 });
+    if (s > 1) colliders.push({ x, z, r: s * .9, height: s * .7 });
   }
   instances(new T.IcosahedronGeometry(1, 1), material(0xffffff), rocks, root);
   instances(new T.IcosahedronGeometry(1, 1), material(0x688449), moss, root);
@@ -765,7 +765,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     1.8,
     -1,
   );
-  colliders.push({ id: "cooking-fire", x: 4, z: 29, r: 1 });
+  colliders.push({ id: "cooking-fire", x: 4, z: 29, r: 1, height: .8 });
   const table = at(-0.5, 33.5);
   colliders.push({ id: "village-table", x: -0.5, z: 33.5, hx: 2, hz: 0.75 });
   mesh(new T.BoxGeometry(4, 0.18, 1.5), wood, table, 0, 1);
@@ -1065,7 +1065,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     }
     const stump = at(3, -28);
     mesh(new T.CylinderGeometry(0.6, 0.95, 2, 7), trunkMat, stump, 0, 1);
-    colliders.push({ x: 3, z: -28, r: 0.85 });
+    colliders.push({ x: 3, z: -28, r: .85, height: 2 });
     const tube = at(-4, -27);
     const tubemat = material(0xabb87a);
     mesh(
@@ -1281,7 +1281,7 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
         object: g,
         radius: 2.1,
       });
-      colliders.push({ x, z, r: 0.7 });
+      colliders.push({ x, z, r: .7, height: 1.25 });
     }
     for (let i = 0; i < 2; i++) {
       const x = -11 + i * 2,

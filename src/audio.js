@@ -56,6 +56,28 @@ export class ForestAudio {
     o.connect(g).connect(this.master);
     o.start(t);
     o.stop(t + duration + 0.03);
+    o.onended = () => { o.disconnect(); g.disconnect(); };
+  }
+  whoosh(duration, startHz, endHz, volume, type = 'bandpass') {
+    if (!this.ctx || !this.enabled) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.noise) {
+      this.noise = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * .35), ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
+    const source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain();
+    source.buffer = this.noise;
+    filter.type = type;
+    filter.Q.value = .7;
+    filter.frequency.setValueAtTime(startHz, t);
+    filter.frequency.exponentialRampToValueAtTime(endHz, t + duration);
+    gain.gain.setValueAtTime(.0001, t);
+    gain.gain.exponentialRampToValueAtTime(volume, t + .025);
+    gain.gain.exponentialRampToValueAtTime(.0001, t + duration);
+    source.connect(filter).connect(gain).connect(this.master);
+    source.start(t); source.stop(t + duration);
+    source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
   }
   play(kind) {
     if(kind==='shot') {
@@ -66,10 +88,15 @@ export class ForestAudio {
     } else if (kind === "discover") {
       [523, 659, 784, 1047].forEach((f, i) => this.note(f, 1.8, 0.3, i * 0.15));
     } else if (kind === "hit") {
-      this.note(110, 0.2, 0.4, 0, "triangle");
-      this.note(82, 0.3, 0.2, 0.06, "triangle");
+      this.whoosh(.11, 2400, 450, .75);
+      this.note(135, .12, .65, 0, 'triangle');
+      this.note(68, .18, .3, .025, 'sine');
+    } else if (kind === 'hurt') {
+      this.whoosh(.2, 900, 150, .55, 'lowpass');
+      this.note(74, .25, .65, 0, 'triangle');
     } else if (kind === "swing") {
-      this.note(210, 0.12, 0.12, 0, "triangle");
+      this.whoosh(.18, 1800, 250, .7);
+      this.note(180, .12, .13, .015, 'triangle');
     } else if (kind === "hiss") {
       this.note(740, 0.35, 0.09, 0, "sawtooth");
     } else if (kind === "step") {

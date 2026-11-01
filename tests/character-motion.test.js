@@ -141,6 +141,7 @@ test("jump, landing, gathering, dodge and attack keep deformed vertices finite a
     { collect: 0.28 },
     { dodge: 0.21 },
     { attack: 0.14 },
+    { hurt: 0.16 },
   ]) {
     for (let i = 0; i < 30; i++)
       motion.update(1 / 60, { ...pose, ...action, time: i / 60 });

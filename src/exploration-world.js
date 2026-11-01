@@ -594,7 +594,7 @@ export function buildExplorationWorld(
         },
       ),
     );
-    colliders.push({ x, z, r: 1.35 });
+    colliders.push({ x, z, r: 1.35, height: 4 + (i % 4) });
   }
   return {
     props,

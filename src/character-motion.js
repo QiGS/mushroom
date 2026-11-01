@@ -148,7 +148,7 @@ export class TravelerMotion {
   }
   update(
     dt,
-    { speed, grounded, vertical, turn, attack, collect, dodge, time },
+    { speed, grounded, vertical, turn, attack, collect, dodge, time, hurt = 0 },
   ) {
     const b = this.rig.bones;
     this.speed = damp(this.speed, speed, 12, dt);
@@ -178,6 +178,7 @@ export class TravelerMotion {
       collect > 0 ? Math.sin(clamp(collect / 0.55, 0, 1) * Math.PI) : 0;
     const strike = attack > 0 ? Math.sin((1 - attack / 0.28) * Math.PI) : 0;
     const duck = dodge > 0 ? Math.sin(clamp(dodge / 0.42, 0, 1) * Math.PI) : 0;
+    const flinch = Math.sin(clamp(hurt / .32, 0, 1) * Math.PI);
     b.hips.position.y =
       0.91 -
       w * lerp(0.035, 0.1, run) +
@@ -187,11 +188,11 @@ export class TravelerMotion {
     b.hips.position.x = Math.sin(phase) * 0.014 * w;
     b.hips.rotation.set(duck * 0.13, Math.sin(phase) * 0.045 * w, -this.lean);
     b.spine.rotation.set(
-      run * w * 0.13 + gather * 0.48 + duck * 0.28 + this.landing * 1.3,
+      run * w * 0.13 + gather * 0.48 + duck * 0.28 + this.landing * 1.3 - flinch * .24,
       -Math.sin(phase) * 0.07 * w + strike * 0.35,
       Math.sin(phase) * 0.025 * w,
     );
-    b.chest.rotation.set(Math.sin(time * 2.1) * 0.012, -strike * 0.15, 0);
+    b.chest.rotation.set(Math.sin(time * 2.1) * 0.012 - flinch * .1, -strike * 0.15, -flinch * .08);
     b.head.rotation.set(
       -run * w * 0.07 - gather * 0.12,
       Math.sin(time * 0.7) * 0.025 * (1 - w),

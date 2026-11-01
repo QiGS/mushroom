@@ -1,15 +1,10 @@
 import * as T from "three";
 import { addProp } from "./prop-model.js";
-import {
-  terrainHeight,
-  colliderActive,
-  overlapsCollider,
-  safeSpawn,
-  waterLevel,
-} from "./terrain.js";
-import { collidersNear } from "./spatial.js";
+import { terrainHeight } from "./terrain.js";
 import { disposeObject } from "./resources.js";
 import { antPhase } from "./combat.js";
+import { moveGroundEnemy, turnGroundEnemy, placeGroundEnemy } from './enemy-movement.js';
+import { surfaceHeight } from './terrain.js';
 
 export function makeEncounter(root, x, z, species) {
   const flying = species === "butterfly",
@@ -106,15 +101,6 @@ function ring(e, point, color = 0xd99775) {
   e.sweep.visible = true;
   e.sweep.material.color.setHex(color);
   e.sweep.position.set(point.x, terrainHeight(point.x, point.z) + 0.1, point.z);
-}
-function blocked(g, e, x, z) {
-  return (
-    collidersNear(g.world, x, z, 1.3).some(
-      (c) => colliderActive(c, g.state) && overlapsCollider(c, x, z, 1.1),
-    ) ||
-    Math.abs(terrainHeight(x, z) - terrainHeight(e.x, e.z)) > 0.65 ||
-    terrainHeight(x, z) < waterLevel(x, z)
-  );
 }
 export function spawnPoisonVolley(g, e) {
   const p = g.player.root.position;
@@ -230,15 +216,11 @@ export function updateEncounter(g, e, dt) {
       e.sweep.visible = false;
     }
   } else if (e.state === "charge") {
-    const x = e.x + e.dir.x * (12 + e.phase) * dt,
-      z = e.z + e.dir.y * (12 + e.phase) * dt;
-    if (blocked(g, e, x, z)) {
+    if (moveGroundEnemy(g.world, g.state, e, e.dir.x * (12 + e.phase) * dt, e.dir.y * (12 + e.phase) * dt)) {
       recover(3.3);
       g.ui.toast("硬甲撞裂了 · 用大炮反击！");
     } else {
-      e.x = x;
-      e.z = z;
-      if (Math.hypot(p.x - x, p.z - z) < 2.4) g.hurt(e);
+      if (Math.hypot(p.x - e.x, p.z - e.z) < 2.4 && Math.abs(p.y - e.object.position.y) < 2) g.hurt(e);
       if (e.timer <= 0) recover(2.1);
     }
   } else if (e.state === "tail" || e.state === "claw") {
@@ -266,12 +248,10 @@ export function updateEncounter(g, e, dt) {
       const dx = e.aim.x - e.home.x,
         dz = e.aim.z - e.home.z,
         len = Math.max(1, Math.hypot(dx, dz) / 9);
-      const point = safeSpawn(g.world, g.state, {
+      placeGroundEnemy(g.world, g.state, e, {
         x: e.home.x + dx / len,
         z: e.home.z + dz / len,
       });
-      e.x = point.x;
-      e.z = point.z;
       if (Math.hypot(p.x - e.x, p.z - e.z) < 3) g.hurt(e);
       recover(2.6);
     }
@@ -295,12 +275,11 @@ export function updateEncounter(g, e, dt) {
     e.art.group.rotation.z = Math.sin(g.gameTime * 2.5) * 0.08;
   } else {
     if (Math.hypot(e.x - e.home.x, e.z - e.home.z) > 15) {
-      e.x = e.home.x;
-      e.z = e.home.z;
+      placeGroundEnemy(g.world, g.state, e);
       recover(1);
     }
-    e.object.position.set(e.x, terrainHeight(e.x, e.z) + 0.08, e.z);
-    e.object.rotation.y = Math.atan2(e.dir.x, e.dir.y);
+    e.object.position.set(e.x, surfaceHeight(g.world, e.x, e.z) + .08, e.z);
+    turnGroundEnemy(g.world, g.state, e, Math.atan2(e.dir.x, e.dir.y));
     if (e.state !== "burrow")
       e.art.group.position.y = Math.sin(g.gameTime * 8) * 0.025;
     e.art.group.rotation.x = e.state === "tail" ? -0.1 : 0;

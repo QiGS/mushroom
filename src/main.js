@@ -10,14 +10,15 @@ import { TrailGuide, guideDestination } from './trail-guide.js';
 import { BOSS_DESTINATIONS, prepareBossTrip } from "./story.js";
 import { makeAnt, updateAnt } from "./ant-enemy.js";
 import { disposeObject } from "./resources.js";
-import { collidersNear } from "./spatial.js";
 import {
   fieldDay,
   advanceCalendar,
   harvestSnakeChance,
   WEATHER_NAMES,
 } from "./seasons.js";
-import { constrainCamera } from "./camera-collision.js";
+import { CameraArm } from "./camera-collision.js";
+import { moveGroundEnemy, turnGroundEnemy, placeGroundEnemy } from './enemy-movement.js';
+import { CombatFeedback } from './combat-feedback.js';
 import { canWalk } from "./navigation.js";
 import { isChest, mouseChest, reachableInteraction } from "./interaction.js";
 import {
@@ -26,8 +27,6 @@ import {
   waterLevel,
   houseUnlocked,
   insideHouse,
-  colliderActive,
-  overlapsCollider,
 } from "./terrain.js";
 import {
   daylight,
@@ -194,6 +193,12 @@ class Game {
     this.photoMode = false;
     this.keys = new Set();
     this.joystick = { x: 0, y: 0 };
+    this.cameraArm = new CameraArm();
+    this.hitEffects = new CombatFeedback(this.scene);
+    this.hurtTime = 0;
+    this.damageVeil = document.createElement('div');
+    this.damageVeil.id = 'damage-veil';
+    document.getElementById('hud').append(this.damageVeil);
     this.yaw = 0.15;
     this.pitch = 0.3;
     this.distance = 7;
@@ -641,6 +646,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.fallPeak = this.player.root.position.y;
   }
   rebuild() {
+    this.cameraArm.reset();
+    this.cameraFocusY = undefined;
     this.ui.notice.close();
     this.swimming = false;
     this.waterTimer = 0;
@@ -674,6 +681,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.applyQuality();
   }
   clearEnemies() {
+    this.hitEffects?.clear();
+    this.hurtTime = 0;
     for (const e of this.enemies || []) {
       e.art?.dispose();
       disposeObject(e.object);
@@ -785,6 +794,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       nightIndex: night ? Number(id.split("-")[1]) : -1,
     });
     if (enemy.segments) enemy.segments[0].material.color.setHex(type.color);
+    enemy.bodyAngle = enemy.object.rotation.y;
+    if (!enemy.flying && placeGroundEnemy(this.world, this.state, enemy, { x, z }))
+      enemy.home = { x: enemy.x, z: enemy.z };
     enemy.object.visible = !this.state.defeated.includes(id);
     this.enemies.push(enemy);
     if (this.state.defeated.includes(id)) enemy.hp = 0;
@@ -933,8 +945,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       e.hp = clock.isNight && !this.state.defeated.includes(e.id) ? e.maxHp : 0;
       e.object.visible = e.hp > 0;
       e.telegraph.visible = e.sweep.visible = false;
-      e.x = e.home.x;
-      e.z = e.home.z;
+      placeGroundEnemy(this.world, this.state, e);
       e.state = "idle";
       e.timer = 1;
     }
@@ -1199,10 +1210,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     let spent = gun;
     if (hit?.type === "enemy") {
       const e = hit.value;
-      e.hp -= damageFor(weapon, e);
+      const damage = damageFor(weapon, e);
+      if (!damage) return;
+      e.hp = Math.max(0, e.hp - damage);
       spent = true;
-      this.burst(e.object.position, 0xcbe794, 12);
-      this.audio.play("hit");
+      this.enemyImpact(e, weapon);
       if (e.hp <= 0) this.defeat(e);
       else {
         e.cooldown = 0.3;
@@ -1216,6 +1228,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       if (!r.ok) this.ui.toast(r.message);
       else {
         spent = true;
+        this.audio.play('hit');
         this.burst(
           new T.Vector3(hit.x, hit.y, hit.z),
           hit.kind === "grass" ? 0xa5b873 : 0xc3a879,
@@ -1338,6 +1351,28 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       })),
     ];
   }
+  enemyImpact(e, weapon) {
+    const point = e.object.position.clone();
+    point.y += e.boss ? (e.flying ? 1.8 : 1.15) : .45;
+    const facing = this.camera.position.clone().sub(point).normalize();
+    point.addScaledVector(facing, e.boss ? .8 : .25);
+    this.hitEffects.impact(e.object, point, { size: e.boss ? 1.15 : .7 });
+    e.hitPause = e.boss ? .045 : .075;
+    const p = this.player.root.position, dx = e.x - p.x, dz = e.z - p.z, distance = Math.hypot(dx, dz) || 1;
+    if (!e.boss) e.recoil = { x: dx / distance, z: dz / distance, time: .12 };
+    if (this.lastImpactSound === undefined || this.gameTime - this.lastImpactSound > .045) {
+      this.audio.play('hit');
+      this.lastImpactSound = this.gameTime;
+    }
+  }
+  playerImpact() {
+    this.hurtTime = .32;
+    this.damageVeil.style.opacity = '.75';
+    const point = this.player.root.position.clone();
+    point.y += 1;
+    this.hitEffects.impact(this.player.root, point, { color: 0xff976a, size: .55 });
+    this.audio.play('hurt');
+  }
   applyWeaponHit(hit, weapon) {
     const s = this.state;
     if (hit.type === "enemy") {
@@ -1355,7 +1390,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         e.state = "stunned";
         e.timer = 0.35;
       }
-      this.burst(new T.Vector3(hit.x, hit.y, hit.z), 0xe8ce7c, 8);
+      this.enemyImpact(e, weapon);
       if (!e.hp) this.defeat(e);
     } else if (!s.broken.includes(hit.id)) {
       const result = strikeObject(s, hit.value, weapon);
@@ -2179,12 +2214,13 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           angleDelta(this.player.root.rotation.y, facingBefore) /
           Math.max(dt, 0.001),
         attack: this.attackTime,
+        hurt: this.hurtTime,
         collect: this.collectTime,
         dodge: this.dodgeTime,
         time: this.gameTime,
       });
       this.player.model.visible =
-        this.invincible <= 0 || Math.floor(this.gameTime * 12) % 2 === 0;
+        this.hurtTime > 0 || this.invincible <= 0 || Math.floor(this.gameTime * 12) % 2 === 0;
     } else {
       const gait = this.gameTime * (sprint ? 14 : 10),
         bob =
@@ -2228,7 +2264,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           dt,
         );
         this.player.model.visible =
-          this.invincible <= 0 || Math.floor(this.gameTime * 12) % 2 === 0;
+          this.hurtTime > 0 || this.invincible <= 0 || Math.floor(this.gameTime * 12) % 2 === 0;
       }
     }
     if (isGun(this.state.weapon) && this.dodgeTime <= 0)
@@ -2247,7 +2283,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.state.health -= amount;
     this.state.hits++;
     this.invincible = 1.7;
-    this.audio.play("hit");
+    this.playerImpact();
     if (this.state.health <= 0) {
       const p = this.player.root.position;
       p.set(CAMP.x, surfaceHeight(this.world, CAMP.x, CAMP.z), CAMP.z);
@@ -2278,17 +2314,13 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.state.hits++;
     this.invincible = 1.7;
     this.slowTime = enemy?.species === "frost" ? 2.8 : 0.6;
-    this.audio.play("hit");
-    this.burst(this.player.root.position, 0xe9aa7f, 15);
+    this.playerImpact();
     if (this.state.health <= 0) {
       const checkpoint = enemy?.boss
         ? { x: enemy.home.x, z: enemy.home.z + 8 }
         : CAMP;
-      this.player.root.position.set(
-        checkpoint.x,
-        terrainHeight(checkpoint.x, checkpoint.z),
-        checkpoint.z,
-      );
+      const respawn = safeSpawn(this.world, this.state, checkpoint);
+      this.player.root.position.set(respawn.x, surfaceHeight(this.world, respawn.x, respawn.z), respawn.z);
       this.state.health = 5;
       this.state.stamina = 100;
       this.vertical = 0;
@@ -2297,8 +2329,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.velocity.set(0, 0, 0);
       if (enemy) {
         enemy.hp = enemy.maxHp;
-        enemy.x = enemy.home.x;
-        enemy.z = enemy.home.z;
+        placeGroundEnemy(this.world, this.state, enemy);
         enemy.state = "idle";
         enemy.phase = 1;
         enemy.attacks = 0;
@@ -2345,6 +2376,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         e.telegraph.visible = e.sweep.visible = false;
         continue;
       }
+      if (e.hitPause > 0) { e.hitPause = Math.max(0, e.hitPause - dt); continue; }
+      if (e.recoil?.time > 0) {
+        const recoilDt = Math.min(dt, e.recoil.time);
+        moveGroundEnemy(this.world, this.state, e, e.recoil.x * recoilDt * 1.8, e.recoil.z * recoilDt * 1.8);
+        e.recoil.time -= recoilDt;
+      }
       if (e.encounter) {
         updateEncounter(this, e, dt);
         continue;
@@ -2369,8 +2406,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           this.audio.play("hiss");
         } else {
           const a = this.gameTime * 0.3 + (e.boss ? 1 : 0);
-          e.x = T.MathUtils.damp(e.x, e.home.x + Math.sin(a) * 1.2, 1, dt);
-          e.z = T.MathUtils.damp(e.z, e.home.z + Math.cos(a) * 0.6, 1, dt);
+          const dx = T.MathUtils.damp(e.x, e.home.x + Math.sin(a) * 1.2, 1, dt) - e.x;
+          const dz = T.MathUtils.damp(e.z, e.home.z + Math.cos(a) * .6, 1, dt) - e.z;
+          moveGroundEnemy(this.world, this.state, e, dx, dz);
         }
       } else if (e.state === "sweep-windup") {
         e.sweep.visible = true;
@@ -2399,14 +2437,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         }
       } else if (e.state === "charge") {
         e.telegraph.visible = false;
-        e.x += e.dir.x * (e.boss ? 12 : 10) * dt;
-        e.z += e.dir.y * (e.boss ? 12 : 10) * dt;
-        if (dist < (e.boss ? 1.5 : 0.9)) this.hurt(e);
-        const collision = collidersNear(this.world, e.x, e.z, 1).find(
-          (c) =>
-            colliderActive(c, this.state) &&
-            overlapsCollider(c, e.x, e.z, 0.45),
-        );
+        const collision = moveGroundEnemy(this.world, this.state, e, e.dir.x * (e.boss ? 12 : 10) * dt, e.dir.y * (e.boss ? 12 : 10) * dt);
+        if (Math.hypot(p.x - e.x, p.z - e.z) < (e.boss ? 1.5 : .9) &&
+            Math.abs(p.y - e.object.position.y) < 1.5 &&
+            clearShot(this.world, this.state, { x: e.x, y: e.object.position.y + .4, z: e.z }, { x: p.x, y: p.y + .7, z: p.z })) this.hurt(e);
         if (collision) {
           e.state = "stunned";
           e.timer = 2.8;
@@ -2431,8 +2465,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
           dz = e.lure.z - e.z,
           d = Math.hypot(dx, dz);
         if (d > 0.4) {
-          e.x += (dx / d) * 2.5 * dt;
-          e.z += (dz / d) * 2.5 * dt;
+          moveGroundEnemy(this.world, this.state, e, dx / d * 2.5 * dt, dz / d * 2.5 * dt);
         }
         if (e.timer <= 0) {
           e.state = "recover";
@@ -2447,13 +2480,12 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         }
       }
       if (Math.hypot(e.x - e.home.x, e.z - e.home.z) > 20) {
-        e.x = e.home.x;
-        e.z = e.home.z;
+        placeGroundEnemy(this.world, this.state, e);
         e.state = "idle";
         e.timer = 1;
       }
-      e.object.position.set(e.x, terrainHeight(e.x, e.z) + 0.15, e.z);
-      e.object.rotation.y = Math.atan2(e.dir.x, e.dir.y);
+      e.object.position.set(e.x, surfaceHeight(this.world, e.x, e.z) + .15, e.z);
+      if (e.dir.lengthSq() > .001) turnGroundEnemy(this.world, this.state, e, Math.atan2(e.dir.x, e.dir.y));
       e.object.scale.setScalar(e.boss ? 1.9 : 1);
       e.segments.forEach((seg, i) => {
         seg.position.x =
@@ -2588,15 +2620,19 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       desired.set(p.x + 7 + orbit * 3, p.y + 4.8, p.z + 7);
       target.set(p.x - 1, p.y + 1.2, p.z - 7);
     } else {
-      const d = insideHouse(p.x, p.z)
-        ? 2.4
-        : this.photoMode
-          ? this.distance * 1.5
-          : this.distance;
-      target.set(p.x, p.y + 1.3, p.z);
+      const d = this.photoMode ? this.distance * 1.5 : this.distance;
+      if (!this.cameraFocus || this.cameraFocus.distanceTo(p) > 12) {
+        this.cameraArm.reset();
+        this.cameraFocusY = p.y + 1.3;
+      }
+      this.cameraFocus ??= new T.Vector3();
+      this.cameraFocus.copy(p);
+      this.cameraFocusY = T.MathUtils.damp(this.cameraFocusY ?? p.y + 1.3, p.y + 1.3, 14, dt);
+      this.cameraFocusY = Math.max(p.y + .95, this.cameraFocusY);
+      target.set(p.x, this.scoped ? p.y + 1.5 : this.cameraFocusY, p.z);
       desired.set(
         p.x + Math.sin(this.yaw) * Math.cos(this.pitch) * d,
-        p.y + 1.4 + Math.sin(this.pitch) * d,
+        target.y + Math.sin(this.pitch) * d,
         p.z + Math.cos(this.yaw) * Math.cos(this.pitch) * d,
       );
       if (isGun(this.state.weapon) && !this.photoMode && !this.scoped) {
@@ -2605,31 +2641,10 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         desired.y += 0.3;
       }
       if (this.scoped) desired.set(p.x, p.y + 1.5, p.z);
-      desired.y = Math.max(
-        desired.y,
-        terrainHeight(desired.x, desired.z) + 0.6,
-      );
-      const constrained = constrainCamera(
-        this.world,
-        this.state,
-        target,
-        desired,
-      );
-      desired.set(constrained.x, constrained.y, constrained.z);
-    }
-    this.camera.position.lerp(
-      desired,
-      1 - Math.exp(-dt * (this.look?.locked ? 18 : 6)),
-    );
-    if (this.started) {
-      const constrained = constrainCamera(
-        this.world,
-        this.state,
-        target,
-        this.camera.position,
-      );
+      const constrained = this.cameraArm.update(this.world, this.state, target, desired, dt);
       this.camera.position.set(constrained.x, constrained.y, constrained.z);
     }
+    if (!this.started) this.camera.position.lerp(desired, 1 - Math.exp(-dt * 6));
     this.world.foliageFocus.copy(target);
     this.world.foliageEye.copy(this.camera.position);
     // Tight corners transition to an unobstructed close view, rather than
@@ -2720,6 +2735,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         "collectTime",
         "stoneCooldown",
         "slowTime",
+        "hurtTime",
       ])
         this[key] = Math.max(0, this[key] - dt);
       this.updateReload(dt);
@@ -2782,6 +2798,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       !this.ui.blocking &&
       this.state.guidance;
     this.updateCamera(dt);
+    this.hitEffects.update(active ? dt : 0, this.camera);
+    this.damageVeil.style.opacity = String(Math.max(0, this.hurtTime / .32) * .75);
     this.hudTime += dt;
     if (this.started && this.hudTime >= 0.08) {
       this.ui.update(this.hudTime);

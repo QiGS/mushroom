@@ -1,13 +1,9 @@
 import * as T from "three";
 import { addProp } from "./prop-model.js";
-import {
-  terrainHeight,
-  colliderActive,
-  overlapsCollider,
-  waterLevel,
-} from "./terrain.js";
-import { collidersNear } from "./spatial.js";
+import { terrainHeight } from "./terrain.js";
 import { antPhase, antAttack } from "./combat.js";
+import { moveGroundEnemy, turnGroundEnemy, placeGroundEnemy } from './enemy-movement.js';
+import { surfaceHeight } from './terrain.js';
 export function makeAnt(root, x, z, boss = false) {
   const object = new T.Group(),
     body = new T.Group(),
@@ -173,25 +169,14 @@ export function updateAnt(g, e, dt) {
     if (e.state === "investigate")
       e.dir.set(e.lure.x - e.x, e.lure.z - e.z).normalize();
     const speed = e.state === "investigate" ? 2.5 : e.boss ? 11 + e.phase : 6;
-    const x = e.x + e.dir.x * speed * dt,
-      z = e.z + e.dir.y * speed * dt;
-    const blocked =
-      collidersNear(g.world, x, z, 1).some(
-        (c) =>
-          colliderActive(c, g.state) &&
-          overlapsCollider(c, x, z, e.boss ? 1 : 0.3),
-      ) ||
-      terrainHeight(x, z) < waterLevel(x, z) ||
-      Math.abs(terrainHeight(x, z) - terrainHeight(e.x, e.z)) > 1;
+    const blocked = moveGroundEnemy(g.world, g.state, e, e.dir.x * speed * dt, e.dir.y * speed * dt);
     if (blocked) {
       e.state = "stunned";
       e.timer = e.boss ? 2.8 : 1.4;
       e.telegraph.visible = false;
       if (e.boss) g.ui.toast("毒蚁撞上岩石 · 毒囊暴露，趁现在反击！");
     } else {
-      e.x = x;
-      e.z = z;
-      if (dist < (e.boss ? 1.8 : 0.85) && e.state === "charge") g.hurt(e);
+      if (Math.hypot(p.x - e.x, p.z - e.z) < (e.boss ? 1.8 : .85) && Math.abs(p.y - e.object.position.y) < 1.5 && e.state === "charge") g.hurt(e);
     }
     if (e.timer <= 0) recover(e.boss ? 1.7 : 1.2);
   } else if (e.state === "recover" || e.state === "stunned") {
@@ -199,12 +184,11 @@ export function updateAnt(g, e, dt) {
     if (e.timer <= 0) e.state = "idle";
   }
   if (Math.hypot(e.x - e.home.x, e.z - e.home.z) > 19) {
-    e.x = e.home.x;
-    e.z = e.home.z;
+    placeGroundEnemy(g.world, g.state, e);
     recover(1);
   }
-  e.object.position.set(e.x, terrainHeight(e.x, e.z) + 0.08, e.z);
-  e.object.rotation.y = Math.atan2(e.dir.x, e.dir.y);
+  e.object.position.set(e.x, surfaceHeight(g.world, e.x, e.z) + .08, e.z);
+  turnGroundEnemy(g.world, g.state, e, Math.atan2(e.dir.x, e.dir.y));
   e.body.position.y =
     Math.sin(g.gameTime * (e.state === "charge" ? 18 : 5)) * 0.035;
   e.legs.forEach(
