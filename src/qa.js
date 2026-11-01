@@ -96,6 +96,51 @@ export function attachQA(game) {
     game.player.root.rotation.y = Math.PI;
     game.cameraArm.reset(); game.updateCamera(.1);
   });
+  add('QA 实体与击退检查', () => {
+    game.ui.close(); game.photo(false); game.invincible = 30;
+    const e = impactEnemy || game.spawnEnemy(0,20,'qa-impact'); impactEnemy = e;
+    e.hp = e.maxHp = 8; e.cooldown = 0; e.hitPause = e.hitReact = 0; e.recoil = null;
+    game.state.defeated = game.state.defeated.filter(id => id !== e.id);
+    e.bodyAngle = 0; placeGroundEnemy(game.world,game.state,e,{x:0,z:20});
+    e.home = {x:e.x,z:e.z}; e.state='recover';e.timer=20;
+    move(e.x,e.z+3);game.yaw=0;game.pitch=.3;game.distance=6;
+    game.world.actors.refreshAll(); game.keys.add('KeyW');
+    for(let i=0;i<100;i++)game.updatePlayer(1/60);
+    game.keys.clear();game.velocity.set(0,0,0);
+    const contact = game.player.root.position.z-e.z;
+    game.player.root.rotation.y=Math.PI;game.attackCooldown=0;
+    const before={x:e.x,z:e.z,hp:e.hp};game.attack();
+    for(let i=0;i<30;i++)game.updateEnemies(1/60);
+    const retreat=Math.hypot(e.x-before.x,e.z-before.z);
+    cameraAudit=` 实体检查:停距${contact.toFixed(2)}米 伤害${before.hp-e.hp} 击退${retreat.toFixed(2)}米 状态${e.state} 整蛇安全${enemyFits(game.world,game.state,e,e.x,e.z)}`;
+    e.timer=30;
+  });
+  add('QA 冲撞一次检查', () => {
+    game.ui.close();game.photo(false);
+    const e=impactEnemy || game.spawnEnemy(0,20,'qa-impact');impactEnemy=e;
+    e.hp=e.maxHp=8;e.hitPause=e.hitReact=0;e.recoil=null;
+    e.bodyAngle=0;placeGroundEnemy(game.world,game.state,e,{x:0,z:20});e.home={x:e.x,z:e.z};
+    move(e.x,e.z+3);game.world.actors.refreshAll();game.state.health=5;game.invincible=0;game.state.shielded=false;
+    e.dir.set(0,1);e.state='charge';e.timer=.5;
+    for(let i=0;i<90;i++){
+      game.invincible=Math.max(0,game.invincible-1/60);
+      game.updateEnemies(1/60);game.updatePlayer(1/60);
+    }
+    cameraAudit=` 冲撞检查:HP${game.state.health}/5 状态${e.state} 玩家无穿身${game.player.root.position.z>e.z+.8} 整蛇安全${enemyFits(game.world,game.state,e,e.x,e.z)}`;
+    e.state='recover';e.timer=30;game.invincible=30;
+  });
+  add('QA 命中展示', () => {
+    game.ui.close();game.photo(false);
+    const e=impactEnemy;if(!e)return;
+    e.hp=e.maxHp=8;e.cooldown=0;e.hitPause=e.hitReact=0;e.recoil=null;
+    e.state='recover';e.timer=30;game.state.weapon='staff';game.attackCooldown=0;
+    move(e.x,e.z+1.7);game.player.root.rotation.y=Math.PI;
+    game.yaw=.3;game.pitch=.3;game.distance=5.5;game.attack();game.attackTime=.14;
+    game.updatePlayer(.08);game.updateCamera(.1);game.hitEffects.update(0,game.camera);
+    game.damageNumbers.update(0,game.camera,false);game.ui.adventure.update();
+    game.photoMode=true;
+    bar.hidden=true;bar.style.display='none';
+  });
   add('QA 命中定格', () => {
     game.attackCooldown = 0;
     game.attack();

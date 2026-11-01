@@ -269,6 +269,7 @@ export function buildExplorationWorld(
   add(vendorFallback, new T.SphereGeometry(0.23, 10, 6), 0xcfa678, 0, 1.5, 0);
   add(vendorFallback, new T.ConeGeometry(0.47, 0.24, 10), 0xc6a773, 0, 1.74, 0);
   const shopkeeper = addVillager(keeper, "uncle", vendorFallback);
+  solid("shopkeeper-body", 8, 30.35, .4, .4, { height: 1.9 });
   const forecast = group(7.8, 24),
     forecastFallback = new T.Group();
   forecast.add(forecastFallback);

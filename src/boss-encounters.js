@@ -1,3 +1,4 @@
+import { bodyChargeContact } from './combat-response.js';
 import * as T from "three";
 import { addProp } from "./prop-model.js";
 import { terrainHeight } from "./terrain.js";
@@ -217,10 +218,13 @@ export function updateEncounter(g, e, dt) {
     }
   } else if (e.state === "charge") {
     if (moveGroundEnemy(g.world, g.state, e, e.dir.x * (12 + e.phase) * dt, e.dir.y * (12 + e.phase) * dt)) {
-      recover(3.3);
-      g.ui.toast("硬甲撞裂了 · 用大炮反击！");
+      if (e.blockedBy) {
+        bodyChargeContact(g, e, 1.5);
+      } else {
+        recover(3.3);
+        g.ui.toast("硬甲撞裂了 · 用大炮反击！");
+      }
     } else {
-      if (Math.hypot(p.x - e.x, p.z - e.z) < 2.4 && Math.abs(p.y - e.object.position.y) < 2) g.hurt(e);
       if (e.timer <= 0) recover(2.1);
     }
   } else if (e.state === "tail" || e.state === "claw") {
@@ -255,7 +259,7 @@ export function updateEncounter(g, e, dt) {
       if (Math.hypot(p.x - e.x, p.z - e.z) < 3) g.hurt(e);
       recover(2.6);
     }
-  } else if (e.state === "stunned" && e.timer <= 0) {
+  } else if ((e.state === "stunned" || e.state === "recover") && e.timer <= 0) {
     e.state = "idle";
     e.timer = 1;
   }

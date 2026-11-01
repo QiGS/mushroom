@@ -532,7 +532,16 @@ export class UI {
     });
   }
   shop() {
-    this.journey.market("tools");
+    this.close();
+    this.notice.close();
+    this.dialog.show({
+      speaker: '大叔 · 山货铺',
+      text: '回来啦！山路不好走，先歇歇脚。新鲜菌子我收，趁手的家伙也替你备着。今天想看看什么？',
+      actions: [
+        { label: '看看工具与补给', run: () => { this.dialog.close(); this.journey.market('tools'); } },
+        { label: '卖出采来的菌子', run: () => { this.dialog.close(); this.journey.market('sell'); } },
+      ],
+    });
   }
   house() {
     this.show(

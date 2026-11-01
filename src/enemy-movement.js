@@ -15,7 +15,14 @@ export function enemyFootprint(e, x = e.x, z = e.z, angle = e.bodyAngle ?? 0) {
   return [{ x, z, radius: e.boss ? (e.encounter ? 2.5 : 2.4) : .5 }];
 }
 
-export function enemyFits(world, state, e, x, z, angle = e.bodyAngle ?? 0) {
+export function enemyActorBlocker(world, e, x, z, angle = e.bodyAngle ?? 0, allowEscape = false) {
+  const y = surfaceHeight(world, x, z);
+  return world.actors?.blocker(enemyFootprint(e, x, z, angle), y, y + (e.boss ? 2.5 : .85), e,
+    allowEscape ? enemyFootprint(e) : []) || null;
+}
+
+export function enemyFits(world, state, e, x, z, angle = e.bodyAngle ?? 0, allowEscape = false) {
+  if (enemyActorBlocker(world, e, x, z, angle, allowEscape)) return false;
   const floor = surfaceHeight(world, x, z), b = WORLD_BOUNDS;
   for (const p of enemyFootprint(e, x, z, angle)) {
     if (p.x - p.radius < b.minX || p.x + p.radius > b.maxX || p.z - p.radius < b.minZ || p.z + p.radius > b.maxZ) return false;
@@ -37,6 +44,7 @@ export function placeGroundEnemy(world, state, e, point = e.home) {
       if (!enemyFits(world, state, e, x, z)) continue;
       e.x = x; e.z = z;
       e.object.position.set(x, surfaceHeight(world, x, z) + .12, z);
+      world.actors?.refresh(e);
       return true;
     }
   }
@@ -51,19 +59,23 @@ export function turnGroundEnemy(world, state, e, angle) {
   e.bodyAngle = start;
   for (let i = 1; i <= steps; i++) {
     const next = start + delta * i / steps;
-    if (!enemyFits(world, state, e, e.x, e.z, next)) break;
+    if (!enemyFits(world, state, e, e.x, e.z, next, true)) break;
     e.bodyAngle = next;
   }
   e.object.rotation.y = e.bodyAngle;
+  world.actors?.refresh(e);
 }
 
 export function moveGroundEnemy(world, state, e, dx, dz) {
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / .1));
   let blocked = false;
+  e.blockedBy = null;
   for (let i = 0; i < steps; i++) {
     const x = e.x + dx / steps, z = e.z + dz / steps;
+    e.blockedBy = enemyActorBlocker(world, e, x, z, e.bodyAngle, true);
+    if (e.blockedBy) { blocked = true; break; }
     const rise = surfaceHeight(world, x, z) - surfaceHeight(world, e.x, e.z);
-    if (Math.abs(rise) > .32 || !enemyFits(world, state, e, x, z) ||
+    if (Math.abs(rise) > .32 || !enemyFits(world, state, e, x, z, e.bodyAngle, true) ||
         (state.chapter === 3 && !state.gateOpen && z < -32.5 && z > -46 && Math.abs(x) < 5)) {
       blocked = true;
       break;
@@ -71,5 +83,6 @@ export function moveGroundEnemy(world, state, e, dx, dz) {
     e.x = x; e.z = z;
   }
   e.object.position.set(e.x, surfaceHeight(world, e.x, e.z) + .12, e.z);
+  world.actors?.refresh(e);
   return blocked;
 }

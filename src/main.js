@@ -17,7 +17,10 @@ import {
   WEATHER_NAMES,
 } from "./seasons.js";
 import { CameraArm } from "./camera-collision.js";
-import { moveGroundEnemy, turnGroundEnemy, placeGroundEnemy } from './enemy-movement.js';
+import { moveGroundEnemy, turnGroundEnemy, placeGroundEnemy, enemyFootprint } from './enemy-movement.js';
+import { ActorSpace } from './actor-collision.js';
+import { meleeContact, beginHitReaction, advanceHitReaction, bodyChargeContact } from './combat-response.js';
+import { DamageNumbers } from './damage-numbers.js';
 import { CombatFeedback } from './combat-feedback.js';
 import { canWalk } from "./navigation.js";
 import { isChest, mouseChest, reachableInteraction } from "./interaction.js";
@@ -231,6 +234,7 @@ class Game {
     this.gameTime = 0;
     this.lastTime = performance.now();
     this.bind();
+    this.damageNumbers = new DamageNumbers();
     this.makeEnemies();
     this.world.sync(this.state);
     this.restoreSafePosition();
@@ -529,7 +533,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     boss.id = "boss-bar";
     boss.className = "hidden";
     boss.innerHTML =
-      "<span>菌窝守卫 · 青影</span><div><i></i></div><small>观察预警 · 侧闪 · 等它露出破绽</small>";
+      "<span>菌窝守卫 · 青影</span><div><b class=health-chip></b><i></i></div><small>观察预警 · 侧闪 · 等它露出破绽</small>";
     $("hud").append(boss);
   }
   clearInput() {
@@ -683,6 +687,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   }
   clearEnemies() {
     this.hitEffects?.clear();
+    this.damageNumbers?.clear();
+    this.playerRecoil = null;
     this.hurtTime = 0;
     for (const e of this.enemies || []) {
       e.art?.dispose();
@@ -704,6 +710,18 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
   }
   makeEnemies() {
     this.enemies = [];
+    this.world.actors = new ActorSpace();
+    this.world.actors.track(this.player, () => {
+      const p = this.player.root.position;
+      return { discs: [{ x: p.x, z: p.z, radius: .38 }], bottom: p.y, top: p.y + 1.65 };
+    }, 'player');
+    for (const actor of this.world.interactables.filter(a => ['grandma', 'uncle', 'trail-guide', 'badger', 'mouse'].includes(a.type))) {
+      this.world.actors.track(actor, () => {
+        if (!actor.object.visible) return null;
+        const p = actor.object.position;
+        return { discs: [{ x: p.x, z: p.z, radius: actor.id === 'herder-guide' ? .75 : actor.type === 'badger' ? .6 : .4 }], bottom: p.y, top: p.y + (['badger', 'mouse'].includes(actor.type) ? .85 : 1.8) };
+      }, 'npc');
+    }
     this.traps = [];
     const positions =
       this.state.chapter === 1
@@ -801,6 +819,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     enemy.object.visible = !this.state.defeated.includes(id);
     this.enemies.push(enemy);
     if (this.state.defeated.includes(id)) enemy.hp = 0;
+    this.world.actors.track(enemy, () => {
+      if (enemy.hp <= 0 || this.state.defeated.includes(enemy.id) || (enemy.ant && !this.state.gateOpen)) return null;
+      const y = enemy.object.position.y;
+      return { discs: enemyFootprint(enemy), bottom: y - .15, top: y + (enemy.boss ? 2.5 : .85) };
+    });
     return enemy;
   }
   spawnSwarm(boss) {
@@ -808,6 +831,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       (e) => e.id.startsWith("swarm-") && e.hp <= 0,
     );
     for (const e of expired) {
+      this.world.actors?.remove(e);
       disposeObject(e.object);
       disposeObject(e.telegraph);
       disposeObject(e.sweep);
@@ -1184,8 +1208,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         )
         .map((e) => ({
           type: "enemy",
-          x: e.x,
-          z: e.z,
+          ...meleeContact(e, p),
           y: e.object.position.y + 0.5,
           value: e,
           id: e.id,
@@ -1212,18 +1235,13 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     if (hit?.type === "enemy") {
       const e = hit.value;
       const damage = damageFor(weapon, e);
-      if (!damage) return;
+      if (!damage) { this.damageNumbers.show(e.object.position, '格挡', 'blocked'); return; }
+      const weak = e.state === 'stunned' || e.state === 'hover';
       e.hp = Math.max(0, e.hp - damage);
       spent = true;
-      this.enemyImpact(e, weapon);
+      this.enemyImpact(e, weapon, damage, weak);
       if (e.hp <= 0) this.defeat(e);
-      else {
-        e.cooldown = 0.3;
-        if (!e.encounter && (e.state === "idle" || e.state === "recover")) {
-          e.state = "recover";
-          e.timer = 0.4;
-        }
-      }
+      else e.cooldown = 0.3;
     } else if (hit?.type === "prop") {
       const r = strikeObject(s, hit.value, weapon);
       if (!r.ok) this.ui.toast(r.message);
@@ -1352,15 +1370,14 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       })),
     ];
   }
-  enemyImpact(e, weapon) {
+  enemyImpact(e, weapon, damage, weak = false) {
     const point = e.object.position.clone();
     point.y += e.boss ? (e.flying ? 1.8 : 1.15) : .45;
     const facing = this.camera.position.clone().sub(point).normalize();
     point.addScaledVector(facing, e.boss ? .8 : .25);
-    this.hitEffects.impact(e.object, point, { size: e.boss ? 1.15 : .7 });
-    e.hitPause = e.boss ? .045 : .075;
-    const p = this.player.root.position, dx = e.x - p.x, dz = e.z - p.z, distance = Math.hypot(dx, dz) || 1;
-    if (!e.boss) e.recoil = { x: dx / distance, z: dz / distance, time: .12 };
+    this.hitEffects.impact(e.object, point, { size: e.boss ? 1.5 : .95 });
+    this.damageNumbers.show(point, `${weak ? '弱点 ' : ''}-${damage}`, weak ? 'weak' : 'hit');
+    beginHitReaction(e, weapon, this.player.root.position);
     if (this.lastImpactSound === undefined || this.gameTime - this.lastImpactSound > .045) {
       this.audio.play('hit');
       this.lastImpactSound = this.gameTime;
@@ -1381,17 +1398,15 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       if (e.hp <= 0) return;
       const damage = damageFor(weapon, e);
       if (!damage) {
+        this.damageNumbers.show(e.object.position, '格挡', 'blocked');
         this.ui.toast(
           e.flying ? "毒鳞挡住了攻击 · 仅狙击枪可以击穿" : "等待首领露出弱点",
         );
         return;
       }
+      const weak = e.state === 'stunned' || e.state === 'hover';
       e.hp = Math.max(0, e.hp - damage);
-      if (!e.boss) {
-        e.state = "stunned";
-        e.timer = 0.35;
-      }
-      this.enemyImpact(e, weapon);
+      this.enemyImpact(e, weapon, damage, weak);
       if (!e.hp) this.defeat(e);
     } else if (!s.broken.includes(hit.id)) {
       const result = strikeObject(s, hit.value, weapon);
@@ -1946,12 +1961,11 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     }
     if (item.type === "uncle") {
       s.uncle = true;
-      this.ui.show(
-        "篮子还在散步",
-        "A FAMILIAR FACE",
-        `<p class="camp-intro">“篮子放地上，一转头就没了。不好说，它走的时候还挺有礼貌。”</p><p class="panel-subtitle">大叔指向坡下的小脚印。帮他找回竹篮可以获得回复果和额外路标容量。<br><br>“菌谷入口要认三处地方：会响的石头、弯月形的水潭，还有两棵抱在一起的老树。找到一处，把旧路牌扶起来。”</p><div class="panel-footer"><span>主线线索已记入手记</span><button id="uncle-close">我去看看</button></div>`,
-      );
-      $("uncle-close").onclick = () => this.ui.close();
+      this.ui.dialog.show({
+        speaker: '大叔 · 篮子还在散步', actor: item,
+        text: '篮子放地上，一转头就没了。不好说，它走的时候还挺有礼貌。\n帮我找回竹篮，回复果和额外路标就送给你。\n菌谷入口要认三处地方：会响的石头、弯月形的水潭，还有两棵抱在一起的老树。找到一处，把旧路牌扶起来。',
+        actions: [{ label: '记下了，我去看看', run: () => this.ui.dialog.close() }],
+      });
       this.save();
       return;
     }
@@ -2157,8 +2171,16 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       dx = this.dodgeDir.x * 10 * dt;
       dz = this.dodgeDir.y * 10 * dt;
     }
+    if (this.playerRecoil?.time > 0) {
+      const t = Math.min(dt, this.playerRecoil.time);
+      dx = this.playerRecoil.x * 4.5 * t;
+      dz = this.playerRecoil.z * 4.5 * t;
+      this.playerRecoil.time -= t;
+      this.velocity.set(0, 0, 0);
+    }
     const old = p.clone();
     const body = {
+      actor: this.player,
       position: p,
       vertical: this.vertical,
       grounded: this.grounded,
@@ -2315,8 +2337,13 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     this.state.hits++;
     this.invincible = 1.7;
     this.slowTime = enemy?.species === "frost" ? 2.8 : 0.6;
+    if (enemy) {
+      const p = this.player.root.position, dx = p.x - enemy.x, dz = p.z - enemy.z, length = Math.hypot(dx, dz) || 1;
+      this.playerRecoil = { x: dx / length, z: dz / length, time: .2 };
+    }
     this.playerImpact();
     if (this.state.health <= 0) {
+      this.playerRecoil = null;
       const checkpoint = enemy?.boss
         ? { x: enemy.home.x, z: enemy.home.z + 8 }
         : CAMP;
@@ -2355,6 +2382,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     const guide = this.guide, actor = guide.actor, destination = guideDestination(this.state);
     this.ui.dialog.show({
       speaker: `${actor.displayName} · ${actor.role}`,
+      portrait: actor.id, actor,
       text: `${actor.greeting}\n\n眼下要做的是：${destination.name}。${destination.hint}`,
       actions: [
         { label: '带我去主线线索', run: () => {
@@ -2377,12 +2405,8 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         e.telegraph.visible = e.sweep.visible = false;
         continue;
       }
-      if (e.hitPause > 0) { e.hitPause = Math.max(0, e.hitPause - dt); continue; }
-      if (e.recoil?.time > 0) {
-        const recoilDt = Math.min(dt, e.recoil.time);
-        moveGroundEnemy(this.world, this.state, e, e.recoil.x * recoilDt * 1.8, e.recoil.z * recoilDt * 1.8);
-        e.recoil.time -= recoilDt;
-      }
+      e.hitLabel = Math.max(0, (e.hitLabel || 0) - dt);
+      if (advanceHitReaction(this.world, this.state, e, dt)) continue;
       if (e.encounter) {
         updateEncounter(this, e, dt);
         continue;
@@ -2439,10 +2463,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       } else if (e.state === "charge") {
         e.telegraph.visible = false;
         const collision = moveGroundEnemy(this.world, this.state, e, e.dir.x * (e.boss ? 12 : 10) * dt, e.dir.y * (e.boss ? 12 : 10) * dt);
-        if (Math.hypot(p.x - e.x, p.z - e.z) < (e.boss ? 1.5 : .9) &&
-            Math.abs(p.y - e.object.position.y) < 1.5 &&
-            clearShot(this.world, this.state, { x: e.x, y: e.object.position.y + .4, z: e.z }, { x: p.x, y: p.y + .7, z: p.z })) this.hurt(e);
-        if (collision) {
+        if (collision && e.blockedBy) {
+          bodyChargeContact(this, e, e.boss ? 1.8 : 1.3);
+        } else if (collision) {
           e.state = "stunned";
           e.timer = 2.8;
           this.ui.toast("撞上树根！现在反击会造成更多伤害。");
@@ -2512,6 +2535,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         : boss.ant
           ? `阶段 ${boss.phase} / 3 · ${boss.state === "stunned" ? "毒囊暴露 · 反击伤害翻倍" : "Q 闪避 · 离开酸液 · 优先清理蚁群"}`
           : "观察预警 · 侧闪 · 等它露出破绽";
+      $("boss-bar").querySelector(".health-chip").style.width = `${(boss.hp / boss.maxHp) * 100}%`;
       $("boss-bar").querySelector("i").style.width =
         `${(boss.hp / boss.maxHp) * 100}%`;
     }
@@ -2742,6 +2766,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.updateReload(dt);
       this.narrator.update(dt);
       this.updateNightPopulation();
+      this.world.actors?.refreshAll();
       this.updatePlayer(dt);
       const clue = this.guide.update(dt, this.state, this.player.root.position);
       if (this.state.waypoint?.kind === 'guide') Object.assign(this.state.waypoint, { x: this.world.guide.x, z: this.world.guide.z });
@@ -2789,6 +2814,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         this.save();
       }
     }
+    this.ui.dialog.update(dt);
     this.world.update(this.gameTime, this.state);
     this.trailLight.intensity = daylight(this.state).night * 2.2;
     this.trailLight.position.copy(this.player.root.position).y += 1.8;
@@ -2800,6 +2826,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.state.guidance;
     this.updateCamera(dt);
     this.hitEffects.update(active ? dt : 0, this.camera);
+    this.damageNumbers.update(active ? dt : 0, this.camera, !!this.ui.blocking);
     this.damageVeil.style.opacity = String(Math.max(0, this.hurtTime / .32) * .75);
     this.hudTime += dt;
     if (this.started && this.hudTime >= 0.08) {

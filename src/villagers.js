@@ -1,20 +1,16 @@
 import * as T from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 const cache = new Map();
+export function loadVillager(id) {
+  if (!cache.has(id)) cache.set(id, new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}assets/villagers/${id}.glb`));
+  return cache.get(id);
+}
 export function addVillager(parent, id, fallback, options = {}) {
   let disposed = false,
     model = null;
   // The scene can be constructed by headless rule tests without fetching assets.
   if (typeof window !== "undefined") {
-    if (!cache.has(id))
-      cache.set(
-        id,
-        new GLTFLoader().loadAsync(
-          `${import.meta.env.BASE_URL}assets/villagers/${id}.glb`,
-        ),
-      );
-    cache
-      .get(id)
+    loadVillager(id)
       .then((gltf) => {
         if (disposed) return;
         model = gltf.scene.clone(true);

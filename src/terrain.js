@@ -206,6 +206,8 @@ export function stepBody(world, s, body, dx, dz, dt) {
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.15));
   const blocked = (x, z) => {
     if (s.chapter === 3 && !s.gateOpen && z < -32.5 && z > -46 && Math.abs(x) < 5) return true;
+    if (world.actors?.blocker([{ x, z, radius: body.radius || .38 }], p.y, p.y + 1.65, body.actor,
+      [{ x: p.x, z: p.z, radius: body.radius || .38 }])) return true;
     return collidersNear(world, x, z).some((c) => {
       if (!colliderActive(c, s)) return false;
       const next = penetration(c, x, z);
@@ -263,6 +265,7 @@ export function stepBody(world, s, body, dx, dz, dt) {
     landed = 0;
   }
   body.swimming = swimming;
+  world.actors?.refresh(body.actor);
   return {
     landed,
     water: swimming,

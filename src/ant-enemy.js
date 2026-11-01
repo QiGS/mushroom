@@ -1,3 +1,4 @@
+import { bodyChargeContact } from './combat-response.js';
 import * as T from "three";
 import { addProp } from "./prop-model.js";
 import { terrainHeight } from "./terrain.js";
@@ -170,13 +171,13 @@ export function updateAnt(g, e, dt) {
       e.dir.set(e.lure.x - e.x, e.lure.z - e.z).normalize();
     const speed = e.state === "investigate" ? 2.5 : e.boss ? 11 + e.phase : 6;
     const blocked = moveGroundEnemy(g.world, g.state, e, e.dir.x * speed * dt, e.dir.y * speed * dt);
-    if (blocked) {
+    if (blocked && e.blockedBy) {
+      bodyChargeContact(g, e, e.boss ? 1.7 : 1.2);
+    } else if (blocked) {
       e.state = "stunned";
       e.timer = e.boss ? 2.8 : 1.4;
       e.telegraph.visible = false;
       if (e.boss) g.ui.toast("毒蚁撞上岩石 · 毒囊暴露，趁现在反击！");
-    } else {
-      if (Math.hypot(p.x - e.x, p.z - e.z) < (e.boss ? 1.8 : .85) && Math.abs(p.y - e.object.position.y) < 1.5 && e.state === "charge") g.hurt(e);
     }
     if (e.timer <= 0) recover(e.boss ? 1.7 : 1.2);
   } else if (e.state === "recover" || e.state === "stunned") {

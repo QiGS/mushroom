@@ -1,0 +1,9 @@
+#damage-numbers { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 9; }
+#damage-numbers > span { position: absolute; white-space: nowrap; font: bold 25px var(--ui); color: #fff5d3; -webkit-text-stroke: 1px #6a4326; paint-order: stroke fill; text-shadow: 0 2px 1px #392d22, 0 0 10px #ffcf7d66; }
+#damage-numbers > .weak { color: #ffcc64; font-size: 29px; }
+#damage-numbers > .blocked { color: #e4d6bd; font-size: 18px; }
+.enemy-label > div, #boss-bar > div { position: relative; }
+.enemy-label .health-chip, #boss-bar .health-chip { position: absolute; height: 100%; top: 0; left: 0; display: block; background: #fff0ae; transition: width .45s .25s; }
+.enemy-label i, #boss-bar i { position: relative; z-index: 1; }
+.enemy-label.is-hit strong { color: #fff5ba; text-shadow: 0 0 8px #ffcb75, 0 1px 2px #38230c; }
+.enemy-label.is-hit > div { border-color: #fff5cf; box-shadow: 0 0 9px #ffe098a0; }

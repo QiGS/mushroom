@@ -19,7 +19,7 @@ export class TrailGuide {
     this.find = createPathfinder(world);
     this.phase = 'idle';
     this.path = [];
-    this.body = { position: this.actor.object.position, grounded: true, vertical: 0 };
+    this.body = { actor: this.actor, radius: this.actor.id === 'herder-guide' ? .75 : .4, position: this.actor.object.position, grounded: true, vertical: 0 };
   }
   start(s) {
     this.target = guideDestination(s);

@@ -67,7 +67,7 @@ export class AdventureUI {
       if (!node) {
         node = document.createElement("div");
         node.className = "enemy-label";
-        node.innerHTML = `<strong>${e.name}</strong><small>${e.kind}</small><div><i></i></div><b></b>`;
+        node.innerHTML = `<strong>${e.name}</strong><small>${e.kind}</small><div><span class="health-chip"></span><i></i></div><b></b>`;
         this.labels.append(node);
         this.elements.set(e.id, node);
       }
@@ -97,12 +97,14 @@ export class AdventureUI {
         Math.abs(this.vector.x) < 1.12 &&
         Math.abs(this.vector.y) < 1.1;
       node.hidden = !visible;
+      node.classList.toggle('is-hit', e.hitLabel > 0);
       if (visible) {
         node.style.left = `${(this.vector.x * 0.5 + 0.5) * 100}%`;
         node.style.top = `${(-this.vector.y * 0.5 + 0.5) * 100}%`;
+        node.querySelector(".health-chip").style.width = `${(100 * e.hp) / e.maxHp}%`;
         node.querySelector("i").style.width = `${(100 * e.hp) / e.maxHp}%`;
         node.querySelector("b").textContent =
-          `${Math.max(0, e.hp)} / ${e.maxHp}${e.state === "stunned" ? " · 眩晕" : ""}`;
+          `${Math.max(0, e.hp)} / ${e.maxHp}${e.hitLabel > 0 ? " · 命中" : e.state === "stunned" ? " · 眩晕" : ""}`;
       }
     }
     const signature = JSON.stringify([s.weapon, s.gear, s.timber, s.unlocked]);
