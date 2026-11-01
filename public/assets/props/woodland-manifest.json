@@ -1,0 +1,30 @@
+[
+  {
+    "id": "woodland-tree-two",
+    "source": "道具二维/树木2.glb",
+    "sourceTriangles": 1992538,
+    "triangles": 4908,
+    "bytes": 685440
+  },
+  {
+    "id": "woodland-tree-three",
+    "source": "道具二维/树木3.glb",
+    "sourceTriangles": 1877280,
+    "triangles": 4988,
+    "bytes": 795988
+  },
+  {
+    "id": "bamboo-stalk",
+    "source": "道具二维/竹子3d.glb",
+    "sourceTriangles": 499518,
+    "triangles": 3998,
+    "bytes": 857788
+  },
+  {
+    "id": "bamboo-grove",
+    "source": "道具二维/竹林 3d.glb",
+    "sourceTriangles": 499754,
+    "triangles": 5498,
+    "bytes": 1012692
+  }
+]

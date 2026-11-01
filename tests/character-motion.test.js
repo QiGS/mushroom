@@ -162,3 +162,24 @@ test("jump, landing, gathering, dodge and attack keep deformed vertices finite a
     Math.abs(angleDelta(-Math.PI + 0.01, Math.PI - 0.01) - 0.02) < 1e-6,
   );
 });
+
+// Use the supplied character, including its actual skin weights, for hold poses.
+const { poseHeldGun, gripError } = await import('../src/weapon-pose.js');
+test('the supplied traveler deforms safely with both hands on all three firearms', () => {
+  const rig = rigFromAsset(), motion = new TravelerMotion(rig), root = new T.Group(), holder = new T.Group();
+  root.add(rig.root, holder);
+  for (const weapon of ['rifle','sniper','cannon']) for (const pitch of [-1.2,0,1.05]) {
+    motion.update(1/60,{...pose,speed:6.5});
+    poseHeldGun(root,rig.bones,holder,weapon,pitch,{reload:1,reloadDuration:2});
+    root.updateMatrixWorld(true);rig.skeleton.update();
+    assert.ok(gripError(rig.bones,holder,weapon)<.025);
+    rig.root.traverse(mesh=>{
+      if(!mesh.isSkinnedMesh)return;
+      const positions=mesh.geometry.getAttribute('position');
+      for(let i=0;i<positions.count;i+=7) {
+        const v=new T.Vector3().fromBufferAttribute(positions,i);mesh.applyBoneTransform(i,v);
+        assert.ok(v.toArray().every(Number.isFinite));assert.ok(v.length()<2.6);
+      }
+    });
+  }
+});

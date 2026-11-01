@@ -1443,10 +1443,18 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.reloadRifle();
       return;
     }
-    const p = this.player.root.position,
-      from = new T.Vector3(p.x, p.y + 1.35, p.z);
-    const dir = this.camera.getWorldDirection(new T.Vector3()),
-      targets = this.combatTargets();
+    const p = this.player.root.position;
+    const dir = this.camera.getWorldDirection(new T.Vector3());
+    this.player.root.rotation.y = Math.atan2(dir.x, dir.z);
+    this.equipment?.update(id, this.pitch, { scoped: this.scoped });
+    const from = this.equipment?.muzzleWorld(id) || new T.Vector3(p.x,p.y+1.35,p.z);
+    const targets = this.combatTargets();
+    // A muzzle extended through a wall must not permit a shot through that wall.
+    if (!clearShot(this.world,s,new T.Vector3(p.x,p.y+1.35,p.z),from)) {
+      this.ui.toast('枪口被挡住了，退开一点再射击');
+      this.attackCooldown = .2;
+      return;
+    }
     const hits =
       id === "rifle"
         ? shotgunTargets(
@@ -1508,7 +1516,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         for (const hit of hits.slice(1))
           this.shotTrail(from, new T.Vector3(hit.x, hit.y, hit.z));
     }
-    this.burst(from, 0xffc96f, 4);
+    this.burst(from, 0xffc96f, 4, 0);
     if (s.weapon !== id) {
       this.scoped = false;
       this.ui.toast(`${w.name}弹药用尽 · 已换回竹杖`);
@@ -2236,7 +2244,7 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
         turn:
           angleDelta(this.player.root.rotation.y, facingBefore) /
           Math.max(dt, 0.001),
-        attack: this.attackTime,
+        attack: isGun(this.state.weapon) ? 0 : this.attackTime,
         hurt: this.hurtTime,
         collect: this.collectTime,
         dodge: this.dodgeTime,
@@ -2292,9 +2300,9 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
     }
     if (isGun(this.state.weapon) && this.dodgeTime <= 0)
       this.player.root.rotation.y = this.yaw + Math.PI;
-    this.equipment?.update(this.state.weapon, this.pitch);
+    this.equipment?.update(this.state.weapon, this.pitch, { scoped: this.scoped, attack: this.attackTime, reload: this.reloadTime, reloadDuration: WEAPONS[this.state.weapon]?.reload || 1 });
     this.player.basket.scale.setScalar(1 + basketCount(this.state) / 100);
-    this.attackRing.visible = this.attackTime > 0;
+    this.attackRing.visible = this.attackTime > 0 && !isGun(this.state.weapon);
     if (this.attackRing.visible) {
       this.attackRing.position.set(p.x, p.y + 0.15, p.z);
       this.attackRing.rotation.z = -this.player.root.rotation.y + Math.PI / 2;
@@ -2698,13 +2706,13 @@ transformed.y+=abs(sin(uWalk))*uWalkAmount*legWeight*0.015;
       this.camera.updateProjectionMatrix();
     }
   }
-  burst(pos, color, count) {
+  burst(pos, color, count, heightOffset = .4) {
     const geo = new T.SphereGeometry(0.045, 4, 3),
       mat = new T.MeshBasicMaterial({ color });
     for (let i = 0; i < count; i++) {
       const m = new T.Mesh(geo, mat);
       m.position.copy(pos);
-      m.position.y += 0.4;
+      m.position.y += heightOffset;
       this.scene.add(m);
       this.particles.push({
         mesh: m,

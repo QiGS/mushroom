@@ -76,6 +76,22 @@ export function attachQA(game) {
     bar.style.display = 'none';
     });
   }
+  let heldPreview = 'rifle';
+  const showHeld = (action = {}) => {
+    game.photo(false); game.ui.close(); move(0,23);
+    game.state.weapon = heldPreview; game.scoped = false;
+    game.player.root.rotation.set(0,0,0); game.invincible=300;
+    game.motion?.update(1/60,{speed:0,grounded:true,vertical:0,turn:0,attack:0,collect:0,dodge:0,time:0,...action});
+    game.equipment?.update(heldPreview,action.pitch || 0,{...action,reloadDuration:2});
+    game.photo(true); game.yaw=1.05;game.pitch=.07;game.distance=1.65;
+    game.cameraArm.reset();game.updateCamera(.1);
+  };
+  for(const [id,label] of [['rifle','霰弹枪'],['sniper','狙击枪'],['cannon','手持炮']]) add('QA 双手'+label,()=>{heldPreview=id;showHeld();});
+  add('QA 托枪跑步',()=>showHeld({speed:6.5,time:.7}));
+  add('QA 托枪装填',()=>showHeld({reload:1}));
+  add('QA 托枪后坐',()=>showHeld({attack:.22}));
+  add('QA 托枪仰射',()=>showHeld({pitch:-.65}));
+  add('QA 林景全览',()=>{game.photo(false);game.scoped=false;game.state.weapon='staff';move(0,23);game.yaw=.5;game.pitch=.18;game.distance=8;game.cameraArm.reset();});
   let impactEnemy;
   let cameraAudit = '';
   add('QA 打击准备', () => {
@@ -784,7 +800,7 @@ export function attachQA(game) {
         .join(
           ",",
         )} | ${CHAPTERS[game.state.chapter - 1].name} | ${p.x.toFixed(1)},${p.z.toFixed(1)} 高${p.y.toFixed(1)} HP${game.state.health} | 武器:${game.state.weapon} | 最近: ${game.nearest?.name || "无"} | ${game.world.mountains.loaded}/6 山体 ${game.world.mountains.sections} 片 | ${game.renderer.info.render.calls} draws / ${game.renderer.info.render.triangles} tris` +
-      cameraAudit + ` 命中星芒:${game.hitEffects.pool.filter(p => p.life > 0).length} 亮闪:${game.hitEffects.flashes.size} 受击:${game.hurtTime.toFixed(2)} 音频:${game.audio.ctx?.state || '无'}` +
+      cameraAudit + ` 持枪模型:${game.equipment?.loaded?'已加载':'无'} 握持误差:${((game.equipment?.gripError || 0)*100).toFixed(2)}cm 林景实例:${(()=>{const counts={};game.world.root.traverse(o=>{if(o.isInstancedMesh&&/woodland|bamboo|^rock/.test(o.name))counts[o.name]=(counts[o.name]||0)+o.count;});return JSON.stringify(counts);})()} 命中星芒:${game.hitEffects.pool.filter(p => p.life > 0).length} 亮闪:${game.hitEffects.flashes.size} 受击:${game.hurtTime.toFixed(2)} 音频:${game.audio.ctx?.state || '无'}` +
       (game.desktopControls
         ? ` | 夜行:${game.enemies.filter((e) => e.night && e.hp > 0).length} | 游泳:${game.swimming} | 水中:${game.waterTimer.toFixed(1)} | 时刻:${daylight(game.state).hour.toFixed(1)} | 鼠标:${game.look?.locked ? "已捕获" : "自由"} | 镜头:${game.yaw.toFixed(2)},${game.pitch.toFixed(2)} | 骨骼:${game.motion?.rig.skeleton.bones.length || 0} | 步速:${game.motion?.speed.toFixed(2) || 0}`
         : "");

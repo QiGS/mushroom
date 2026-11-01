@@ -1,6 +1,7 @@
 import * as T from "three";
-import { addProp } from "./prop-model.js";
+import { loadProp } from "./prop-model.js";
 import { WEAPONS, isGun } from "./progression.js";
+import { GUN_GRIPS, poseHeldGun, gripError } from "./weapon-pose.js";
 export function equipmentVisual(player, motion) {
   const holder = new T.Group(),
     axe = new T.Group(),
@@ -12,7 +13,7 @@ export function equipmentVisual(player, motion) {
   holder.add(axe);
   const gunHolder = new T.Group();
   player.root.add(gunHolder);
-  gunHolder.position.set(0.38, 1.14, 0.28);
+
   gunHolder.add(rifle);
   const wood = new T.MeshStandardMaterial({ color: 0x795335, roughness: 0.9 }),
     metal = new T.MeshStandardMaterial({
@@ -49,31 +50,43 @@ export function equipmentVisual(player, motion) {
   barrel.rotation.x = Math.PI / 2;
   add(rifle, new T.BoxGeometry(0.05, 0.1, 0.05), metal, 0, 0.13, 0.76);
   const guns = new Map();
+  let selected = 'staff';
   return {
-    update(weapon, pitch = 0) {
-      gunHolder.rotation.x = pitch;
+    holder: gunHolder,
+    get loaded() { return !!guns.get(selected)?.loaded; },
+    get gripError() { return gripError(motion?.rig.bones,gunHolder,selected); },
+    muzzleWorld(weapon = selected) {
+      if (!GUN_GRIPS[weapon]) return null;
+      gunHolder.updateWorldMatrix(true,false);
+      return GUN_GRIPS[weapon].muzzle.clone().applyMatrix4(gunHolder.matrixWorld);
+    },
+    update(weapon, pitch = 0, options = {}) {
+      selected = weapon;
       axe.visible = weapon === "axe";
+      gunHolder.visible = isGun(weapon);
       if (isGun(weapon) && !guns.has(weapon)) {
         const group = new T.Group();
         gunHolder.add(group);
-        const prop = addProp(group, WEAPONS[weapon].art, {
-          width: weapon === "sniper" ? 1.45 : 1.1,
-          rotation: weapon === "cannon" ? Math.PI / 2 : -Math.PI / 2,
-        });
-        prop.group.position.set(0, -0.32, 0.35);
-        if (weapon === "cannon") group.rotation.x = 0.2;
-        guns.set(weapon, { group, prop });
+        const entry = { group, loaded: false }; guns.set(weapon,entry);
+        if (typeof window !== 'undefined') loadProp(WEAPONS[weapon].art).then(({scene}) => {
+          const calibrated = new T.Group();
+          calibrated.matrix.copy(GUN_GRIPS[weapon].matrix);
+          calibrated.matrixAutoUpdate = false;
+          const model = scene.clone(true);
+          model.traverse(o => {
+            if (!o.isMesh) return;
+            o.geometry = o.geometry.clone();
+            const material = m => { const copy=m.clone(); copy.roughness=Math.max(.72,copy.roughness); if ('transmission' in copy) copy.transmission=0; return copy; };
+            o.material = Array.isArray(o.material) ? o.material.map(material) : material(o.material);
+            o.castShadow = o.receiveShadow = true;
+          });
+          calibrated.add(model); group.add(calibrated); entry.loaded = true; if (selected === weapon) rifle.visible = false;
+        }).catch(error => console.warn('Held weapon unavailable; retaining fallback.',weapon,error));
       }
-      for (const [id, g] of guns) g.group.visible = id === weapon;
-      rifle.visible = isGun(weapon) && !guns.get(weapon)?.prop.loaded;
+      for (const [id,g] of guns) g.group.visible = id === weapon;
+      rifle.visible = isGun(weapon) && !guns.get(weapon)?.loaded;
       player.staff.visible = weapon === "staff";
-      if (isGun(weapon) && motion) {
-        const b = motion.rig.bones;
-        b.rightArm.rotation.x = -1.1;
-        b.rightForearm.rotation.x = -0.3;
-        b.leftArm.rotation.x = -0.8;
-        b.leftForearm.rotation.x = -0.6;
-      }
+      if (isGun(weapon)) poseHeldGun(player.root,motion?.rig.bones,gunHolder,weapon,pitch,options);
     },
   };
 }

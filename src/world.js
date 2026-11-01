@@ -3,6 +3,7 @@ import { CHAPTER_GUIDES, chapterGuide } from "./guide-data.js";
 import { grandmaPlace, GRANDMA_CLEARINGS } from "./story.js";
 import { CANYONS, canyonAt, baseTerrainHeight, surfaceHeight } from "./terrain.js";
 import { disposeObject, bakePainted } from "./resources.js";
+import { addSceneryInstances } from './scenery-instances.js';
 import { addProp } from "./prop-model.js";
 import { softenFoliage } from "./camera-collision.js";
 import { addMountainBackdrop } from "./mountains.js";
@@ -270,6 +271,9 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     pineCrowns = [],
     rocks = [],
     moss = [];
+  const treeModels = [[], []], rockModels = [[], [], []];
+  const treeFallback = new T.Group(), rockFallback = new T.Group();
+  root.add(treeFallback, rockFallback);
   const foliageFocus = new T.Vector3(0, 2, 27),
     foliageEye = new T.Vector3(0, 5, 34);
   softenFoliage(canopyMat, foliageFocus, foliageEye);
@@ -287,8 +291,10 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       r = 0.3 + random() * 0.45,
       y = height(x, z),
       pine = random() > 0.45;
-    trees.push({ x, z, r: r + 0.1 });
-    colliders.push({ x, z, r: r + .2, height: h });
+    const bodyRadius = Math.max(r + .2, h * .085);
+    trees.push({ x, z, r: bodyRadius });
+    colliders.push({ x, z, r: bodyRadius, height: h });
+    treeModels[i % 2].push({ x, y, z, height: h, ry: i * 2.4 });
     trunks.push({
       x,
       y: y + h * 0.5,
@@ -326,9 +332,10 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       }
     }
   }
-  instances(new T.CylinderGeometry(0.65, 1, 1, 7), trunkMat, trunks, root);
-  instances(new T.IcosahedronGeometry(1, 1), canopyMat, crowns, root);
-  instances(new T.ConeGeometry(1, 1, 9, 1), canopyMat, pineCrowns, root);
+  instances(new T.CylinderGeometry(0.65, 1, 1, 7), trunkMat, trunks, treeFallback);
+  instances(new T.IcosahedronGeometry(1, 1), canopyMat, crowns, treeFallback);
+  instances(new T.ConeGeometry(1, 1, 9, 1), canopyMat, pineCrowns, treeFallback);
+  props.push(addSceneryInstances(root, treeModels.map((placements, i) => ({ id: i ? "woodland-tree-three" : "woodland-tree-two", placements })), { fallback: treeFallback, foliage: { focus: foliageFocus, eye: foliageEye } }));
   for (let i = 0; i < 145; i++) {
     const x = (random() - 0.5) * 120,
       z = (random() - 0.5) * 120;
@@ -357,10 +364,12 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
       sz: s * 0.72,
       ry: random() * 6,
     });
-    if (s > 1) colliders.push({ x, z, r: s * .9, height: s * .7 });
+    rockModels[i % 3].push({ x, y: height(x, z) - .08, z, width: s * 1.4, height: s * .7, depth: s * 1.1, ry: i * 2.4 });
+    if (s > .55) colliders.push({ x, z, r: s * .92, height: s * .7 });
   }
-  instances(new T.IcosahedronGeometry(1, 1), material(0xffffff), rocks, root);
-  instances(new T.IcosahedronGeometry(1, 1), material(0x688449), moss, root);
+  instances(new T.IcosahedronGeometry(1, 1), material(0xffffff), rocks, rockFallback);
+  instances(new T.IcosahedronGeometry(1, 1), material(0x688449), moss, rockFallback);
+  props.push(addSceneryInstances(root, rockModels.map((placements, i) => ({ id: ['rock', 'rock-two', 'rock-three'][i], placements })), { fallback: rockFallback }));
   const grassGeo = new T.BufferGeometry();
   grassGeo.setAttribute(
     "position",
@@ -1182,6 +1191,8 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
     const bamboo = [],
       rings = [],
       leaves = [];
+    const bambooModels = [[], []], bambooFallback = new T.Group();
+    root.add(bambooFallback);
     for (let i = 0; i < 210; i++) {
       const z = 22 - random() * 73,
         x = (random() - 0.5) * 78;
@@ -1214,26 +1225,29 @@ export function buildWorld(scene, chapter = 1, weather = "rain", day = 1) {
           ry: random() * 6,
           color: palette[2],
         });
-      colliders.push({ x, z, r: 0.25 });
+      const grove = i % 11 === 0;
+      bambooModels[grove ? 1 : 0].push({ x, y, z, height: h * .65, width: grove ? 2.8 : 1.6, depth: grove ? 2.3 : 1.4, ry: i * 2.4 });
+      colliders.push({ x, z, r: grove ? 1.4 : .42, height: h * .65 });
     }
     instances(
       new T.CylinderGeometry(1, 1, 1, 7),
       material(0xffffff),
       bamboo,
-      root,
+      bambooFallback,
     );
     instances(
       new T.CylinderGeometry(1, 1, 1, 7),
       material(0xb3c388),
       rings,
-      root,
+      bambooFallback,
     );
     instances(
       new T.OctahedronGeometry(1),
       windMaterial(0xffffff, time, 0.1),
       leaves,
-      root,
+      bambooFallback,
     );
+    props.push(addSceneryInstances(root, bambooModels.map((placements,i) => ({ id: i ? 'bamboo-grove' : 'bamboo-stalk', placements })), { fallback: bambooFallback, foliage: { focus: foliageFocus, eye: foliageEye } }));
   }
   const landmarks = new Map();
   let gate = null,

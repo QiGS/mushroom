@@ -326,11 +326,12 @@ export function buildExplorationWorld(
       }
       add(stump, new T.CylinderGeometry(0.7, 0.85, 0.08, 9), 0x647e4e, 0, 0.04);
     } else if (p.kind === "bamboo") {
+      const bambooFallback = new T.Group(); g.add(bambooFallback);
       for (let i = 0; i < 3; i++) {
         const x = (i - 1) * 0.42,
           z = (i % 2) * 0.4;
         add(
-          g,
+          bambooFallback,
           new T.CylinderGeometry(0.09, 0.13, 4 + i * 0.4, 7),
           0x729c62,
           x,
@@ -339,7 +340,7 @@ export function buildExplorationWorld(
         );
         for (let j = 1; j < 5; j++)
           add(
-            g,
+            bambooFallback,
             new T.CylinderGeometry(0.14, 0.14, 0.08, 7),
             0xb1bd79,
             x,
@@ -347,7 +348,7 @@ export function buildExplorationWorld(
             z,
           );
         const leaves = add(
-          g,
+          bambooFallback,
           new T.ConeGeometry(0.8, 1.4, 5),
           0x507b47,
           x,
@@ -364,6 +365,7 @@ export function buildExplorationWorld(
           z,
         );
       }
+      models.push(addProp(g, 'bamboo-stalk', { width: 1.5, height: 4.8, depth: 1.4, fallback: bambooFallback }));
     } else if (p.kind === "crate") {
       box(g, 0, 0.55, 0, 1.2, 1.1, 1, 0x8f6942);
       for (const z of [-0.51, 0.51])
@@ -440,8 +442,8 @@ export function buildExplorationWorld(
             p.id,
             p.x,
             p.z,
-            p.kind === "crate" ? 0.6 : 0.35,
-            p.kind === "crate" ? 0.5 : 0.35,
+            p.kind === "crate" ? 0.6 : p.kind === "bamboo" ? .6 : 0.35,
+            p.kind === "crate" ? 0.5 : p.kind === "bamboo" ? .45 : 0.35,
           );
     const item = {
       ...p,

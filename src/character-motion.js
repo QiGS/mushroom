@@ -243,9 +243,9 @@ export class TravelerMotion {
         i === 1 ? -strike * 0.5 : 0,
         (i ? -1 : 1) * (0.035 + duck * 0.25),
       );
-      b[`${side}Forearm`].rotation.x =
-        -0.1 - run * w * 0.45 - Math.max(0, -swing) * 0.4 - gather * 0.25;
-      b[`${side}Hand`].rotation.x = i === 1 ? -strike * 0.3 : 0;
+      b[`${side}Forearm`].rotation.set(
+        -0.1 - run * w * 0.45 - Math.max(0, -swing) * 0.4 - gather * 0.25, 0, 0);
+      b[`${side}Hand`].rotation.set(i === 1 ? -strike * 0.3 : 0, 0, 0);
     }
   }
 }

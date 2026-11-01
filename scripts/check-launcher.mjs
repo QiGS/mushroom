@@ -145,6 +145,10 @@ try {
     "shotgun",
     "sniper",
     "cannon",
+    "woodland-tree-two",
+    "woodland-tree-three",
+    "bamboo-stalk",
+    "bamboo-grove",
   ]) {
     const r = await fetch(`${url}assets/props/${id}.glb`, {
       ...options,

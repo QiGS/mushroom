@@ -1,6 +1,10 @@
 import * as T from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 const cache = new Map();
+export function loadProp(id) {
+  if (!cache.has(id)) cache.set(id, new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}assets/props/${id}.glb`));
+  return cache.get(id);
+}
 
 export function addProp(parent, id, options = {}) {
   const group = new T.Group();
@@ -15,15 +19,7 @@ export function addProp(parent, id, options = {}) {
   };
   let disposed = false;
   if (typeof window === "undefined") return result;
-  if (!cache.has(id))
-    cache.set(
-      id,
-      new GLTFLoader().loadAsync(
-        `${import.meta.env.BASE_URL}assets/props/${id}.glb`,
-      ),
-    );
-  cache
-    .get(id)
+  loadProp(id)
     .then(({ scene }) => {
       if (disposed) return;
       const model = scene.clone(true);
