@@ -89,7 +89,7 @@ test('enemies stop at other enemies and villagers without a false player hit or 
 test('ordinary hits cancel charges and visibly recoil, with no forward AI during reaction',()=>{
   for(const weapon of ['staff','axe','rifle','sniper','cannon']){
     const {world,state,root}=setup(),e=makeSnake(root,0,0);
-    e.hp=8;e.state='charge';placeGroundEnemy(world,state,e,{x:0,z:0});track(world,e);
+    e.hp=8;e.state='charge';e.cooldown=.3;placeGroundEnemy(world,state,e,{x:0,z:0});track(world,e);
     const before=e.z;
     beginHitReaction(e,weapon,{x:0,z:3});
     assert.equal(e.state,'recover');assert.equal(e.sweep.visible,false);
@@ -98,6 +98,7 @@ test('ordinary hits cancel charges and visibly recoil, with no forward AI during
       if(i<18) assert.equal(reacted,true);
     }
     assert.ok(before-e.z>=1.24,`${weapon} should visibly push the target away`);
+    assert.equal(e.cooldown,0,'hit stop must not make the next staff swing miss');
     assert.ok(enemyFits(world,state,e,e.x,e.z));
     disposeObject(root);
   }

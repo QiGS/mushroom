@@ -30,6 +30,10 @@ export function beginHitReaction(e, weapon, player) {
 
 // Returns true while the body is reacting, so charge AI cannot cancel recoil.
 export function advanceHitReaction(world, state, e, dt) {
+  // Contact cooldown still elapses during hit stop; otherwise the next valid
+  // staff swing would be silently rejected while the target is recovering.
+  if (e.hitPause > 0 || e.hitReact > 0 || e.recoil?.time > 0)
+    e.cooldown = Math.max(0, (e.cooldown || 0) - dt);
   if (e.hitPause > 0) { e.hitPause = Math.max(0, e.hitPause - dt); return true; }
   const reacting = e.hitReact > 0 || e.recoil?.time > 0;
   if (e.recoil?.time > 0) {
