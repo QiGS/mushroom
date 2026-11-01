@@ -1,3 +1,4 @@
+import { notebookIcon, notebookText } from "./notebook-ui.js";
 import {
   COLLECTION,
   RARITIES,
@@ -22,7 +23,6 @@ export class CollectionUI {
     this.ui = ui;
     this.game = ui.game;
     this.filter = "all";
-    this.page = 0;
     this.selected = null;
   }
   open(selected) {
@@ -33,9 +33,6 @@ export class CollectionUI {
     if (selected) {
       this.selected = selected;
       this.filter = "all";
-      this.page = Math.floor(
-        COLLECTION.findIndex((p) => p.id === selected) / 9,
-      );
     }
     const list = COLLECTION.filter(
       (p) =>
@@ -43,10 +40,6 @@ export class CollectionUI {
         p.rarity === this.filter ||
         (this.filter === "owned" && c.counts[p.id]) ||
         (this.filter === "favorites" && c.favorites.includes(p.id)),
-    );
-    this.page = Math.max(
-      0,
-      Math.min(this.page, Math.ceil(list.length / 9) - 1),
     );
     if (!this.selected || !list.some((p) => p.id === this.selected))
       this.selected = list[0]?.id || null;
@@ -81,17 +74,15 @@ export class CollectionUI {
     ui.show(
       "山野菌子图鉴",
       "THE WILDWOOD / COLLECTION",
-      `<nav class="book-nav" aria-label="手记导航"><button data-book-nav="map">⌖ 地图</button><button data-book-nav="bag">♧ 背篓</button><button class="active" aria-current="page">菌子图鉴</button><button data-book-nav="journal">☷ 任务</button><button data-book-nav="achievements">☆ 成就</button><button data-book-nav="settings">⚙ 设置</button></nav>
-      <div class="collection-book"><aside class="book-filters" aria-label="图鉴分类">${filters.map(([id, icon, label, total]) => `<button class="book-filter ${this.filter === id ? "active" : ""}" data-collection-filter="${id}" aria-pressed="${this.filter === id}"><span>${icon}</span><b>${label}<small>${total}</small></b></button>`).join("")}<div class="book-note"><span>寻菌小记</span><p>重复的相遇，<br/>也是森林的馈赠。</p><b>${stats.total}</b><small>朵累计发现</small></div></aside>
+      `<div class="collection-book"><aside class="book-filters" aria-label="图鉴分类">${filters.map(([id, icon, label, total]) => `<button class="book-filter ${this.filter === id ? "active" : ""}" data-collection-filter="${id}" aria-pressed="${this.filter === id}"><span>${icon}</span><b>${label}<small>${total}</small></b></button>`).join("")}<div class="book-note"><span>寻菌小记</span><p>重复的相遇，<br/>也是森林的馈赠。</p><b>${stats.total}</b><small>朵累计发现</small></div></aside>
       <section class="book-cards-page" aria-label="菌子卡片"><div class="book-page-heading"><span>林间拾珍</span><small>已点亮 ${stats.unique} / 12</small></div><div class="collection-grid">${list
-        .slice(this.page * 9, this.page * 9 + 9)
         .map(
           (p) =>
             `<button class="collection-card ${p.rarity} ${c.counts[p.id] ? "known" : "locked"} ${this.selected === p.id ? "selected" : ""}" data-collection-id="${p.id}" aria-label="${c.counts[p.id] ? `${p.name}，累计 ${c.counts[p.id]} 朵` : `未发现的${RARITIES[p.rarity].name}菌，第 ${COLLECTION.indexOf(p) + 1} 页`}" aria-pressed="${this.selected === p.id}"><span class="card-scene">${picture(p, c.counts[p.id] > 0)}${c.unseen.includes(p.id) ? '<i class="new-species">新</i>' : ""}${c.favorites.includes(p.id) ? '<i class="card-star">★</i>' : ""}</span><strong>${c.counts[p.id] ? p.name : "未发现"}</strong><small>${RARITIES[p.rarity].icon} ${RARITIES[p.rarity].name}${c.counts[p.id] ? ` <b>×${c.counts[p.id]}</b>` : ""}</small></button>`,
         )
         .join(
           "",
-        )}${!list.length ? '<p class="empty-cards">这里还没有记录。<br/>去山野里找一份惊喜吧。</p>' : ""}</div><div class="book-pagination"><button id="collection-prev" aria-label="上一页" ${this.page === 0 ? "disabled" : ""}>‹</button><span>${this.page + 1} / ${Math.max(1, Math.ceil(list.length / 9))}</span><button id="collection-next" aria-label="下一页" ${this.page >= Math.ceil(list.length / 9) - 1 ? "disabled" : ""}>›</button></div></section>${detail}</div>
+        )}${!list.length ? '<p class="empty-cards">这里还没有记录。<br/>去山野里找一份惊喜吧。</p>' : ""}</div></section>${detail}</div>
       <footer class="book-footer"><button id="story-field-guide">查看旅途食材手记 →</button><span>游戏收藏设定，不作为现实菌种辨识与食用依据。</span></footer>`,
       "collection",
     );
@@ -99,7 +90,6 @@ export class CollectionUI {
       (b) =>
         (b.onclick = () => {
           this.filter = b.dataset.collectionFilter;
-          this.page = 0;
           this.selected = null;
           this.open();
         }),
@@ -111,25 +101,6 @@ export class CollectionUI {
           this.open();
         }),
     );
-    document
-      .querySelectorAll("[data-book-nav]")
-      .forEach(
-        (b) =>
-          (b.onclick = () =>
-            b.dataset.bookNav === "achievements"
-              ? this.achievements()
-              : ui[b.dataset.bookNav]()),
-      );
-    $("collection-prev").onclick = () => {
-      this.page--;
-      this.selected = list[this.page * 9]?.id;
-      this.open();
-    };
-    $("collection-next").onclick = () => {
-      this.page++;
-      this.selected = list[this.page * 9]?.id;
-      this.open();
-    };
     $("story-field-guide").onclick = () => ui.storyGuide();
     if (p)
       $("collection-favorite").onclick = () => {
@@ -220,18 +191,18 @@ export class CollectionUI {
     this.ui.show(
       "把相遇写成成就",
       "COLLECTION MILESTONES",
-      `<div class="collection-achievements">${[
+      `<div class="achievement-summary"><div><span>林间收藏</span><b>${stats.unique}<small> / 12 种</small></b></div><div><span>打开宝箱</span><b>${s.collection.totalBoxes}<small> 个</small></b></div><div><span>累计相遇</span><b>${stats.total}<small> 朵</small></b></div></div><div class="collection-achievements">${[
         [3, "初识菌林", 20],
         [6, "林间收藏家", 50],
         [12, "菌物全图鉴", 100],
       ]
         .map(
           ([n, title, coins]) =>
-            `<article class="collection-achievement ${stats.unique >= n ? "complete" : ""}"><span>♜</span><div><h3>${title}</h3><p>收藏 ${n} 种不同菌子 · ${coins} 竹叶币</p><progress value="${Math.min(stats.unique, n)}" max="${n}"></progress><small>${Math.min(stats.unique, n)} / ${n} ${s.collection.milestones.includes(n) ? "· 奖励已领取" : ""}</small></div></article>`,
+            `<article class="collection-achievement ${stats.unique >= n ? "complete" : ""}"><span class="achievement-medal">${notebookIcon("achievements")}</span><div><h3>${title}</h3><p>收藏 ${n} 种不同菌子 · ${coins} 竹叶币</p><progress value="${Math.min(stats.unique, n)}" max="${n}"></progress><small>${Math.min(stats.unique, n)} / ${n} ${s.collection.milestones.includes(n) ? "· 奖励已领取" : ""}</small></div></article>`,
         )
         .join(
           "",
-        )}</div><p class="panel-subtitle">累计打开 ${s.collection.totalBoxes} 个宝箱 · 累计发现 ${stats.total} 朵菌子</p><div class="panel-footer"><span>成就奖励会在达成时自动领取</span><button id="achievement-guide">返回图鉴</button></div>`,
+        )}</div><section class="earned-titles paper-leaf"><div class="book-page-heading"><span>旅途留下的印记</span><small>${s.achievements.length} 枚称号</small></div><div>${s.achievements.length ? s.achievements.map(title => `<span class="earned-title">✧ ${notebookText(title)}</span>`).join("") : `<p>去采集、探路、赴一场菌宴，新的称号会在这里留下。</p>`}</div></section><div class="panel-footer"><span>成就奖励会在达成时自动领取</span><button id="achievement-guide">返回图鉴</button></div>`,
       "achievements",
     );
     $("achievement-guide").onclick = () => this.open();

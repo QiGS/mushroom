@@ -109,6 +109,7 @@ import {
 } from "./state.js";
 import "./journey.css";
 import "./scenery.css";
+import "./notebook.css";
 const $ = (id) => document.getElementById(id),
   clamp = T.MathUtils.clamp;
 const QA =

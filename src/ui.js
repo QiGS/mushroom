@@ -1,3 +1,4 @@
+import { SatchelUI, notebookNav, notebookSection } from "./notebook-ui.js";
 import { BOSSES, WEAPONS } from "./progression.js";
 import { bossMapMarker, drawMapSymbol, mapViewport } from "./map-markers.js";
 import { toolArt } from "./tool-art.js";
@@ -51,14 +52,14 @@ import {
   CAMP,
 } from "./state.js";
 import { ToolbeltUI } from "./toolbelt-ui.js";
-import { TOOL_DEFS, ownedTools } from "./tools.js";
+
 import { navigationTarget, RIVER_NOTE, RIVER_WALKWAY } from "./navigation.js";
 import { CollectionUI } from "./collection-ui.js";
 import {
   RARITIES,
   TREASURES,
   activeClues,
-  collectionStats,
+
 } from "./collection.js";
 const $ = (id) => document.getElementById(id);
 const icons = () =>
@@ -90,6 +91,7 @@ export class UI {
     this.dialog = new SceneDialog(game);
     this.journey = new JourneyPanels(this);
     this.collection = new CollectionUI(this);
+    this.satchel = new SatchelUI(this);
     this.toolbelt = new ToolbeltUI(this);
     this.adventure = new AdventureUI(game);
     this.bind();
@@ -174,7 +176,20 @@ export class UI {
     this.game.clearInput();
     $("panel-title").textContent = title;
     $("panel-kicker").textContent = kicker;
-    $("panel-body").innerHTML = html;
+    const notebook = notebookSection(kind);
+    $("panel").classList.toggle("field-journal", !!notebook);
+    $("panel-body").innerHTML = notebook
+      ? notebookNav(kind) + `<div class="notebook-content">${html}</div>`
+      : html;
+    $("panel").scrollTop = 0;
+    document.querySelectorAll('[data-notebook-nav]').forEach(button => {
+      button.onclick = () => {
+        const tab = button.dataset.notebookNav;
+        if (tab === 'collection') this.guide();
+        else if (tab === 'achievements') this.collection.achievements();
+        else this[tab]();
+      };
+    });
     $("modal-backdrop").classList.remove("hidden");
     document.body.classList.add("modal-open");
     $("close-panel").focus();
@@ -207,32 +222,7 @@ export class UI {
     });
   }
   bag() {
-    const s = this.game.state,
-      stats = collectionStats(s);
-    this.show(
-      "竹篮里的山野",
-      "YOUR LITTLE HARVEST",
-      `<div class="collection-bag-link"><span>图鉴发现 ${stats.unique} / 12 种 · ${stats.total} 朵</span><button id="bag-collection">翻开收藏图鉴 →</button></div><p class="panel-subtitle">${basketCount(s)} / ${s.capacity} 朵 · 任务食材在出售时自动保留，收藏菌不占背篓容量；可在大叔的山货铺出售，图鉴记录保留。</p><div class="species-grid">${SPECIES.map((p) => `<button class="species-card ${s.inventory[p.id] ? "" : "locked"}" data-species="${p.id}"><span class="species-count">× ${s.inventory[p.id]}</span>${mushroomSVG(p.color)}<h3>${p.name}</h3><small>${p.rarity} · ${p.area}</small></button>`).join("")}</div><div class="panel-footer"><span>竹叶币 <strong>${s.coins}</strong></span><span>↑↓ 切换随身道具 · G 使用</span></div><div class="bag-tool-row">${
-        ownedTools(s)
-          .map(
-            (t) =>
-              `<button data-bag-tool="${t.id}"><span>${toolArt(t)}</span>${t.name} ×${s.tools[t.id]}<small>选入道具栏，返回后按 G 使用</small></button>`,
-          )
-          .join("") || '<p class="map-note">道具已用完，探索宝箱可以补充。</p>'
-      }</div>`,
-      "bag",
-    );
-    this.bindSpecies();
-    document.getElementById("bag-collection").onclick = () => this.guide();
-    document.querySelectorAll("[data-bag-tool]").forEach(
-      (b) =>
-        (b.onclick = () => {
-          s.selectedTool = b.dataset.bagTool;
-          this.game.save();
-          this.close();
-          this.updateToolbelt();
-        }),
-    );
+    this.satchel.open();
   }
   bindSpecies() {
     document
@@ -614,7 +604,7 @@ export class UI {
     this.show(
       "让旅程更合心意",
       "SETTINGS",
-      `<div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>左键 / J</kbd>武器攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>Z / 右键</kbd>狙击开镜 · 滚轮变倍</span><span><kbd>R</kbd>枪械装填 / 投石诱导</span><span><kbd>1—5</kbd>切换武器</span><span><kbd>↑ / ↓</kbd>切换道具</span><span><kbd>G</kbd>使用当前道具</span><span><kbd>V</kbd>主线虚线引导</span><span><kbd>L</kbd>跳关 / 首领战</span><span><kbd>K</kbd>旅途手记</span><span><kbd>M / B / I</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
+      `<div class="settings-spread"><section class="settings-preferences paper-leaf"><div class="book-page-heading"><span>旅途偏好</span><small>随心调整</small></div><div class="setting-row"><div>森林的声音<p>风声、轻柔旋律与交互反馈</p></div><button id="set-sound" aria-pressed="${s.settings.sound}">${s.settings.sound ? "已开启" : "已关闭"}</button></div><div class="setting-row"><div>画面品质<p>低画质降低阴影精度与渲染分辨率</p></div><button id="set-quality">${s.settings.quality === "high" ? "精致" : "流畅"}</button></div><div class="setting-row"><span>视角灵敏度</span><input id="set-sensitivity" aria-label="视角灵敏度" type="range" min="0.3" max="2" step="0.1" value="${s.settings.sensitivity}"/><output id="sensitivity-value">${s.settings.sensitivity.toFixed(1)}×</output></div></section><section class="settings-controls paper-leaf"><div class="book-page-heading"><span>旅人操作手册</span><small>记住几个常用的就好</small></div><div class="control-table"><span><kbd>W A S D</kbd>移动</span><span><kbd>${cameraHelp}</kbd>环视</span><span><kbd>Shift</kbd>奔跑</span><span><kbd>Space</kbd>跳跃</span><span><kbd>E</kbd>采集 / 交互</span><span><kbd>F</kbd>观察 / 拨草</span><span><kbd>左键 / J</kbd>武器攻击</span><span><kbd>Q</kbd>侧向闪避</span><span><kbd>Z / 右键</kbd>狙击开镜 · 滚轮变倍</span><span><kbd>R</kbd>枪械装填 / 投石诱导</span><span><kbd>1—5</kbd>切换武器</span><span><kbd>↑ / ↓</kbd>切换道具</span><span><kbd>G</kbd>使用当前道具</span><span><kbd>V</kbd>主线虚线引导</span><span><kbd>L</kbd>跳关 / 首领战</span><span><kbd>K</kbd>旅途手记</span><span><kbd>M / B / I</kbd>地图 / 背篓 / 图鉴</span><span><kbd>P</kbd>拍照</span></div></section></div><div class="panel-footer"><span>进度自动保存在当前浏览器</span>${this.game.desktopControls ? '<button id="resume-play">继续游戏 · 捕获鼠标</button>' : ""}<button id="save-exit">保存并返回标题</button></div>`,
       "settings",
     );
     $("set-sound").onclick = () => {
@@ -632,6 +622,7 @@ export class UI {
     };
     $("set-sensitivity").oninput = (e) => {
       s.settings.sensitivity = Number(e.target.value);
+      $("sensitivity-value").textContent = s.settings.sensitivity.toFixed(1) + "×";
       this.game.save();
     };
     if ($("resume-play"))
@@ -655,10 +646,21 @@ export class UI {
       "map",
     );
     this.drawMap($("large-map").getContext("2d"), 600, true);
-    $("panel-body").insertAdjacentHTML(
+    document.querySelector(".notebook-content").insertAdjacentHTML(
       "beforeend",
       `<div class="map-route-summary"><div><strong>⌖ ${target.name}</strong><small>距离 ${Math.round(Math.hypot(target.x - s.position.x, target.z - s.position.z))}m · 道具栏指南针 ×${s.tools.compass}</small></div><button id="map-guide-toggle">V · ${s.guidance ? "关闭" : "显示"}虚线引导</button></div><p class="map-compass-hint">右上罗盘指示目标方向 · 金色标记为当前目标 · 河心石台可沿浮桥抵达</p>${!s.riverNoteFound ? '<div class="map-clues"><button class="river-note" id="map-river"><span>▤</span><div><b>河心石台 · 未拾取的便笺</b><small>点击后由罗盘指向便笺 · V 始终引导主线</small></div></button></div>' : ""}${this.collection.cluesMarkup()}<div class="explore-map-links">${EXPLORATION_SPOTS.map((p) => `<button data-explore="${p.id}">◇ ${p.name}</button>`).join("")}<button data-explore="shop">山货铺</button></div>`,
     );
+    const mapPage = document.querySelector('.notebook-content');
+    const mapMain = document.createElement('section');
+    const mapNotes = document.createElement('aside');
+    mapMain.className = 'notebook-map-main';
+    mapNotes.className = 'notebook-map-notes';
+    mapNotes.setAttribute('aria-label', '地图情报与线索');
+    mapNotes.append(mapPage.querySelector('.boss-map-card'));
+    for (const child of [...mapPage.children]) {
+      (child.matches('.map-toolbar,.map-sheet,.map-legend,.map-note') ? mapMain : mapNotes).append(child);
+    }
+    mapPage.append(mapMain, mapNotes);
     $("map-zoom").onclick = () => {
       this.mapZoom = !this.mapZoom;
       this.map();

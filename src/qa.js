@@ -50,6 +50,32 @@ export function attachQA(game) {
     bar.append(b);
   };
   add("QA 开始", () => game.begin(true));
+  add('QA 手记满背篓', () => {
+    game.state.coins = 1286;
+    for (const [i, id] of Object.keys(game.state.inventory).entries()) game.state.inventory[id] = i + 2;
+    for (const [i, id] of Object.keys(game.state.collection.counts).entries()) {
+      game.state.collection.counts[id] = i + 3;
+      game.state.collection.stock[id] = i % 4 + 1;
+      game.state.collection.foundAt[id] = { day: i + 1, source: 'wild' };
+    }
+    for (const t of TOOL_DEFS) game.state.tools[t.id] = 3;
+    game.state.timber = 18;
+    game.state.achievements = ['采得漂亮', '采菌高手', '云南人看了都眼红', '这朵菌子，可遇不可求！', '好菌子，都藏在后面'];
+    game.ui.guide();
+    bar.hidden = true;
+    bar.style.display = 'none';
+  });
+  for (const [label, width, height] of [['QA 手记720p', 1280, 720], ['QA 手记600p', 1024, 600], ['QA 手记窄屏', 740, 680], ['QA 手记原尺寸', 0, 0]]) {
+    add(label, () => {
+      const backdrop = document.getElementById('modal-backdrop');
+      backdrop.style.width = width ? width + 'px' : '';
+      backdrop.style.height = height ? height + 'px' : '';
+      backdrop.style.right = width ? 'auto' : '';
+      backdrop.style.bottom = height ? 'auto' : '';
+      bar.hidden = true;
+    bar.style.display = 'none';
+    });
+  }
   let impactEnemy;
   let cameraAudit = '';
   add('QA 打击准备', () => {
